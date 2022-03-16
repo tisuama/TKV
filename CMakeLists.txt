@@ -9,8 +9,13 @@ message(STATUS "CXX compiler: ${CMAKE_CXX_COMPILER}, version: ${CMAKE_CXX_COMPIL
 include (FindThreads)
 
 find_package(OpenSSL REQUIRED)
-ADD_LIBRARY(ssl SHARED IMPORTED GLOBAL)
-ADD_LIBRARY(crypto SHARED IMPORTED GLOBAL)
+
+# glog
+find_path(GFLAGS_INCLUDE_DIR NAMES gflags/gflags.h)
+find_library(GFLAGS_LIBRARIES NAMES gflags)
+if ((NOT GFLAGS_INCLUDE_DIR) OR (NOT GFLAGS_LIBRARIES)) 
+	message(FATAL_ERROR "Fail to find glog")
+endif()
 
 # glog
 find_path(GLOG_INCLUDE_DIR NAMES glog/logging.h)
@@ -18,7 +23,6 @@ find_library(GLOG_LIBRARIES NAMES glog)
 if ((NOT GLOG_INCLUDE_DIR) OR (NOT GLOG_LIBRARIES)) 
 	message(FATAL_ERROR "Fail to find glog")
 endif()
-ADD_LIBRARY(glog SHARED IMPORTED GLOBAL)
 
 # brpc
 find_path(BRPC_INCLUDE_DIR NAMES brpc/server.h)
@@ -27,7 +31,7 @@ if ((NOT BRPC_INCLUDE_DIR) OR (NOT BRPC_LIBRARIES))
 	message(FATAL_ERROR "Fail to find brpc")
 endif()
 
-#braft
+# braft
 find_path(BRAFT_INCLUDE_DIR NAMES braft/raft.h)
 find_library(BRAFT_LIBRARIES NAMES braft)
 if ((NOT BRAFT_INCLUDE_DIR) OR (NOT BRAFT_LIBRARIES)) 
@@ -36,14 +40,34 @@ endif()
 
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto
+	${GFLAGS_INCLUDE_DIR}
+	${GLOG_INCLUDE_DIR}
+	${BRPC_INCLUDE_DIR}
+	${BRAFT_INCLUDE_DIR}
 )
+
+include_directories(
+	${DEP_INC}
+	include/
+	include/common/
+	)
 
 SET(DEP_LIB
 	${BRAFT_LIBRARIES}
 	${BRPC_LIBRARIES}
+	${GLOG_LIBRARIES}
+	${GFLAGS_LIBRARIES}
+	dl
+	ssl
+	crypto
 )
 
-SET(DEP_LIB
-	${DEP_LIB}
-	ssl
-)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -pipe -m64 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -pipe -m64 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(TKVMeta
+	src/meta/main.cpp
+	)
+target_link_libraries(TKVMeta ${DEP_LIB})

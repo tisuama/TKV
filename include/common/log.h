@@ -17,6 +17,7 @@
 #include <stdarg.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include "common/options.h"
 
 // CHECK LOG FORMAT AND NOT PRINT LOG
 #undef CHECK_LOG_FORMAT
@@ -150,7 +151,6 @@ inline void glog_error_writelog(const char* fmt, ...) {
     va_end(args);
     LOG(ERROR) << buf;
 }
-#ifndef CHECK_LOG_FORMAT
 
 #ifndef NDEBUG
 #define DB_DEBUG(_fmt_, args...) \
@@ -259,9 +259,9 @@ inline int init_log(const char* bin_name) {
     FLAGS_logbufsecs = 0;
     FLAGS_logtostderr = false;
     FLAGS_alsologtostderr = false;
-    ::google::SetLogDestination(google::GLOG_INFO, FLAGS_log_file);
-    ::google::SetLogDestination(google::GLOG_WARNING, FLAGS_log_file);
-    ::google::SetLogDestination(google::GLOG_ERROR, FLAGS_log_file);
+    ::google::SetLogDestination(google::GLOG_INFO, FLAGS_log_file.data());
+    ::google::SetLogDestination(google::GLOG_WARNING, FLAGS_log_file.data());
+    ::google::SetLogDestination(google::GLOG_ERROR, FLAGS_log_file.data());
 
     if (FLAGS_servitysinglelog) {
         auto old_logger1 = google::base::GetLogger(google::GLOG_INFO);
