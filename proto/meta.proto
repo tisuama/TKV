@@ -1,0 +1,162 @@
+syntax="proto2";
+import "common.proto";
+package TKV.pb;
+option cc_generic_services = true;
+
+enum Status {
+    NORMAL = 1;
+    FAULTY = 2;
+    DEAD = 3;
+    MIGERATE = 4;
+    FULL = 5;
+    SLOW = 6;
+};
+
+enum RegionStatus {
+    IDLE = 1;
+    DOING = 2;
+};
+
+enum PeerStatus {
+    STATUS_NORMAL = 0;
+    STATUS_UNSTABLE = 1; // add_peer?
+    STATUS_ERROR = 2;
+    STATUS_ILLEGAL_PEER = 3;
+    STATUS_NOT_HEARTBEAT = 4;
+    STATUS_NOT_LEADER = 5;
+    STATUS_SET_PEER = 6;
+    STATUS_INITED = 7;
+};
+
+message PeerStatusInfo {
+    optional string peer_id = 1;
+    optional PeerStatus peer_status = 2;
+    optional int64 table_id = 3;
+    optional uint32 timestamp = 4;
+    optional int64 region_id = 5;
+};
+
+message InstanceInfo {
+    required string address = 1;
+    optional int64 capacity = 2; 
+    optional int64 used_sze = 3;
+    optional string resouce_tag = 4;
+    optional string physical_room = 5;
+    optional Status status = 6;
+    optional string logical_room = 7;
+    optional string version = 8;
+    optional int64 raft_total_latency = 9;
+    optional int64 raft_total_qps = 10;
+    optional int64 select_latency = 11;
+    optional int64 select_qps = 12;
+    // The store id of this instance
+    optional int64 store_id = 13;
+};
+
+message SchemaHB {
+    required int64 talbe_id = 1;
+    required int64 version = 2;
+};
+
+message RegionInfo {
+    required int64 region_id = 1;
+    optional string table_name = 2;
+    required int64 talbe_id = 3;
+    required int64 replica_num = 4;
+    required int64 version = 5;
+    repeated string peers = 6;
+    optional string leader = 7;
+    optional int64 used_size = 8;
+    optional int64 log_index = 9;
+    optional bool deleted = 10; 
+    optional bool can_add_peer = 11;
+    optional int64 parent = 12;
+    optional uint32 timestamp = 13;
+    optional bool is_leader = 14;
+};
+
+message LeaderHB {
+    required RegionInfo region =  1;
+    optional RegionStatus status = 2;
+    repeated PeerStatusInfo peer_status = 3;
+};
+
+message PeerHB {
+    required int64 region_id = 1;
+    required int64 table_id = 2;
+    required int64 log_index = 3;
+    // no more need
+};
+
+message ReplicaDist {
+    required string logical_room = 1;
+    required int64 count = 2;
+};
+
+message SchemaInfo {
+    optional int64 talbe_id = 1;
+    required string table_name = 2;
+    optional string new_table_name = 3;
+    required string database = 4;
+    optional uint64 database_id = 5;
+    required string namespace_name = 6;
+    optional uint64 namespace_id = 7;
+    optional int64 region_size = 8;
+    optional int64 replica_num = 9;
+    repeated string init_store = 10;
+    optional bool deleted = 11;
+    optional uint32 timestamp = 12;
+    repeated ReplicaDist dists = 13;
+    optional string main_logical_room = 14;
+    optional int32 region_num = 15;
+    optional string comment = 16; 
+};
+
+message StoreHBRequest {
+    required InstanceInfo instance_info = 1;
+    repeated SchemaHB schema_info = 2;
+    repeated LeaderHB leader_info = 3;
+    repeated PeerHB peer_info = 4;
+};
+
+message AddPeer {
+    required int64 region_id = 1;
+    repeated string old_peers = 2;
+    repeated string new_peers = 3;
+};
+
+message TransLeaderRequest {
+    required int64 region_id = 1;
+    required string old_leader = 2;
+    required string new_leader = 3;
+    optional int64 table_id = 4;
+};
+
+message ParamDesc {
+    optional string key = 1;
+    optional string value = 2;
+    optional bool is_meta_param = 3;
+};
+
+message InstanceParam {
+    optional string resouce_tag_or_addr = 1;
+    repeated ParamDesc params = 2;
+};
+
+message StoreHBResponse {
+    required ErrorCode errcode = 1;
+    optional string errormsg = 2;
+    repeated SchemaInfo schema_change_info = 3;
+    repeated int64 deleted_region_ids = 4;
+    repeated AddPeer add_peers = 5;
+    optional string leader = 6;
+    repeated TransLeaderRequest trans_leader = 7;
+    repeated int64 trans_leader_table_id = 8;
+    repeated int64 trans_leader_count = 9;
+    repeated InstanceParam instance_param = 10;
+};
+
+service MetaService {
+    rpc store_heartbeat(StoreHBRequest) returns (StoreHBResponse);
+};
+/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
