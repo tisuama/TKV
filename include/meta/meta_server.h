@@ -6,6 +6,7 @@
 namespace TKV {
 class MetaServer: public pb::MetaService {
 public:
+    virtual ~MetaServer() {};
     
     int init(const std::vector<braft::PeerId>& peers);
 
@@ -18,8 +19,8 @@ public:
         static MetaServer meta_server;
         return &meta_server;
     }
-    MetaServer() {}
 private:
+    MetaServer() {};
     bthread::Mutex _meta_interact_mutex;
     // std::map<std::string, MetaServerInteract*> _meta_interact_map;
     // MetaStateMachine* _meta_state_machine = nullptr;
