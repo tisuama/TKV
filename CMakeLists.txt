@@ -18,18 +18,18 @@ if ((NOT GFLAGS_INCLUDE_DIR) OR (NOT GFLAGS_LIBRARIES))
 	message(FATAL_ERROR "Fail to find glog")
 endif()
 
-# glog(BRPC_WITH_GLOG)
-# find_path(GLOG_INCLUDE_DIR NAMES glog/logging.h)
-# find_library(GLOG_LIBRARIES NAMES glog)
-# if ((NOT GLOG_INCLUDE_DIR) OR (NOT GLOG_LIBRARIES)) 
-# 	message(FATAL_ERROR "Fail to find glog")
-# endif()
-
 # brpc
 find_path(BRPC_INCLUDE_DIR NAMES brpc/server.h)
 find_library(BRPC_LIBRARIES NAMES brpc)
 if ((NOT BRPC_INCLUDE_DIR) OR (NOT BRPC_LIBRARIES))
 	message(FATAL_ERROR "Fail to find brpc")
+endif()
+
+# rocksdb
+find_path(ROCKSDB_INCLUDE_DIR NAMES rocksdb/db.h)
+find_library(ROCKSDB_LIBRARIES NAMES rocksdb)
+if ((NOT ROCKSDB_INCLUDE_DIR) OR (NOT ROCKSDB_LIBRARIES)) 
+	mesage(FATAL_ERROR "Fail to find rocksdb")
 endif()
 
 # braft
@@ -63,12 +63,18 @@ file(GLOB META_SERVER
 	)
 add_library(meta_server_lib OBJECT ${META_SERVER})
 
+file(GLOB ENGINE_SRC
+	src/engine/*.cpp
+	)
+add_library(engine_src_lib OBJECT ${ENGINE_SRC})
+
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto/
 	${GFLAGS_INCLUDE_DIR}
 	${BRPC_INCLUDE_DIR}
 	${BRAFT_INCLUDE_DIR}
 	${PROTOBUF_INCLUDE_DIR}
+	${ROCKSDB_INCLUDE_DIR}
 )
 
 include_directories(
@@ -83,6 +89,7 @@ SET(DEP_LIB
 	${BRAFT_LIBRARIES}
 	${BRPC_LIBRARIES}
 	${PROTOBUF_LIBRARIES}
+	${ROCKSDB_LIBRARIES}
 	dl
 	ssl
 	crypto
@@ -96,5 +103,6 @@ add_executable(TKVMeta
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:meta_server_lib>
+	$<TARGET_OBJECTS:engine_src_lib>
 	)
 target_link_libraries(TKVMeta ${DEP_LIB})

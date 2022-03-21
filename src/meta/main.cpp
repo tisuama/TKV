@@ -45,8 +45,14 @@ int main(int argc, char** argv) {
         DB_FATAL("Fail to Add meta_server Service");
         return -1;
     }
-
-    // Start server at port
+    if (server.Start(addr, NULL)) {
+        DB_FATAL("Fail to start server");
+        return -1;
+    }
+    if (meta_server->init(peers)) {
+        DB_FATAL("Meta server init failed");
+        return -1;
+    }
 }
 
 
