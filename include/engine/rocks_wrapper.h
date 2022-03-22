@@ -17,9 +17,9 @@ namespace TKV {
 using rocksdb::Status;
 class RocksWrapper {
 public:
-    static const std::string RAFT_LOG_CF;
-    static const std::string DATA_CF;
-    static const std::string METAINFO_CF;
+    static const std::string RAFT_LOG_CF {"raft_log"};
+    static const std::string DATA_CF {"data"};
+    static const std::string METAINFO_CF {"meta_info"};
     static std::atomic<int64_t> raft_cf_remove_range_count;
     static std::atomic<int64_t> data_cf_remove_range_count;
     static std::atomic<int64_t> meta_cf_remove_range_count;
@@ -129,12 +129,12 @@ public:
         return _flush_file_num;
     }
 private:
-    RocksWrapper();
+    RocksWrapper(): _is_init(false), _db{nullptr} {}
     std::string _db_path;
     bool _is_init {false};
 
-    rocksdb::DB* _db;
-    rocksdb::Cache* _cache;
+    rocksdb::DB* _db {nullptr};
+    rocksdb::Cache* _cache {nullptr};
 
     std::map<std::string, rocksdb::ColumnFamilyHandle*> _column_families;
     
