@@ -1,3 +1,4 @@
+#include <rocksdb/filter_policy.h>
 #include "engine/rocks_wrapper.h"
 #include "common/common.h"
 
@@ -24,14 +25,18 @@ DEFINE_int64(rocks_flush_memtable_interval_us, 10 * 60 * 1000 * 1000LL,  "rocks_
 DEFINE_int32(rocks_max_background_jobs, 24, "rocks_max_background_jobs, default: 24");
 DEFINE_int32(rocks_max_write_buffer_number, 6, "rocks_max_write_buffer_number, default: 6");
 DEFINE_int32(rocks_write_buffer_size, 128 * 1024 * 1024, "rocks_write_buffer_size");
-DEFINE_int32(rocks_min_write_buffer_num_to_merge, 2, "rocks_min_write_buffer_num_to_merge");
+DEFINE_int32(rocks_min_write_buffer_number_to_merge, 2, "rocks_min_write_buffer_num_to_merge");
 DEFINE_int32(rocks_level0_file_num_compaction_trigger, 5, "Number of files to trigger level0 compaction");
 DEFINE_int32(rocks_max_bytes_for_level_base, 1024 * 1024 * 1024, "level1's total size");
 DEFINE_int32(rocks_target_file_size_base, 128 * 1024 * 1024, "rocks_target_file_size_base");
 DEFINE_int32(addpeer_rate_limit_level, 1, "0: no limit, 1: limit when stall, 2: limit when compaction pending, default: 1");
 DEFINE_bool(rocks_delete_files_in_range, true, "delete files in range");
 DEFINE_bool(rocks_enable_bottommost_compression, false, "rocks_enable_bottommost_compression");
+DEFINE_bool(rocks_kSkipAnyCorruptedRecords, false, "rocks_kSkipAnyCorruptedRecords");
 
+const std::string RocksWrapper::RAFT_LOG_CF = "raft_log";
+const std::string RocksWrapper::DATA_CF = "data_cf";
+const std::string RocksWrapper::METAINFO_CF = "meta_info";
 int32_t RocksWrapper::init(const std::string& path) {
     if (_is_init) return 0;
     rocksdb::BlockBasedTableOptions table_options;
@@ -42,27 +47,27 @@ int32_t RocksWrapper::init(const std::string& path) {
         table_options.cache_index_and_filter_blocks = true;
         table_options.pin_top_level_index_and_filter = true;
         table_options.cache_index_and_filter_blocks_with_high_priority = true;
-        table_options.pin_l0_filter_and_index_block_in_cache = true;
-        table_options.block_cache = rocksdb::NewLRUCache(FLAGS_block_cache_size_mb * 1024 * 1024LL, 8, false, FLAGS_rocks_high_pri_pool_ratio);
-        FLAGS_rocks_max_open_files = -1;'
+        table_options.pin_l0_filter_and_index_blocks_in_cache = true;
+        table_options.block_cache = rocksdb::NewLRUCache(FLAGS_rocks_block_cache_size_mb * 1024 * 1024LL, 8, false, FLAGS_rocks_high_pri_pool_ratio);
+        FLAGS_rocks_max_open_files = -1;
     } else {
         table_options.data_block_index_type = rocksdb::BlockBasedTableOptions::kDataBlockBinaryAndHash;
         table_options.block_cache = rocksdb::NewLRUCache(FLAGS_rocks_block_cache_size_mb * 1024 * 1024LL, 8);
     }
     table_options.format_version = 4;
     table_options.block_size = FLAGS_rocks_block_size;
-    table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(10));
     _cache = table_options.block_cache.get();
+    table_options.filter_policy.reset(rocksdb::NewBloomFilterPolicy(10));
 
     // rocksdb option
     rocksdb::Options db_options;
-    db_options.IncreaseParalleism(FLAGS_max_background_jobs);
+    db_options.IncreaseParallelism(FLAGS_rocks_max_background_jobs);
     db_options.create_if_missing = true;
     db_options.max_open_files = FLAGS_rocks_max_open_files;
     db_options.skip_stats_update_on_db_open = FLAGS_rocks_skip_stats_update_on_db_open;
     db_options.compaction_readahead_size = FLAGS_rocks_compaction_readahead_size;
     db_options.WAL_ttl_seconds = 10 * 60;
-    db_options.WAL_size_limit_mb = 0;
+    db_options.WAL_size_limit_MB = 0;
     db_options.max_background_compactions = FLAGS_rocks_max_background_compactions;
     if (FLAGS_rocks_kSkipAnyCorruptedRecords) {
         db_options.wal_recovery_mode = rocksdb::WALRecoveryMode::kSkipAnyCorruptedRecords; 
@@ -75,44 +80,44 @@ int32_t RocksWrapper::init(const std::string& path) {
     // log cf
     // prefix_extractor need to cal again
     _log_cf_option.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(sizeof(uint64_t) + 1));
-    _log_cf_option.OptimizedLevelStyleCompaction();
+    _log_cf_option.OptimizeLevelStyleCompaction();
     _log_cf_option.compaction_pri = rocksdb::kOldestLargestSeqFirst;
     _log_cf_option.level0_file_num_compaction_trigger = 5;
     _log_cf_option.level0_slowdown_writes_trigger = FLAGS_rocks_slowdown_write_sst_cnt;
-    _log_cf_option.level0_stop_writes_trigger = FLAGS_rocks_stop_rite_sst_cnt;
+    _log_cf_option.level0_stop_writes_trigger = FLAGS_rocks_stop_write_sst_cnt;
     _log_cf_option.target_file_size_base = FLAGS_rocks_target_file_size_base;
-    _log_cf_option.max_byte_for_level_base = 1024 * 1024 * 1024;
+    _log_cf_option.max_bytes_for_level_base = 1024 * 1024 * 1024;
     _log_cf_option.level_compaction_dynamic_level_bytes = FLAGS_rocks_data_dynamic_level_bytes;
     _log_cf_option.max_write_buffer_number = FLAGS_rocks_max_write_buffer_number;
-    _log_cf_option.max_write_buffer_nummber_to_maintain = FLAGS_rocks_max_write_buffer_number;
+    _log_cf_option.max_write_buffer_number_to_maintain = _log_cf_option.max_write_buffer_number;
     _log_cf_option.write_buffer_size = FLAGS_rocks_write_buffer_size;
     _log_cf_option.min_write_buffer_number_to_merge = FLAGS_rocks_min_write_buffer_number_to_merge;
 
     // data cf 
     _data_cf_option.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(sizeof(uint64_t) * 2));
-    _data_cf_option.OptimizedLevelStyleCompaction();
-    _data_cf_option.compaction_pri = static_cast<rocksdb::ComapctionPri>(FLAGS_rocks_data_compation_pri);
+    _data_cf_option.OptimizeLevelStyleCompaction();
+    _data_cf_option.compaction_pri = static_cast<rocksdb::CompactionPri>(FLAGS_rocks_data_compaction_pri);
     // need to impl compaction filter first to set
     // _data_cf_option.compaction_filter = SplitCompactionFilter::get_instance();
     _data_cf_option.table_factory.reset(rocksdb::NewBlockBasedTableFactory(table_options));
     _data_cf_option.compaction_style = rocksdb::kCompactionStyleLevel;
-    _data_cf_option.optimize_filters_for_hit = FLAGS_rocks_optimize_filters_for_hit;
+    _data_cf_option.optimize_filters_for_hits = FLAGS_rocks_optimize_filter_for_hits;
     _data_cf_option.level0_file_num_compaction_trigger = FLAGS_rocks_level0_file_num_compaction_trigger;
     _data_cf_option.level0_slowdown_writes_trigger = FLAGS_rocks_slowdown_write_sst_cnt;
-    _data_cf_option.level0_stop_writes_trigger = FLAGS_rocks_stop_rite_sst_cnt;
+    _data_cf_option.level0_stop_writes_trigger = FLAGS_rocks_stop_write_sst_cnt;
     _data_cf_option.target_file_size_base = FLAGS_rocks_target_file_size_base;
     _data_cf_option.level_compaction_dynamic_level_bytes = FLAGS_rocks_data_dynamic_level_bytes;
-    _data_cf_option.max_bytes_for_level_multiplier = FLAGS_rocks_max_bytes_for_level_multiplier;
+    _data_cf_option.max_bytes_for_level_multiplier = FLAGS_rocks_level_multiplier;
     _data_cf_option.hard_pending_compaction_bytes_limit = FLAGS_rocks_hard_pending_compaction_g * 1073741824ull;
     _data_cf_option.soft_pending_compaction_bytes_limit = FLAGS_rocks_soft_pending_compaction_g * 1073741824ull;
 
     _data_cf_option.max_write_buffer_number = FLAGS_rocks_max_write_buffer_number;
-    _data_cf_option.max_write_buffer_nummber_to_maintain = FLAGS_rocks_max_write_buffer_number;
+    _data_cf_option.max_write_buffer_number_to_maintain = _data_cf_option.max_write_buffer_number;
     _data_cf_option.write_buffer_size = FLAGS_rocks_write_buffer_size;
     _data_cf_option.min_write_buffer_number_to_merge = FLAGS_rocks_min_write_buffer_number_to_merge;
     _data_cf_option.max_bytes_for_level_base = FLAGS_rocks_max_bytes_for_level_base; 
     // compression 
-    if (FLAGS_enable_bottommost_compression) {
+    if (FLAGS_rocks_enable_bottommost_compression) {
         _data_cf_option.bottommost_compression_opts.enabled = true;
         _data_cf_option.bottommost_compression = rocksdb::kZSTD;
         _data_cf_option.bottommost_compression_opts.max_dict_bytes = 1 << 14;
@@ -121,8 +126,57 @@ int32_t RocksWrapper::init(const std::string& path) {
 
 
     // meta cf
+    _meta_cf_option.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(1));
+    _meta_cf_option.OptimizeLevelStyleCompaction();
+    _meta_cf_option.compaction_pri = rocksdb::kOldestLargestSeqFirst;
+    _meta_cf_option.level_compaction_dynamic_level_bytes = FLAGS_rocks_data_dynamic_level_bytes;
+    _meta_cf_option.max_write_buffer_number_to_maintain = _meta_cf_option.max_write_buffer_number;
 
+    // open db
+    _db_path = path;
+
+    std::vector<std::string> column_family_names;
+    rocksdb::Status s;
+    s = rocksdb::DB::ListColumnFamilies(db_options, path, &column_family_names);
+    if (!s.ok()) {
+        s = rocksdb::DB::Open(db_options, path, &_db);
+        if (s.ok()) {
+            DB_WARNING("open db: %s sucess", path.data());
+        } else {
+            DB_FATAL("open db: %s failed", path.data());
+            return -1;
+        }
+    } else {
+        std::vector<rocksdb::ColumnFamilyDescriptor> column_family_desc;
+        std::vector<rocksdb::ColumnFamilyHandle*> handles;
+        for (auto& c : column_family_names) {
+            if (c == RAFT_LOG_CF) {
+                column_family_desc.push_back(rocksdb::ColumnFamilyDescriptor(RAFT_LOG_CF, _log_cf_option));
+            } else if (c == DATA_CF) {
+                column_family_desc.push_back(rocksdb::ColumnFamilyDescriptor(DATA_CF, _data_cf_option));
+            } else if (c == METAINFO_CF) {
+                column_family_desc.push_back(rocksdb::ColumnFamilyDescriptor(METAINFO_CF, _meta_cf_option));
+            } else {
+                column_family_desc.push_back(rocksdb::ColumnFamilyDescriptor(c, rocksdb::ColumnFamilyOptions()));
+                DB_WARNING("column_family_desc push column_family_name: %s for default", c.data());
+            }
+        }
+        s = rocksdb::DB::Open(db_options, path, column_family_desc, &handles, &_db);
+        if (s.ok()) {
+            DB_WARNING("reopen db: %s sucess", path.data());
+            for (auto& h : handles) {
+                _column_families[h->GetName()] = h;
+                DB_WARNING("open column family: %s", h->GetName().data());
+            }
+        } else {
+            DB_FATAL("reopen db: %s, error message: %s", path.data(), s.ToString().data());
+            return -1;
+        }
+    } 
     return 0;
+}
+
+RocksWrapper::~RocksWrapper() {
 }
 } // namespace TKV
 

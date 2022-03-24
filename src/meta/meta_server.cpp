@@ -1,4 +1,5 @@
 #include "meta/meta_server.h"
+#include "engine/rocks_wrapper.h"
 
 namespace TKV {
 void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
@@ -9,6 +10,8 @@ void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
 }
 
 int MetaServer::init(const std::vector<braft::PeerId>& peers) {
+    auto _db = RocksWrapper::get_instance(); 
+    _db->init("raft");
     return 0;
 }
 } //namespace of TKV

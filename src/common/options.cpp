@@ -10,8 +10,6 @@ DEFINE_int32(meta_replica_number, 3, "replicas of meta server");
 
 
 // rocksdb
-DEFINE_int32(rocks_max_background_compactions, 20, "max background_compactions");
-DEFINE_int32(addpeer_rate_limit_level, 1, "addpeer_rate_limit_level");
 }
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -17,9 +17,9 @@ namespace TKV {
 using rocksdb::Status;
 class RocksWrapper {
 public:
-    static const std::string RAFT_LOG_CF {"raft_log"};
-    static const std::string DATA_CF {"data"};
-    static const std::string METAINFO_CF {"meta_info"};
+    static const std::string RAFT_LOG_CF;
+    static const std::string DATA_CF;
+    static const std::string METAINFO_CF;
     static std::atomic<int64_t> raft_cf_remove_range_count;
     static std::atomic<int64_t> data_cf_remove_range_count;
     static std::atomic<int64_t> meta_cf_remove_range_count;
