@@ -139,6 +139,7 @@ int32_t RocksWrapper::init(const std::string& path) {
     rocksdb::Status s;
     s = rocksdb::DB::ListColumnFamilies(db_options, path, &column_family_names);
     if (!s.ok()) {
+        // new db
         s = rocksdb::DB::Open(db_options, path, &_db);
         if (s.ok()) {
             DB_WARNING("open db: %s sucess", path.data());
@@ -173,6 +174,40 @@ int32_t RocksWrapper::init(const std::string& path) {
             return -1;
         }
     } 
+    // check column_family
+    if (_column_families.count(RAFT_LOG_CF) == 0) {
+        rocksdb::ColumnFamilyHandle* raft_log_handle;
+        s = _db->CreateColumnFamily(_log_cf_option, RAFT_LOG_CF, &raft_log_handle);
+        if (s.ok()) {
+            DB_WARNING("create column_family %s sucess", RAFT_LOG_CF.data());
+            _column_families[RAFT_LOG_CF] = raft_log_handle;
+        } else {
+            DB_WARNING("create column_family %s failed", RAFT_LOG_CF.data());
+            return -1;
+        }
+    }
+    if (_column_families.count(DATA_CF) == 0) {
+        rocksdb::ColumnFamilyHandle* data_handle;
+        s = _db->CreateColumnFamily(_data_cf_option, DATA_CF, &data_handle);
+        if (s.ok()) {
+            DB_WARNING("create column_family %s sucess", DATA_CF.data());
+            _column_families[DATA_CF] = data_handle;
+        } else {
+            DB_WARNING("create column_family %s failed", DATA_CF.data());
+            return -1;
+        }
+    }
+    if (_column_families.count(METAINFO_CF) == 0) {
+        rocksdb::ColumnFamilyHandle* meta_info_handle;
+        s = _db->CreateColumnFamily(_meta_cf_option, METAINFO_CF, &meta_info_handle);
+        if (s.ok()) {
+            DB_WARNING("create column_family %s sucess", METAINFO_CF.data());
+            _column_families[METAINFO_CF] = meta_info_handle;
+        } else {
+            DB_WARNING("create column_family %s failed", METAINFO_CF.data());
+            return -1;
+        }
+    }
     return 0;
 }
 
