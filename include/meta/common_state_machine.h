@@ -15,6 +15,7 @@ public:
         , _dummy_region_id(dummy_region_id)
         , _file_path(file_path)
         , _check_migrate(&BTHREAD_ATTR_SMALL) {}  
+
     virtual ~CommonStateMachine() {}
     virtual int init(const std::vector<braft::PeerId>& peers);
 
@@ -30,10 +31,6 @@ public:
     virtual void check_migrate();
     virtual void on_apply(braft::Iterator& iter) = 0;
 
-    virtual void on_shutdown() {
-        DB_WARNING("region_id: %ld raft is shutdown now", _dummy_region_id);
-    }
-    
     virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) = 0;
     virtual int on_snapshot_load(braft::SnapshotReader* reader) = 0;
     virtual void on_leader_start();
@@ -44,6 +41,10 @@ public:
     virtual void on_configuration_committed(const braft::Configuration& conf);
     void start_check_bns();
 
+    virtual void on_shutdown() {
+        DB_WARNING("region_id: %ld raft is shutdown now", _dummy_region_id);
+    }
+    
     virtual butil::EndPoint get_leader() {
         return _node.leader_id().addr;
     }
@@ -67,8 +68,6 @@ public:
         _have_data = flag;
     }
 
-private:
-    virtual int send_set_peer_request(bool remove_peer, const std::string& change_peer);
 
 protected:
     braft::Node          _node;
@@ -77,6 +76,8 @@ protected:
     std::string          _file_path;
 
 private:
+    virtual int send_set_peer_request(bool remove_peer, const std::string& change_peer);
+
     Bthread _check_migrate;
     bool    _check_state  {false};
     bool    _have_data    {false};
