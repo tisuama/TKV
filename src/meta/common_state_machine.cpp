@@ -6,7 +6,6 @@ DECLARE_int32(meta_replica_number);
 
 DEFINE_int32(snapshot_interval_s, 600, "raft snapshot interval");
 DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms)");
-// DEFINE_string(log_uri, "myraftlog://my_raft_log?id=", "raft log uri");
 DEFINE_string(log_uri, "local://./raft_data/raft_log", "raft log uri");
 DEFINE_string(stable_uri, "local://./raft_data/stable", "raft stable uri");
 DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");

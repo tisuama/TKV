@@ -4,6 +4,8 @@
 namespace TKV {
 DECLARE_int32(meta_port); 
 DECLARE_int32(meta_replica_num);
+DECLARE_bool(meta_with_any_ip);
+DECLARE_string(meta_ip);
 
 void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
      const ::TKV::pb::StoreHBRequest* request,
@@ -25,7 +27,11 @@ void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
 int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     
     butil::EndPoint addr;
-    addr.ip = butil::my_ip();
+    if (FLAGS_meta_with_any_ip) {
+        addr.ip = butil::my_ip();
+    } else {
+        butil::str2ip(FLAGS_meta_ip.data(), &addr.ip);
+    }
     addr.port = FLAGS_meta_port;
     braft::PeerId peer_id(addr, 0);
     _meta_state_machine = new (std::nothrow)MetaStateMachine(peer_id);

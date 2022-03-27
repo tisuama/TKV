@@ -53,6 +53,16 @@ int main(int argc, char** argv) {
         DB_FATAL("Meta server init failed");
         return -1;
     }
+
+    while (!brpc::IsAskedToQuit()) {
+        bthread_usleep(1000000L);
+    }
+    DB_WARNING("receive kill signal, begin to quit");
+    
+    server.Stop(0);
+    server.Join();
+    DB_WARNING("meta server quit sucess");
+    return 0;
 }
 
 
