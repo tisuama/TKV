@@ -37,6 +37,11 @@ DEFINE_bool(rocks_kSkipAnyCorruptedRecords, false, "rocks_kSkipAnyCorruptedRecor
 const std::string RocksWrapper::RAFT_LOG_CF = "raft_log";
 const std::string RocksWrapper::DATA_CF = "data_cf";
 const std::string RocksWrapper::METAINFO_CF = "meta_info";
+// define here
+std::atomic<int64_t> RocksWrapper::raft_cf_remove_range_count {0};
+std::atomic<int64_t> RocksWrapper::data_cf_remove_range_count {0};
+std::atomic<int64_t> RocksWrapper::meta_cf_remove_range_count {0};
+
 int32_t RocksWrapper::init(const std::string& path) {
     if (_is_init) return 0;
     rocksdb::BlockBasedTableOptions table_options;
@@ -208,11 +213,102 @@ int32_t RocksWrapper::init(const std::string& path) {
             return -1;
         }
     }
+    _is_init = true;
+    DB_WARNING("rocksdb init sucess");
     return 0;
 }
 
-RocksWrapper::~RocksWrapper() {
+
+Status RocksWrapper::remove_range(const rocksdb::WriteOptions& options,
+                    rocksdb::ColumnFamilyHandle* column_family,
+                    const rocksdb::Slice& begin, 
+                    const rocksdb::Slice& end,
+                    bool delete_files_in_range) {
+    auto raft_cf = get_raft_log_handle();
+    auto data_cf = get_data_handle();
+    auto meta_cf = get_meta_info_handle();
+    if (raft_cf != nullptr && column_family->GetID() == raft_cf->GetID()) {
+        raft_cf_remove_range_count++;
+    } else if (data_cf != nullptr && column_family->GetID() == data_cf->GetID()) {
+        data_cf_remove_range_count++;
+    } else if (meta_cf != nullptr && column_family->GetID() == meta_cf->GetID()) {
+        meta_cf_remove_range_count++;
+    }
+    if (delete_files_in_range && FLAGS_rocks_delete_files_in_range) {
+        auto s = rocksdb::DeleteFilesInRange(_db, column_family, &begin, &end, false);
+        if (!s.ok()) {
+            return s;
+        }
+    }
+    rocksdb::WriteBatch batch;
+    batch.DeleteRange(column_family, begin, end);
+    return _db->Write(options, &batch);
 }
+
+int32_t RocksWrapper::delete_column_family(const std::string& cf_name) {
+    if (_column_families.count(cf_name) == 0) {
+        DB_FATAL("delete column family %s failed", cf_name.data());
+        return -1;
+    } 
+    auto cf_hander = _column_families[cf_name];
+    auto s = _db->DropColumnFamily(cf_hander);
+    if (!s.ok()) {
+        DB_WARNING("drop column family %s failed, error msg: %s",
+                cf_name.data(), s.ToString().data());
+        return -1;
+    }
+    s = _db->DestroyColumnFamilyHandle(cf_hander);
+    if (!s.ok()) {
+        DB_WARNING("drop column family %s failed, error mgs: %s", 
+                cf_name.data(), s.ToString().data());
+        return -1;
+    }
+    _column_families.erase(cf_name);
+    return 0;
+}
+
+int32_t RocksWrapper::create_column_family(const std::string& cf_name) {
+    if (_column_families.count(cf_name) != 0) {
+        DB_FATAL("column family: %s is already exist", cf_name.data());
+        return -1;
+    }
+    rocksdb::ColumnFamilyHandle* cf_handle = nullptr;
+    auto s = _db->CreateColumnFamily(_data_cf_option, cf_name, &cf_handle);
+    if (s.ok()) {
+        DB_WARNING("create column family %s sucess", cf_name.data());
+        _column_families[cf_name] = cf_handle;
+        return 0;
+    } else {
+        DB_FATAL("create column family %s failed", cf_name.data());
+        return -1;
+    }
+
+}
+
+rocksdb::ColumnFamilyHandle* RocksWrapper::get_raft_log_handle() {
+    if (!_is_init || _column_families.count(RAFT_LOG_CF) == 0) {
+        DB_FATAL("db has not been init or raft log not init");
+        return nullptr;
+    }
+    return _column_families[RAFT_LOG_CF];
+}
+
+rocksdb::ColumnFamilyHandle* RocksWrapper::get_data_handle() {
+    if (!_is_init || _column_families.count(DATA_CF) == 0) {
+        DB_FATAL("db has not been init or raft log not init");
+        return nullptr;
+    }
+    return _column_families[RAFT_LOG_CF];
+}
+
+rocksdb::ColumnFamilyHandle* RocksWrapper::get_meta_info_handle() {
+    if (!_is_init || _column_families.count(METAINFO_CF) == 0) {
+        DB_FATAL("db has not been init or raft log not init");
+        return nullptr;
+    }
+    return _column_families[METAINFO_CF];
+}
+
 } // namespace TKV
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -4,9 +4,19 @@
 #include "common/common.h"
 
 namespace TKV {
+#define RETURN_IF_NOT_INIT(init, response, log_id) \
+    do {\
+        if (!init) {\
+            DB_WARNING("have not init, log_id: %lu", log_id);\
+            response->set_errcode(pb::HAVE_NOT_INIT);\
+            response->set_errmsg("have not init");\
+            return ;\
+        }\
+    } while(0);
+
 class MetaServer: public pb::MetaService {
 public:
-    virtual ~MetaServer() {};
+    virtual ~MetaServer() {}
     
     int init(const std::vector<braft::PeerId>& peers);
 
@@ -20,10 +30,10 @@ public:
         return &meta_server;
     }
 private:
-    MetaServer() {};
+    MetaServer() {}
     bthread::Mutex _meta_interact_mutex;
     // std::map<std::string, MetaServerInteract*> _meta_interact_map;
-    // MetaStateMachine* _meta_state_machine = nullptr;
+    MetaStateMachine* _meta_state_machine = nullptr;
     Bthread _flush_bth;
     Bthread _apply_region_bth;
     bool _init_sucess = false;

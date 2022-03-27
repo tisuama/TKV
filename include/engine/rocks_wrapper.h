@@ -24,7 +24,7 @@ public:
     static std::atomic<int64_t> data_cf_remove_range_count;
     static std::atomic<int64_t> meta_cf_remove_range_count;
     
-    virtual ~RocksWrapper();
+    virtual ~RocksWrapper() {};
     static RocksWrapper* get_instance() {
         static RocksWrapper _instance;
         return &_instance;
@@ -75,6 +75,7 @@ public:
                         const rocksdb::Slice& begin, 
                         const rocksdb::Slice& end,
                         bool delete_files_in_range);
+
     rocksdb::Iterator* new_iterator(const rocksdb::ReadOptions& options,
                                     rocksdb::ColumnFamilyHandle* column_family) {
         return _db->NewIterator(options, column_family);
@@ -92,7 +93,7 @@ public:
         return _db->IngestExternalFile(column_family, external_file, options);
     }
 
-    rocksdb::ColumnFamilyHandle* get_raft_log_hande();
+    rocksdb::ColumnFamilyHandle* get_raft_log_handle();
     rocksdb::ColumnFamilyHandle* get_data_handle();
     rocksdb::ColumnFamilyHandle* get_meta_info_handle();
     rocksdb::DB* get_db() {

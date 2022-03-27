@@ -7,6 +7,16 @@ void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
      ::TKV::pb::StoreHBResponse* response,
      ::google::protobuf::Closure* done) {
     // store heartbeat for MetaServer
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    RETURN_IF_NOT_INIT(_init_sucess, response, log_id); 
+    if (_meta_state_machine) {
+        _meta_state_machine->store_heartbeat(controller, request, response, done_guard.release());
+    }
 }
 
 int MetaServer::init(const std::vector<braft::PeerId>& peers) {
