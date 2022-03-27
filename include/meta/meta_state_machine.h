@@ -6,8 +6,31 @@
 namespace TKV {
 class MetaStateMachine: public CommonStateMachine {
 public:
-    MetaStateMachine(const braft::PeerId& peerid) 
-        : CommonStateMachine(0, "meta_raft", "/meta_server", peerid)
+    MetaStateMachine(const braft::PeerId& peer_id) 
+        : CommonStateMachine(0, "meta_raft", "/meta_server", peer_id)
+        , _bth(&BTHREAD_ATTR_SMALL)
+        , _health_check_start(false)
+        , _tkv_heart_beat("tkv_heart_beat")
+        , _store_heart_beat("store_heart_beat") {
+        bthread_mutex_init(&_param_mutex, NULL);
+    }  
+    
+    virtual ~MetaStateMachine() {
+        bthread_mutex_destroy(&_param_mutex);
+    }
+    
+    // raft 
+    virtual void on_apply(braft::Iterator& iter) override;
+    virtual void on_snapshot_save(braft::SnapshotWriter* writer,
+                                  braft::Closure* done) override;
+    virtual int on_snapshot_load(braft::SnapshotReader* reader) override;
+    
+    // service
+
+    void store_heartbeat(::google::protobuf::RpcController* controller,
+                         const ::TKV::pb::StoreHBRequest* request,
+                         ::TKV::pb::StoreHBResponse* response,
+                         ::google::protobuf::Closure* done);
 private:
     void save_snapshot(braft::Closure* done, 
                        rocksdb::Iterator* iter, 
@@ -30,9 +53,9 @@ private:
     bool    _unsafe_decision = false;
     int64_t _applied_index   = 0;
 
-    bvar::LatencyReocrder _tkv_heart_beat;
+    bvar::LatencyRecorder _tkv_heart_beat;
     bvar::LatencyRecorder _store_heart_beat;
-}
+};
 } // namespace TKV
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

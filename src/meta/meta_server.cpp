@@ -2,6 +2,9 @@
 #include "engine/rocks_wrapper.h"
 
 namespace TKV {
+DECLARE_int32(meta_port); 
+DECLARE_int32(meta_replica_num);
+
 void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
      const ::TKV::pb::StoreHBRequest* request,
      ::TKV::pb::StoreHBResponse* response,
@@ -20,6 +23,23 @@ void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
 }
 
 int MetaServer::init(const std::vector<braft::PeerId>& peers) {
+    
+    butil::EndPoint addr;
+    addr.ip = butil::my_ip();
+    addr.port = FLAGS_meta_port;
+    braft::PeerId peer_id(addr, 0);
+    _meta_state_machine = new (std::nothrow)MetaStateMachine(peer_id);
+    if (_meta_state_machine == NULL) {
+        DB_FATAL("new meta state machine failed");
+        return -1;
+    }
+    auto ret = _meta_state_machine->init(peers);
+    if (ret != 0) {
+        DB_FATAL("meta state machine init failed");
+        return -1;
+    }
+    DB_WARNING("meta state machine init sucess");
+     
     return 0;
 }
 } //namespace of TKV

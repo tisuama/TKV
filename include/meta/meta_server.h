@@ -1,6 +1,7 @@
 #pragma once
 #include <braft/raft.h>
 #include "proto/meta.pb.h"
+#include "meta/meta_state_machine.h"
 #include "common/common.h"
 
 namespace TKV {

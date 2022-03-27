@@ -145,7 +145,7 @@ message InstanceParam {
 
 message StoreHBResponse {
     required ErrorCode errcode = 1;
-    optional string errormsg = 2;
+    optional string errmsg = 2;
     repeated SchemaInfo schema_change_info = 3;
     repeated int64 deleted_region_ids = 4;
     repeated AddPeer add_peers = 5;

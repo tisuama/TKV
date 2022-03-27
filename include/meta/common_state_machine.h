@@ -19,25 +19,20 @@ public:
     virtual ~CommonStateMachine() {}
     virtual int init(const std::vector<braft::PeerId>& peers);
 
-    virtual void raft_control(google::protobuf::RpcController* controller,
-            const pb::RaftControlRequest* request,
-            pb::RaftControlResponse* response,
-            google::protobuf::Closure* done); 
-    virtual void process(google::protobuf::RpcController* controller,
-            const pb::MetaManagerRequest* request, 
-            pb::MetaManagerResponse* response,
-            google::protobuf::Closure* done);
     virtual void start_check_migrate();
     virtual void check_migrate();
-    virtual void on_apply(braft::Iterator& iter) = 0;
 
-    virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) = 0;
+    // must impl by meta_state_machine
+    virtual void on_apply(braft::Iterator& iter) = 0;
+    virtual void on_snapshot_save(braft::SnapshotWriter* writer, 
+                                  braft::Closure* done) = 0;
     virtual int on_snapshot_load(braft::SnapshotReader* reader) = 0;
+
     virtual void on_leader_start();
     virtual void on_leader_start(int64_t term);
     virtual void on_leader_stop();
     virtual void on_leader_stop(const butil::Status& status);
-    virtual void on_error(const butil::Error& e);
+    virtual void on_error(const braft::Error& e);
     virtual void on_configuration_committed(const braft::Configuration& conf);
     void start_check_bns();
 
