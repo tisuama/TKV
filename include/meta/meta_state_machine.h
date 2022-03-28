@@ -25,8 +25,7 @@ public:
                                   braft::Closure* done) override;
     virtual int on_snapshot_load(braft::SnapshotReader* reader) override;
     
-    // service
-
+    // service impl
     void store_heartbeat(::google::protobuf::RpcController* controller,
                          const ::TKV::pb::StoreHBRequest* request,
                          ::TKV::pb::StoreHBResponse* response,

@@ -4,6 +4,21 @@
 #include "proto/meta.pb.h"
 
 namespace TKV {
+class CommonStateMachine;
+class MetaServerClosure: public braft::Closure {
+public:
+    virtual void run();
+    
+    brpc::Controller* cntl;
+    CommonStateMachine* _com_fsm;
+    google::protobuf::Closure* done;
+    pb::MetaManagerResponse* response;
+    std::string request;
+    int64_t raft_time_cost;
+    int64_t total_time_cost;
+    TimeCost time_cost;
+};
+
 class CommonStateMachine: public braft::StateMachine {
 public:
     CommonStateMachine(int64_t dummy_region_id,

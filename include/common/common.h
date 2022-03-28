@@ -11,6 +11,7 @@
 
 #include "common/log.h"
 
+namespace TKV {
 class Bthread {
 public:
     Bthread() {
@@ -156,3 +157,23 @@ private:
     bthread_cond_t _cond;
     bthread_mutex_t _mutex;
 };
+
+class TimeCost {
+public:
+    TimeCost(): _start(butil::gettimeofday_us()) {
+    }
+    ~TimeCost() {}
+    
+    void reset() {
+        _start = butil::gettimeofday_us();
+    }
+
+    int64_t get_time() const {
+        return butil::gettimeofday_us() - _start;
+    }
+
+private:
+    int64_t _start;
+};
+} // namespace TKV 
+/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
