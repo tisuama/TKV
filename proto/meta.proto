@@ -1,5 +1,6 @@
 syntax="proto2";
 import "common.proto";
+import "optype.proto";
 package TKV.pb;
 option cc_generic_services = true;
 
@@ -28,19 +29,20 @@ enum PeerStatus {
     STATUS_INITED = 7;
 };
 
-message PeerStatusInfo {
+message PeerStateInfo {
     optional string peer_id = 1;
     optional PeerStatus peer_status = 2;
     optional int64 table_id = 3;
     optional uint32 timestamp = 4;
     optional int64 region_id = 5;
+    optional bool is_learner = 6;
 };
 
 message InstanceInfo {
     required string address = 1;
     optional int64 capacity = 2; 
     optional int64 used_sze = 3;
-    optional string resouce_tag = 4;
+    optional string resource_tag = 4;
     optional string physical_room = 5;
     optional Status status = 6;
     optional string logical_room = 7;
@@ -64,21 +66,25 @@ message RegionInfo {
     required int64 talbe_id = 3;
     required int64 replica_num = 4;
     required int64 version = 5;
-    repeated string peers = 6;
-    optional string leader = 7;
-    optional int64 used_size = 8;
-    optional int64 log_index = 9;
-    optional bool deleted = 10; 
-    optional bool can_add_peer = 11;
-    optional int64 parent = 12;
-    optional uint32 timestamp = 13;
-    optional bool is_leader = 14;
+    optional bytes start_key = 6;
+    optional bytes end_key = 7;
+    repeated string peers = 8;
+    optional string leader = 9;
+    optional RegionStatus status = 10;
+    optional int64 used_size = 11;
+    optional int64 log_index = 12;
+    optional bool deleted = 13; 
+    optional bool can_add_peer = 14;
+    optional int64 parent = 15;
+    optional uint32 timestamp = 16;
+    repeated string learners = 17;
+    optional bool is_learner = 18;
 };
 
 message LeaderHB {
     required RegionInfo region =  1;
     optional RegionStatus status = 2;
-    repeated PeerStatusInfo peer_status = 3;
+    repeated PeerStateInfo peer_status = 3;
 };
 
 message PeerHB {
@@ -93,23 +99,55 @@ message ReplicaDist {
     required int64 count = 2;
 };
 
+// MUST ensure file_id in fileds are continuous and sorted
+message SplitKey {
+    optional bytes index_name = 1;
+    repeated bytes split_keys = 2;
+};
+
+enum RW {
+    READ = 1;
+    WRITE = 2;
+};
+
+message PrivilegeDatabase {
+    required string database = 1;
+    required int64 database_id = 2;
+    optional RW rw = 3;
+    optional bool force = 4;
+};
+
+message PrivilegeTable {
+    required string database = 1;
+    optional int64 database_id = 2; 
+    required string table_name = 3;
+    optional int64 table_id = 4;
+    optional RW table_rw = 5;
+    optional bool force = 6;
+};
+
+// No fileds now
 message SchemaInfo {
     optional int64 talbe_id = 1;
     required string table_name = 2;
     optional string new_table_name = 3;
     required string database = 4;
-    optional uint64 database_id = 5;
+    optional int64 database_id = 5;
     required string namespace_name = 6;
-    optional uint64 namespace_id = 7;
+    optional int64 namespace_id = 7;
     optional int64 region_size = 8;
     optional int64 replica_num = 9;
     repeated string init_store = 10;
     optional bool deleted = 11;
-    optional uint32 timestamp = 12;
-    repeated ReplicaDist dists = 13;
-    optional string main_logical_room = 14;
-    optional int32 region_num = 15;
-    optional string comment = 16; 
+    optional int64 byte_size_per_record = 12;
+    optional uint32 timestamp = 13;
+    repeated ReplicaDist dists = 14;
+    optional string main_logical_room = 15;
+    optional int64  region_split_lines = 16;
+    optional SplitKey split_keys = 17;
+    optional string  learner_resource_tags = 19;
+    optional int32 region_num = 20;
+    optional string comment = 21; 
 };
 
 message StoreHBRequest {
@@ -139,7 +177,7 @@ message ParamDesc {
 };
 
 message InstanceParam {
-    optional string resouce_tag_or_addr = 1;
+    optional string resource_tag_or_addr = 1;
     repeated ParamDesc params = 2;
 };
 
@@ -190,6 +228,52 @@ message UserPrivilege {
     optional bool       need_auth_addr = 11; 
 };
 
+// 集群信息、逻辑机房
+message LogicalRoom {
+    repeated string logical_rooms = 1;
+};
+
+message PhysicalRoom {
+    required string logical_room = 1;
+    repeated string physical_rooms = 2;
+};
+
+message MovePhysicalRequest {
+    required string physical_room = 1;
+    required string old_logical_room = 2;
+    required string new_logical_room = 3;
+};
+
+message RegionSplitRequest {
+    required int64 region_id = 1;
+    required bytes split_key = 2;
+    optional string new_instance = 3;
+    optional bool tail_split = 4;// 是否为尾分裂
+    optional int64 table_id = 5;
+    optional string resource_tag = 6;
+};
+
+message RestoreRegionRequest {
+    optional int64 restore_region_id = 1;
+    optional int64 lower_region_id = 2;
+    optional int64 upper_region_id = 3;
+};
+
+message RegionMergeRequest {
+    required int64 src_region_id = 1;
+    required bytes src_start_key =2;
+    required bytes src_end_key = 3;
+    required int64 table_id = 4;
+};
+
+enum RecoverOpt {
+    DO_DONE = 1;
+    DO_REMOVE_ILLEGAL_PEER = 2;
+    DO_REMOVE_PEER = 3;
+    DO_SET_PEER = 4;
+    DO_INIT_REGION = 5;
+};
+
 message MetaManagerRequest {
     required OpType                  op_type         = 1;
     optional SchemaInfo              table_info      = 2;// 建立、删除表
@@ -199,7 +283,7 @@ message MetaManagerRequest {
     // 加字段、索引，删除字段、索引，改字段、索引名称，改类型
     // optional AlterTableRequest       alter_table     = 6;
     optional LogicalRoom             logical_room    = 7;// 新增、删除逻辑机房
-    optional PhysicalRoom            physical_room   = 8;// 新增、删除物理机房
+    optional PhysicalRoom            physical_rooms   = 8;// 新增、删除物理机房
     optional InstanceInfo            instance_info   = 9;// 新增、删除实例
     optional MovePhysicalRequest     move_request    = 10;// 转移逻辑机房
     optional RegionInfo              region_info     = 11;// 新增、删除region
@@ -215,6 +299,40 @@ message MetaManagerRequest {
     optional InstanceParam           instance_params = 20;
     optional RecoverOpt              recover_opt     = 21;
     optional int64                   learner_replica_num = 22;
+};
+
+message RegionSplitResponse {
+    required int64 old_region_id = 1;
+    required int64 new_region_id = 2;
+    required string new_instance = 3;
+    required string add_peer_instance = 4;
+};
+
+message RegionMergeResponse {
+    optional int64 dst_region_id = 1;
+    optional string dst_instance = 2;
+    optional bytes dst_start_key = 3;
+    optional bytes dst_end_key = 4;
+    optional int64 version = 5;
+    optional int64 dst_version = 6;
+};
+
+message RegionRecoverResponse {
+    repeated PeerStateInfo set_peer_regions = 1;
+    repeated PeerStateInfo inited_regions = 2;
+    repeated PeerStateInfo illegal_regions = 3;
+};
+
+message MetaManagerResponse {
+    required ErrorCode errcode = 1;
+    optional string errmsg = 2;
+    optional string leader = 3;
+    optional RegionSplitResponse split_response = 4;
+    optional OpType op_type = 5;
+    optional uint64 start_id = 6;
+    optional uint64 end_id = 7;
+    optional RegionMergeResponse merge_response = 8;
+    optional RegionRecoverResponse recover_response = 9;
 };
 
 service MetaService {
