@@ -6,12 +6,33 @@
 #include <butil/errno.h>
 #include <brpc/closure_guard.h>
 #include <brpc/controller.h>
+#include <brpc/server.h>
 #include <bthread/execution_queue.h>
 
 
 #include "common/log.h"
 
 namespace TKV {
+#define RETURN_IF_NOT_INIT(init, response, log_id) \
+    do {\
+        if (!init) {\
+            DB_WARNING("have not init, log_id: %lu", log_id);\
+            response->set_errcode(pb::HAVE_NOT_INIT);\
+            response->set_errmsg("have not init");\
+            return ;\
+        }\
+    } while(0);
+
+#define IF_DONE_SET_RESPONSE(done, errcode, err_msg) \
+    do {\
+        if (done && static_cast<MetaServerClosure*>(done)->response) {\
+            auto meta_done = static_cast<MetaServerClosure*>(done);\
+            meta_done->response->set_errcode(errcode);\
+            meta_done->response->set_errmsg(err_msg);\
+       }\
+    }while (0);
+
+
 class Bthread {
 public:
     Bthread() {

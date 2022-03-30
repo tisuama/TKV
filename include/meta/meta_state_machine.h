@@ -4,6 +4,7 @@
 #include "meta/common_state_machine.h"
 
 namespace TKV {
+
 class MetaStateMachine: public CommonStateMachine {
 public:
     MetaStateMachine(const braft::PeerId& peer_id) 
@@ -24,7 +25,13 @@ public:
     virtual void on_snapshot_save(braft::SnapshotWriter* writer,
                                   braft::Closure* done) override;
     virtual int on_snapshot_load(braft::SnapshotReader* reader) override;
+    virtual void on_leader_start();
+    virtual void on_leader_stop();
     
+    int64_t applied_index() const {return _applied_index; }
+    
+    bool whether_can_decide();
+
     // service impl
     void store_heartbeat(::google::protobuf::RpcController* controller,
                          const ::TKV::pb::StoreHBRequest* request,

@@ -23,6 +23,17 @@ void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
         _meta_state_machine->store_heartbeat(controller, request, response, done_guard.release());
     }
 }
+/*
+* 将请求分发给各个manager类
+* Manager 包含两类工作: 1) 做一下判断和处理，然后再common_state_machine里做on_apply
+*                       2) on_apply后分别实现op_type里的各个函数，做commit后的应用到状态机
+*/
+void meta_manager(::google::protobuf::RpcController* controller,
+                   const ::TKV::pb::MetaManagerRequest* request,
+                   ::TKV::pb::MetaManagerResponse* response,
+                   ::google::protobuf::Closure* done) {
+    // 
+}
 
 int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     

@@ -7,18 +7,17 @@ namespace TKV {
 class CommonStateMachine;
 class MetaServerClosure: public braft::Closure {
 public:
-    virtual void run();
+    virtual void Run();
     
-    brpc::Controller* cntl;
-    CommonStateMachine* _com_fsm;
-    google::protobuf::Closure* done;
-    pb::MetaManagerResponse* response;
-    std::string request;
+    brpc::Controller* cntl              {nullptr};
+    CommonStateMachine* com_fsm         {nullptr};
+    google::protobuf::Closure* done     {nullptr};
+    pb::MetaManagerResponse* response   {nullptr};
     int64_t raft_time_cost;
     int64_t total_time_cost;
     TimeCost time_cost;
 };
-
+// override by tso_state_machine、auto_incr_state_machine in BaiKalDB
 class CommonStateMachine: public braft::StateMachine {
 public:
     CommonStateMachine(int64_t dummy_region_id,
@@ -33,6 +32,13 @@ public:
 
     virtual ~CommonStateMachine() {}
     virtual int init(const std::vector<braft::PeerId>& peers);
+
+    // common apply task to braft for meat_manager
+    virtual void meta_manager(::google::protobuf::RpcController* controller,
+                       const ::TKV::pb::MetaManagerRequest* request,
+                       ::TKV::pb::MetaManagerResponse* response,
+                       ::google::protobuf::Closure* done);
+
 
     virtual void start_check_migrate();
     virtual void check_migrate();

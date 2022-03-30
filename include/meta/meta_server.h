@@ -5,15 +5,6 @@
 #include "common/common.h"
 
 namespace TKV {
-#define RETURN_IF_NOT_INIT(init, response, log_id) \
-    do {\
-        if (!init) {\
-            DB_WARNING("have not init, log_id: %lu", log_id);\
-            response->set_errcode(pb::HAVE_NOT_INIT);\
-            response->set_errmsg("have not init");\
-            return ;\
-        }\
-    } while(0);
 
 class MetaServer: public pb::MetaService {
 public:
@@ -25,6 +16,11 @@ public:
                          const ::TKV::pb::StoreHBRequest* request,
                          ::TKV::pb::StoreHBResponse* response,
                          ::google::protobuf::Closure* done) override;
+
+    virtual void meta_manager(::google::protobuf::RpcController* controller,
+                       const ::TKV::pb::MetaManagerRequest* request,
+                       ::TKV::pb::MetaManagerResponse* response,
+                       ::google::protobuf::Closure* done) override;
 
     static MetaServer* get_instance() {
         static MetaServer meta_server;
