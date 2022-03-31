@@ -80,5 +80,15 @@ void MetaStateMachine::store_heartbeat(::google::protobuf::RpcController* contro
     DB_DEBUG("TKV store %s heart beat, time cost: %ld log_id: %lu",
             request->instance_info().address().c_str(), time_cost.get_time(), log_id);
 }
+
+
+void MetaStateMachine::on_leader_start() {
+    //
+}
+
+void MetaStateMachine::on_leader_stop() {
+    //
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

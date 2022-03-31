@@ -28,15 +28,27 @@ void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
 * Manager 包含两类工作: 1) 做一下判断和处理，然后再common_state_machine里做on_apply
 *                       2) on_apply后分别实现op_type里的各个函数，做commit后的应用到状态机
 */
-void meta_manager(::google::protobuf::RpcController* controller,
+void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
                    const ::TKV::pb::MetaManagerRequest* request,
                    ::TKV::pb::MetaManagerResponse* response,
                    ::google::protobuf::Closure* done) {
-    // 
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }     
+    RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
+    if (request->op_type() == pb::OP_ADD_INSTANCE) {
+        // ClusterManager::get_instance()->process_cluster_info(controller, request, response, done_guard.release());
+        return ;
+    }
+    response->set_errcode(pb::INPUT_PARAM_ERROR);
+    response->set_errmsg("invalid op_type");
+    response->set_op_type(request->op_type());
 }
 
 int MetaServer::init(const std::vector<braft::PeerId>& peers) {
-    
     butil::EndPoint addr;
     if (FLAGS_meta_with_any_ip) {
         addr.ip = butil::my_ip();
