@@ -32,6 +32,17 @@ namespace TKV {
        }\
     }while (0);
 
+#define ERROR_SET_RESPONSE(response, errcode, err_msg, op_type, log_id) \
+    do {\
+        DB_FATAL("request op_type: %d, %s, log_id: %lu", \
+                op_type, err_msg, log_id);\
+        if (response) { \
+            response->set_errcode(errcode);\
+            response->set_errmsg(err_msg);\
+            response->set_op_type(op_type);\
+        }\
+    } while(0);
+
 
 class Bthread {
 public:

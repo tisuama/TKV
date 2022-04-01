@@ -62,6 +62,7 @@ file(GLOB META_SERVER
 	src/meta/meta_server.cpp
 	src/meta/common_state_machine.cpp
 	src/meta/meta_state_machine.cpp
+	src/meta/cluster_manager.cpp
 	)
 add_library(meta_server_lib OBJECT ${META_SERVER})
 

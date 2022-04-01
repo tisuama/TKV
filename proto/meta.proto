@@ -283,8 +283,8 @@ message MetaManagerRequest {
     // 加字段、索引，删除字段、索引，改字段、索引名称，改类型
     // optional AlterTableRequest       alter_table     = 6;
     optional LogicalRoom             logical_room    = 7;// 新增、删除逻辑机房
-    optional PhysicalRoom            physical_rooms   = 8;// 新增、删除物理机房
-    optional InstanceInfo            instance_info   = 9;// 新增、删除实例
+    optional PhysicalRoom            physical_rooms  = 8;// 新增、删除物理机房
+    optional InstanceInfo            instance        = 9;// 新增、删除实例
     optional MovePhysicalRequest     move_request    = 10;// 转移逻辑机房
     optional RegionInfo              region_info     = 11;// 新增、删除region
     repeated int64                   drop_region_ids = 12;// 删除的reion集合

@@ -1,5 +1,6 @@
 #include "meta/meta_server.h"
 #include "engine/rocks_wrapper.h"
+#include "meta/cluster_manager.h"
 
 namespace TKV {
 DECLARE_int32(meta_port); 
@@ -40,7 +41,7 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
     }     
     RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
     if (request->op_type() == pb::OP_ADD_INSTANCE) {
-        // ClusterManager::get_instance()->process_cluster_info(controller, request, response, done_guard.release());
+        ClusterManager::get_instance()->process_cluster_info(controller, request, response, done_guard.release());
         return ;
     }
     response->set_errcode(pb::INPUT_PARAM_ERROR);

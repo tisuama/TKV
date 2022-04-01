@@ -11,7 +11,8 @@ DEFINE_bool(meta_with_any_ip, false ,"meta server ip is ip_any or meta_ip");
 DEFINE_string(meta_ip, "127.0.0.1", "meta serer ip when meta_with_any_ip = false");
 
 
-// rocksdb
+DEFINE_string(default_logical_room, "default", "default logical room");
+DEFINE_string(default_physical_room, "default", "default physical room");
 }
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
