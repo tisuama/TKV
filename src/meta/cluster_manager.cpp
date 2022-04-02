@@ -18,9 +18,10 @@ void ClusterManager::process_cluster_info(google::protobuf::RpcController* contr
     case pb::OP_ADD_INSTANCE:
         if (!request->has_instance()) {
             ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR, "no instance info", request->op_type(), log_id);
+            // done_guard is called when return ;
             return; 
         }
-       // _meta_state_machine->process(controller, request, response, done_guard.release());
+        _meta_state_machine->process(controller, request, response, done_guard.release());
         return;
     default:
         ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR, "op_type is not support", request->op_type(), log_id);
@@ -30,7 +31,42 @@ void ClusterManager::process_cluster_info(google::protobuf::RpcController* contr
 
 // called when on_apply
 void ClusterManager::add_instance(const meta_req& request, Closure* done) {
+    auto& ins_info = const_cast<pb::InstanceInfo&>(request.instance());
+    std::string address = ins_info.address();
+    if (!ins_info.has_physical_room()) {
+        ins_info.set_physical_room(FLAGS_default_physical_room);
+    } 
+    std::string physical_room = ins_info.physical_room();
 
+    // 检查physical_room -> logical_room
+    if (_phy_log_map.find(physical_room) == _phy_log_map.end()) {
+        ins_info.set_logical_room(_phy_log_map[physical_room]);
+    } else {
+        DB_FATAL("get logical room for physical_room: %s failed", physical_room.c_str());
+        // MetaServer done 
+        IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "physical room to logical room failed");
+        return;
+    }
+
+    // 实例已经存在
+    if (_ins_info.find(address) != _ins_info.end()) {
+        DB_WARNING("instance: %s is already exist", address.c_str());
+        IF_DONE_SET_RESPONSE(done, pb::INPUT_PARAM_ERROR, "instance already exist");
+        return ;
+    }
+
+
+    // write in rocksdb
+    
+    // update mem datastruct
+    Instance ins_mem(ins_info);
+    {
+        BAIDU_SCOPED_LOCK(_ins_mutex);
+        _ins_phy_map[address] = physical_room;
+        _phy_ins_map[physical_room].insert(address);
+        _res_ins_map[ins_mem.resource_tag].insert(address);
+        _ins_info[address] = ins_mem;
+    } 
 } 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

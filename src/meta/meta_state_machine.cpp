@@ -1,4 +1,5 @@
 #include "meta/meta_state_machine.h"
+#include "meta/cluster_manager.h"
 #include <braft/util.h>
 
 namespace TKV {
@@ -33,7 +34,7 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
                 iter.term(), iter.index(), pb::OpType_Name(request.op_type()).c_str());
         switch (request.op_type()) {
         case pb::OP_ADD_INSTANCE:
-            // ClusterManager::get_instance()->add_instance(request, done);
+            ClusterManager::get_instance()->add_instance(request, done);
             break;
         default:
             DB_FATAL("unsupport request op_type, type: %s", request.op_type());

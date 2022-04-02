@@ -1,6 +1,7 @@
 #include "meta/meta_server.h"
 #include "engine/rocks_wrapper.h"
 #include "meta/cluster_manager.h"
+#include "meta/meta_rocksdb.h"
 
 namespace TKV {
 DECLARE_int32(meta_port); 
@@ -50,6 +51,13 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
 }
 
 int MetaServer::init(const std::vector<braft::PeerId>& peers) {
+    // init rocksdb
+    auto ret = MetaRocksdb::get_instance()->init();
+    if (ret < 0) {
+        DB_FATAL("rocksdb init failed, exit now");
+        return -1;
+    }
+
     butil::EndPoint addr;
     if (FLAGS_meta_with_any_ip) {
         addr.ip = butil::my_ip();
@@ -63,7 +71,7 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
         DB_FATAL("new meta state machine failed");
         return -1;
     }
-    auto ret = _meta_state_machine->init(peers);
+    ret = _meta_state_machine->init(peers);
     if (ret != 0) {
         DB_FATAL("meta state machine init failed");
         return -1;

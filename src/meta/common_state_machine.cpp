@@ -56,7 +56,7 @@ int CommonStateMachine::init(const std::vector<braft::PeerId>& peers) {
     return 0;
 }
 
-void CommonStateMachine::meta_manager(::google::protobuf::RpcController* controller,
+void CommonStateMachine::process(::google::protobuf::RpcController* controller,
                    const ::TKV::pb::MetaManagerRequest* request,
                    ::TKV::pb::MetaManagerResponse* response,
                    ::google::protobuf::Closure* done) {

@@ -33,8 +33,8 @@ public:
     virtual ~CommonStateMachine() {}
     virtual int init(const std::vector<braft::PeerId>& peers);
 
-    // common apply task to braft for meat_manager
-    virtual void meta_manager(::google::protobuf::RpcController* controller,
+    // process apply task to braft for meat_manager rpc call
+    virtual void process(::google::protobuf::RpcController* controller,
                        const ::TKV::pb::MetaManagerRequest* request,
                        ::TKV::pb::MetaManagerResponse* response,
                        ::google::protobuf::Closure* done);

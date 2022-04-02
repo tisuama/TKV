@@ -57,9 +57,9 @@ public:
     }
     
     ~ClusterManager() {
-        bthread_mutex_destroy(&_physical_mutex);
-        bthread_mutex_destroy(&_instance_mutex);
-        bthread_mutex_destroy(&_instance_parm_mutex);
+        bthread_mutex_destroy(&_phy_mutex);
+        bthread_mutex_destroy(&_ins_mutex);
+        bthread_mutex_destroy(&_ins_parm_mutex);
     }
     // called before apply for process
     void process_cluster_info(google::protobuf::RpcController* controller,
@@ -72,31 +72,31 @@ public:
 
 private:
     ClusterManager() {
-        bthread_mutex_init(&_physical_mutex, NULL);
-        bthread_mutex_init(&_instance_mutex, NULL);
-        bthread_mutex_init(&_instance_parm_mutex, NULL);
+        bthread_mutex_init(&_phy_mutex, NULL);
+        bthread_mutex_init(&_ins_mutex, NULL);
+        bthread_mutex_init(&_ins_parm_mutex, NULL);
         {
-            BAIDU_SCOPED_LOCK(_physical_mutex);
+            BAIDU_SCOPED_LOCK(_phy_mutex);
             _phy_log_map[FLAGS_default_physical_room] = 
                 FLAGS_default_logical_room;
             _log_phy_map[FLAGS_default_logical_room] = 
                 std::set<std::string>{FLAGS_default_physical_room};
         }
         {
-            BAIDU_SCOPED_LOCK(_instance_mutex);
+            BAIDU_SCOPED_LOCK(_ins_mutex);
             _phy_ins_map[FLAGS_default_physical_room] = std::set<std::string>{};
         }
     } 
 
 private:
-    bthread_mutex_t             _physical_mutex;
+    bthread_mutex_t             _phy_mutex;
     // key: 物理机房 value: 逻辑机房
     std::unordered_map<std::string, std::string>           _phy_log_map;
 
     // key: 逻辑机房 value: 物理机房
     std::unordered_map<std::string, std::set<std::string>> _log_phy_map;
 
-    bthread_mutex_t            _instance_mutex;
+    bthread_mutex_t            _ins_mutex;
     // key: 实例 value: 物理机房
     std::unordered_map<std::string, std::string>           _ins_phy_map;
     // key: 物理机房 value: 实例 
@@ -105,11 +105,11 @@ private:
     std::unordered_map<std::string, std::set<std::string>> _res_ins_map;
 
     // 实例信息
-    std::unordered_map<std::string, Instance>             _instance_info;
+    std::unordered_map<std::string, Instance>             _ins_info;
     std::unordered_map<std::string, std::string>          _container_id_to_ip;
     std::unordered_set<std::string>                       _slow_instance;
     
-    bthread_mutex_t                                       _instance_parm_mutex;
+    bthread_mutex_t                                       _ins_parm_mutex;
     std::unordered_map<std::string, pb::InstanceParam>    _ins_parm_map;
     int                                                   _migreate_concurrency {2};
 
