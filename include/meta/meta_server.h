@@ -8,6 +8,9 @@ namespace TKV {
 
 class MetaServer: public pb::MetaService {
 public:
+    static const std::string CLUSTER_IDENTIFY;
+    static const std::string INSTANCE_CLUSTER_IDENTIFY;
+
     virtual ~MetaServer() {}
     
     int init(const std::vector<braft::PeerId>& peers);

@@ -70,6 +70,12 @@ public:
     // called when on_apply
     void add_instance(const meta_req& request, Closure* done);
 
+    std::string construct_instance_key(const std::string& instance) {
+        return MetaServer::CLUSTER_IDENTIFY +
+               MetaServer::INSTANCE_CLUSTER_IDENTIFY + 
+               instance;
+    }
+
 private:
     ClusterManager() {
         bthread_mutex_init(&_phy_mutex, NULL);

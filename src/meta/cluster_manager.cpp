@@ -1,6 +1,7 @@
 #include "meta/cluster_manager.h"
 #include "common/common.h"
 #include "proto/optype.pb.h"
+#include "meta/meta_rocksdb.h"
 
 namespace TKV {
 using braft::Closure;
@@ -55,8 +56,20 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
         return ;
     }
 
-
     // write in rocksdb
+    std::string value;
+    if (!ins_info.SerializeToString(&value)) {
+        DB_WARNING("request serializeToString failed, request: %s", 
+                request.ShortDebugString().c_str());
+        IF_DONE_SET_RESPONSE(done, pb::PARSE_TO_PB_FAIL, "serializedToString failed");
+        return ;
+    } 
+    auto ret = MetaRocksdb::get_instance()->put_meta_info(construct_instance_key(address), value);
+    if (ret < 0) {
+        DB_WARNING("add instance: %s to rocksdb failed", request.ShortDebugString().c_str());
+        IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "write db failed");
+        return ;
+    }
     
     // update mem datastruct
     Instance ins_mem(ins_info);

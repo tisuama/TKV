@@ -9,6 +9,10 @@ DECLARE_int32(meta_replica_num);
 DECLARE_bool(meta_with_any_ip);
 DECLARE_string(meta_ip);
 
+
+const std::string MetaServer::CLUSTER_IDENTIFY(1, 0x1);
+const std::string MetaServer::INSTANCE_CLUSTER_IDENTIFY(1, 0x3);
+
 void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
      const ::TKV::pb::StoreHBRequest* request,
      ::TKV::pb::StoreHBResponse* response,
