@@ -64,6 +64,7 @@ file(GLOB META_SERVER
 	src/meta/meta_state_machine.cpp
 	src/meta/cluster_manager.cpp
 	src/meta/meta_rocksdb.cpp
+	src/meta/meta_server_interact.cpp
 	)
 add_library(meta_server_lib OBJECT ${META_SERVER})
 
@@ -110,3 +111,15 @@ add_executable(TKVMeta
 	$<TARGET_OBJECTS:engine_src_lib>
 	)
 target_link_libraries(TKVMeta ${DEP_LIB})
+
+
+# add_executable for test
+add_executable(test_meta_server
+	test/test_meta_server.cpp
+	$<TARGET_OBJECTS:common_src_lib>
+	$<TARGET_OBJECTS:proto_src_lib>
+	$<TARGET_OBJECTS:meta_server_lib>
+	$<TARGET_OBJECTS:engine_src_lib>
+	)
+target_link_libraries(test_meta_server ${DEP_LIB})
+

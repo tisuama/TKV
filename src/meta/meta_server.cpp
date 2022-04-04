@@ -48,6 +48,8 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
     if (request->op_type() == pb::OP_ADD_INSTANCE) {
         ClusterManager::get_instance()->process_cluster_info(controller, request, response, done_guard.release());
         return ;
+    } else {
+        DB_WARNING("unknow op_type, requrest: %s", request->ShortDebugString().c_str());
     }
     response->set_errcode(pb::INPUT_PARAM_ERROR);
     response->set_errmsg("invalid op_type");
@@ -81,7 +83,7 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
         return -1;
     }
     DB_WARNING("meta state machine init sucess");
-     
+    _init_sucess = true;
     return 0;
 }
 } //namespace of TKV

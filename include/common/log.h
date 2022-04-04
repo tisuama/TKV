@@ -32,7 +32,7 @@ namespace logging {
 }
 
 namespace TKV {
-DECLARE_string(log_file);
+DECLARE_string(log_path);
 DECLARE_bool(enable_debug);
 DECLARE_bool(enable_self_trace);
 
@@ -119,7 +119,8 @@ inline int init_log(const char* bin_name) {
 #if !BRPC_WITH_GLOG
 	logging::LoggingSettings log_setting;
 	log_setting.logging_dest = logging::LOG_TO_FILE;
-	log_setting.log_file = FLAGS_log_file.data();
+    std::string log_file = FLAGS_log_path + bin_name + ".log";
+	log_setting.log_file = log_file.data();
 	ret = logging::InitLogging(log_setting);
 #endif
     return ret ? 0: -1;
