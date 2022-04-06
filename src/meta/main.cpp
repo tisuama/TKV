@@ -18,11 +18,11 @@ int main(int argc, char** argv) {
     google::SetCommandLineOption("flagfile", "/etc/TKV/meta_flags.conf");
     google::ParseCommandLineFlags(&argc, &argv, true); 
     // init log first
-    if (TKV::init_log(argv[0]) !=  0) {
+    if (TKV::init_log("meta.log") !=  0) {
         fprintf(stderr, "init meta log failed.");
         return -1;
     } 
-    DB_DEBUG("TKV init log sucess");
+    DB_DEBUG("TKV init log success");
     brpc::Server server;
     butil::EndPoint addr;
     addr.ip = butil::IP_ANY;

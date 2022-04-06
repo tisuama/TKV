@@ -73,6 +73,11 @@ file(GLOB ENGINE_SRC
 	)
 add_library(engine_src_lib OBJECT ${ENGINE_SRC})
 
+file(GLOB STORE_SRC
+	src/store/store.cpp
+	)
+add_library(store_src_lib OBJECT ${STORE_SRC})
+
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto/
 	${GFLAGS_INCLUDE_DIR}
@@ -112,6 +117,15 @@ add_executable(TKVMeta
 	)
 target_link_libraries(TKVMeta ${DEP_LIB})
 
+add_executable(TKVStore
+	src/store/main.cpp
+	$<TARGET_OBJECTS:common_src_lib>
+	$<TARGET_OBJECTS:proto_src_lib>
+	$<TARGET_OBJECTS:meta_server_lib>
+	$<TARGET_OBJECTS:engine_src_lib>
+	$<TARGET_OBJECTS:store_src_lib>
+	)
+target_link_libraries(TKVStore ${DEP_LIB})
 
 # add_executable for test
 add_executable(test_meta_server

@@ -1,0 +1,22 @@
+syntax="proto2";
+import "common.proto";
+package TKV.pb;
+option cc_generic_services = true;
+
+message StoreRes {
+    required ErrorCode     errcode = 1;
+    optional bytes       errmsg  = 2;
+    optional string      learder = 3;
+};
+
+message InitRegion {
+    optional bool       is_split = 1;
+    // 初始化时需要snapshot的次数
+    optional int32      snapshot_times = 2;
+    optional bool       is_learner = 3;
+};
+
+service StoreService {
+    rpc init_region(InitRegion) returns (StoreRes);
+};
+/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

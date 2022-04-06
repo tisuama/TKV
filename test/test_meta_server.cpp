@@ -25,8 +25,7 @@ int main(int argc, char** argv) {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_NONE);
-    SyncClosure done;
-    (void)done;
+    
     meta->send_request("meta_manager", request, response);
 
     DB_DEBUG("All test complete");

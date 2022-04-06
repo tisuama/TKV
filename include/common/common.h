@@ -208,6 +208,33 @@ private:
     int64_t _start;
 };
 
+// wrapper bthread::execution_queue functions for c++ style
+class ExecutionQueue {
+public:
+    ExecutionQueue() {
+        bthread::execution_queue_start(&_queue_id, nullptr, run_function, nullptr);
+    }
+    void run(const std::function<void()>& call) {
+        bthread::execution_queue_execute(_queue_id, call);
+    }
+    void stop() {
+        execution_queue_stop(_queue_id);
+    }
+    void join() {
+        execution_queue_join(_queue_id);
+    }
+private:
+    static int run_function(void* meta, bthread::TaskIterator<std::function<void()>>& iter) {
+        if (iter.is_queue_stopped()) {
+            return 0;
+        }
+        for (; iter; ++iter) {
+            (*iter)();
+        }
+        return 0;
+    }
+    bthread::ExecutionQueueId<std::function<void()>> _queue_id = {0};
+};    
 
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
