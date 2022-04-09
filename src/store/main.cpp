@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     google::SetCommandLineOption("flagfile", "/etc/TKV/store_flags.conf");
     google::ParseCommandLineFlags(&argc, &argv, true);
     // init log first
-    if (TKV::init_log("store.log") != 0) {
+    if (TKV::init_log("store") != 0) {
         fprintf(stderr, "init store log failed, exit now");
         return -1;
     }
@@ -33,6 +33,7 @@ int main(int argc, char** argv) {
     DB_WARNING("Add raft to brpc server success");
     // register sotre service  
     TKV::Store* store = TKV::Store::get_instance();
-    (void)store;
+    std::vector<int64_t> init_region_ids;
+    store->init_before_listen(init_region_ids);
 }
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

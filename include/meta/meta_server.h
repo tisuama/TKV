@@ -37,6 +37,8 @@ private:
     MetaStateMachine* _meta_state_machine = nullptr;
     Bthread _flush_bth;
     Bthread _apply_region_bth;
+    
+    std::string _physical_room;
     bool _init_sucess = false;
     bool _shutdown = false;
 };

@@ -24,11 +24,21 @@ DECLARE_int32(store_port);
 
 class Store: public pb::StoreService {
 public:
-    // virtual ~Store();
+    virtual ~Store();
     static Store* get_instance() {
         static Store instance;
         return &instance;
     }    
+    
+    int init_before_listen(std::vector<std::int64_t>& init_region_ids);
+
+    int init_after_listen(const std::vector<std::int64_t>& init_region_ids);
+    
+
+    virtual void init_region(::google::protobuf::RpcController* controller,
+                         const ::TKV::pb::InitRegion* request,
+                         ::TKV::pb::StoreRes* response,
+                         ::google::protobuf::Closure* done) override;
 
     bool doing_snapshot_when_stop(int64_t region_id) {
         if (doing_snapshot_regions.find(region_id) != doing_snapshot_regions.end()) {
@@ -37,20 +47,19 @@ public:
         return false;
     }
     std::set<int64_t>    doing_snapshot_regions;
-    bvar::LatencyRecorder raft_total_cost;
-    bvar::Adder<int64_t> heart_beat_count;
 
 private:
     Store()
         : _split_num(0)
         , _disk_total("disk_total", 0)
         , _disk_used("disk_used", 0)
-        , raft_total_cost("raft_total_cost", 0)
-        , heart_beat_count("heart_beat_count") {
+        , _raft_total_cost("raft_total_cost", 0)
+        , _heart_beat_count("heart_beat_count") {
     }  
 
     std::string              _address;
     std::string              _physical_room;    
+    std::string              _resource_tag;
     RocksWrapper*            _rocksdb;
     
     // std::unordered_map<int64_t, SmartRegion> _region_map;
@@ -73,6 +82,9 @@ private:
 
     bvar::Status<int64_t>   _disk_total;
     bvar::Status<int64_t>   _disk_used;
+    
+    bvar::LatencyRecorder   _raft_total_cost;
+    bvar::Adder<int64_t>    _heart_beat_count;
 
     // queue
     ExecutionQueue          _add_peer_queue;

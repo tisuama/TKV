@@ -13,6 +13,7 @@ DEFINE_int32(meta_port, 8010, "meta port");
 // raft service
 DEFINE_string(default_logical_room, "default", "default logical room");
 DEFINE_string(default_physical_room, "default", "default physical room");
+DEFINE_string(resource_tag, "", "resource_tag");
 DEFINE_int32(store_port, 8110, "store port");
 DEFINE_int32(snapshot_load_num, 4, "snapshot_load_num, default: 4");
 DEFINE_int32(raft_write_concurrency, 40, "raft_write_concurrency, default: 40");

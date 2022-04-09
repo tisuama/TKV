@@ -8,7 +8,7 @@ DECLARE_int32(meta_port);
 DECLARE_int32(meta_replica_num);
 DECLARE_bool(meta_with_any_ip);
 DECLARE_string(meta_ip);
-
+DECLARE_string(default_physical_room);
 
 const std::string MetaServer::CLUSTER_IDENTIFY(1, 0x1);
 const std::string MetaServer::INSTANCE_CLUSTER_IDENTIFY(1, 0x3);
@@ -70,6 +70,9 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     } else {
         butil::str2ip(FLAGS_meta_ip.data(), &addr.ip);
     }
+
+    _physical_room = FLAGS_default_physical_room;
+
     addr.port = FLAGS_meta_port;
     braft::PeerId peer_id(addr, 0);
     _meta_state_machine = new (std::nothrow)MetaStateMachine(peer_id);

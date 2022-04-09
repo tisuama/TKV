@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
     google::SetCommandLineOption("flagfile", "/etc/TKV/meta_flags.conf");
     google::ParseCommandLineFlags(&argc, &argv, true); 
     // init log first
-    if (TKV::init_log("meta.log") !=  0) {
+    if (TKV::init_log("meta") !=  0) {
         fprintf(stderr, "init meta log failed.");
         return -1;
     } 

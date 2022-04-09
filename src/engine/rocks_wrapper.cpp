@@ -59,6 +59,7 @@ int32_t RocksWrapper::init(const std::string& path) {
         table_options.data_block_index_type = rocksdb::BlockBasedTableOptions::kDataBlockBinaryAndHash;
         table_options.block_cache = rocksdb::NewLRUCache(FLAGS_rocks_block_cache_size_mb * 1024 * 1024LL, 8);
     }
+    // rocksdb version
     table_options.format_version = 4;
     table_options.block_size = FLAGS_rocks_block_size;
     _cache = table_options.block_cache.get();
@@ -98,6 +99,11 @@ int32_t RocksWrapper::init(const std::string& path) {
     _log_cf_option.write_buffer_size = FLAGS_rocks_write_buffer_size;
     _log_cf_option.min_write_buffer_number_to_merge = FLAGS_rocks_min_write_buffer_number_to_merge;
 
+    // Setting in binlog
+    // if (FLAGS_rocks_use_partitioned_index_filters) {
+    //     table_options.pin_l0_filter_and_index_blocks_in_cache = false;
+    // }
+    
     // data cf 
     _data_cf_option.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(sizeof(uint64_t) * 2));
     _data_cf_option.OptimizeLevelStyleCompaction();
