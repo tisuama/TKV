@@ -23,6 +23,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         return -1;
     }
     int res = _rocksdb->init(FLAGS_db_path);
+    _factory = SchemaFactory::get_instance();
     if (res != 0) {
         DB_FATAL("rocksdb init failed");
         return -1;
@@ -38,6 +39,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     DB_WARNING("heartbeat request: %s is construct when init store", request.ShortDebugString().data());
     TimeCost time_cost;
     if (_meta_server_interact->send_request("store_heartbeat", request, response) == 0){
+        _factory->update_tables_double_buffer_sync(response.schema_change_info());
         DB_WARNING("send heartbeat request to meta server success");
         // do something
     } else {

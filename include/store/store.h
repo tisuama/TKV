@@ -15,6 +15,7 @@
 #include "proto/store.pb.h"
 #include "engine/rocks_wrapper.h"
 #include "meta/meta_server_interact.h"
+#include "common/schema_factory.h"
 
 namespace TKV {
 DECLARE_int32(snapshot_load_num);
@@ -95,6 +96,8 @@ private:
     BthreadCond             _multi_thread_cond;
     bthread_mutex_t         _param_mutex;
     std::map<std::string, std::string> _param_map;
+    
+    SchemaFactory*           _factory;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
