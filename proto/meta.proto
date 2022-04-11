@@ -127,8 +127,9 @@ message PrivilegeTable {
 };
 
 // No fileds now
+// No index now
 message SchemaInfo {
-    optional int64 talbe_id = 1;
+    optional int64 table_id = 1;
     required string table_name = 2;
     optional string new_table_name = 3;
     required string database = 4;

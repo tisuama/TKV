@@ -1,6 +1,7 @@
 #pragma once
 #include <mutex>
 #include <set>
+#include <map>
 #include <google/protobuf/dynamic_message.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/descriptor.pb.h>
@@ -74,9 +75,29 @@ struct DatabaseInfo {
     std::string namesp;
 };
 
+struct InstanceDBStatus {
+    pb::Status status = pb::NORMAL;
+    bool need_cacle = false;
+    std::string     logical_room;
+    // CHECK_COUNT次后才设置normal
+    int64_t         normal_count = 0;
+    // 探测到FAULT_COUNT次后才设置FAULT
+    int64_t         fault_count = 0;
+    TimeCost        last_update_time;
+    static const int64_t CHECK_OUNT = 10;
+};
+
+struct StatusMapping {
+    // store -> logical_room
+    std::unordered_map<int64_t, InstanceDBStatus> ins_info_map;
+    // physical_room -> logical_room
+    std::unordered_map<std::string, std::string>  phy_log_map;
+};
+
 typedef std::shared_ptr<TableInfo> SmartTable;
 typedef std::shared_ptr<IndexInfo> SmartIndex;
 typedef std::shared_ptr<StatisticsInfo> SmartStatistics;
+typedef std::shared_ptr<InstanceDBStatus> SmartDBStatus;
 
 struct SchemaMapping {
     // namespace.database -> database_id
@@ -124,9 +145,13 @@ struct TableRegionInfo {
     std::unordered_map<int64_t, KeyRegionMap> key_region_map; 
 };
 
-using DoubleBufferedTable = butil::DoublyBufferedData<SchemaMapping>;
 typedef std::shared_ptr<TableRegionInfo> TableRegionPtr;
+using DoubleBufferedTable = butil::DoublyBufferedData<SchemaMapping>;
 using DoubleBufferedTableRegionInfo = butil::DoublyBufferedData<std::unordered_map<int64_t, TableRegionPtr>>;
+using DoubleBufferedStatus = butil::DoublyBufferedData<StatusMapping>;
+template<typename T>
+using DoubleBufferedSet = butil::DoublyBufferedData<std::unordered_set<T>>;
+using DoubleBufferStringSet = DoubleBufferedSet<std::string>;
 
 class SchemaFactory {
 typedef RepeatedPtrField<pb::RegionInfo> RegionVec;
@@ -142,7 +167,6 @@ public:
         return &instance; 
     }
 
-    void update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table);
     void update_tables_double_buffer_sync(const SchemaVec& tables);
     
 private:
@@ -152,19 +176,36 @@ private:
         _physical_room = FLAGS_default_physical_room;
     }
 
+    void delete_table_region_map(const pb::SchemaInfo& table);
+    void update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table);
+
     bool                            _is_inited {false};
     bthread_mutex_t                 _update_slow_db_mutex;
+    // use of slow data base
     std::map<int64_t, DatabaseInfo> _slow_db_info;
 
+    // table info
     DoubleBufferedTable             _double_buffer_table;
+    // table region info
     DoubleBufferedTableRegionInfo   _double_buffer_table_region;
-
+    // ExecutionQueue
     bthread::ExecutionQueueId<RegionVec> _region_queue_id {0};
     
     std::string                     _physical_room;
     std::string                     _logical_room;
     int64_t                         _last_update_index {0};
 };
+
+inline size_t double_buffer_table_region_erase(
+        std::unordered_map<int64_t, TableRegionPtr>& table_region_map, int64_t table_id) {
+    DB_DEBUG("double bufer table region erase table id: %ld", table_id);
+    auto it = table_region_map.find(table_id);
+    if (it != table_region_map.end()) {
+        return table_region_map.erase(table_id);
+    } 
+    return 0;
+}
+
 } // namespace TKV
   
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
