@@ -57,6 +57,7 @@ struct TableInfo {
     DescriptorProto*  tb_proto = nullptr;
     FieldDescriptorProto* file_proto = nullptr;
     DynamicMessageFactory* factory = nullptr;
+    DescriptorPool* pool = nullptr;
 
     uint32_t    timestamp = 0;
 };
@@ -177,7 +178,8 @@ private:
     }
 
     void delete_table_region_map(const pb::SchemaInfo& table);
-    void update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table);
+    int update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table);
+    void delete_table(const pb::SchemaInfo& table, SchemaMapping& background);
 
     bool                            _is_inited {false};
     bthread_mutex_t                 _update_slow_db_mutex;

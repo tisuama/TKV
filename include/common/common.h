@@ -1,4 +1,6 @@
 #pragma once
+#include <cctype>
+
 #include <bthread/bthread.h>
 #include <butil/time.h>
 #include <butil/endpoint.h>
@@ -236,5 +238,10 @@ private:
     bthread::ExecutionQueueId<std::function<void()>> _queue_id = {0};
 };    
 
+inline std::string transfer_to_lower(std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(), 
+            [](unsigned char c) -> unsigned char { return std::tolower(c); });
+    return str;
+}
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
