@@ -1,7 +1,6 @@
 #include "common/schema_factory.h"
 #include "common/common.h"
 
-
 namespace TKV {
 int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table) {
     auto& table_info_mapping = background.table_id_to_table_info;
@@ -32,8 +31,13 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
     const std::string& namesp = table.namespace_name();
 
     // Copy the temp descriptorproto and build the proto
+    DatabaseInfo db_info;
+    db_info.id = db_id;
+    db_info.name = db_name;
+    db_info.namesp = namesp;
+
+    // Create table if not exist
     std::string cur_table_name("table_" + std::to_string(table_id));
-    // change name to id
 }
 
 void SchemaFactory::delete_table_region_map(const pb::SchemaInfo& table) {
@@ -71,10 +75,6 @@ void SchemaFactory::delete_table(const pb::SchemaInfo& table, SchemaMapping& bac
     DB_WARNING("full name: %s is erase", full_name.c_str());
     table_name_id_mapping.erase(full_name);
 
-    delete table_info.file_proto;  
-    delete table_info.pool;
-    delete table_info.factory;
-    table_info_mapping.erase(id);
     return ;
 }
 

@@ -9,16 +9,7 @@
 #include "proto/meta.pb.h"
 #include "common/common.h"
 
-using ::google::protobuf::DescriptorProto;
-using ::google::protobuf::Descriptor;
 using ::google::protobuf::RepeatedPtrField;
-using ::google::protobuf::Message;
-using ::google::protobuf::FieldDescriptorProto;
-using ::google::protobuf::FieldDescriptor;
-using ::google::protobuf::DescriptorPool;
-using ::google::protobuf::DynamicMessageFactory;
-
-
 namespace TKV {
 typedef std::map<std::string, int64_t> KeyRegionMap; 
 DECLARE_string(default_physical_room);
@@ -50,15 +41,7 @@ struct TableInfo {
     std::string main_logical_room;
     std::vector<DistInfo> dists;
     int64_t     replica_num = 3;
-
     int32_t     region_num;
-    const Descriptor* tb_desc = nullptr;
-    const Message*    message_proto = nullptr;
-    DescriptorProto*  tb_proto = nullptr;
-    FieldDescriptorProto* file_proto = nullptr;
-    DynamicMessageFactory* factory = nullptr;
-    DescriptorPool* pool = nullptr;
-
     uint32_t    timestamp = 0;
 };
 
