@@ -126,6 +126,17 @@ message PrivilegeTable {
     optional bool force = 6;
 };
 
+enum PartitionType {
+    PT_HASH = 1;
+    PT_RANGE = 2;
+};
+
+message PartitionInfo {
+    required PartitionType type = 1;
+    optional int32 partition_field = 2;
+    repeated string partition_names = 3;
+};
+
 // No fileds now
 // No index now
 message SchemaInfo {
@@ -149,6 +160,7 @@ message SchemaInfo {
     optional string  learner_resource_tags = 19;
     optional int32 region_num = 20;
     optional string comment = 21; 
+    optional PartitionInfo partition_info = 22;
 };
 
 message StoreHBRequest {

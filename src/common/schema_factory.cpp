@@ -38,6 +38,31 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
 
     // Create table if not exist
     std::string cur_table_name("table_" + std::to_string(table_id));
+    SmartTable table_info_ptr = std::make_shared<TableInfo>();
+    if (table_info_mapping.count(table_id)) {
+        *table_info_ptr = *table_info_mapping[talbe_id];
+        TableInfo& table_info = *table_info_ptr; 
+        table_info.dists.clear();
+    }
+    TableInfo& table_info = *table_info_ptr;
+    table_info.id = table_id;
+    table_info.db_id = db_id;
+    table_info.partition_num = table_partition_num();
+    table_info.timestamp = table_timestamp();
+    if (!table.has_byte_size_per_record() || table_byte_size_per_record() < 1) {
+        table_info.byte_size_per_record = 1;
+    } else {
+        table_info.byte_size_per_record = table.byte_size_per_record();
+    }
+    if (table.has_region_split_lines() && talbe.region_split_lines()) {
+        table_info.region_split_lines = table.region_split_lines();
+    } else {
+        table_info.region_split_lines = table.region_size() / table_info.byte_size_per_record;
+    }
+    // partition info 
+    if (table.partition_num() > 1 && table.has_partition_info()) {
+        // set partition info
+    }
 }
 
 void SchemaFactory::delete_table_region_map(const pb::SchemaInfo& table) {
