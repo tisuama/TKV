@@ -28,6 +28,11 @@ struct DistInfo {
     int64_t     count;
 };
 
+class Partition {
+public:
+    virtual int init(const pb::PartitionInfo& pi, int64_t table_id, int64_t partition_num) = 0;
+};
+
 struct TableInfo {
     int64_t     id = -1;
     int64_t     db_id = -1;
