@@ -157,11 +157,13 @@ message SchemaInfo {
     optional string main_logical_room = 15;
     optional int64  region_split_lines = 16;
     optional SplitKey split_keys = 17;
-    optional string  learner_resource_tags = 19;
+    repeated string  learner_resource_tags = 19;
     optional int32 region_num = 20;
     optional string comment = 21; 
     optional PartitionInfo partition_info = 22;
     optional int64 partition_num = 23;
+    optional string resource_tag = 24;
+    optional Engine  engine = 25;
 };
 
 message StoreHBRequest {

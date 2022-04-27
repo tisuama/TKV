@@ -2,6 +2,14 @@ syntax="proto2";
 package TKV.pb;
 option cc_generic_services = true;
 
+enum Engine {
+    ROCKSDB = 1;
+    REDIS = 2;
+    ROCKSDB_CSTORE = 3;
+    BINLOG = 4;
+    INFORMATION_SCHEMA = 5;
+};
+
 enum ErrorCode {
     SUCCESS = 0;
     NOT_LEADER = 1;

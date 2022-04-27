@@ -7,6 +7,7 @@
 #include <google/protobuf/descriptor.pb.h>
 #include "common/statis.h"
 #include "proto/meta.pb.h"
+#include "proto/common.pb.h"
 #include "common/common.h"
 
 using ::google::protobuf::RepeatedPtrField;
@@ -28,11 +29,6 @@ struct DistInfo {
     int64_t     count;
 };
 
-class Partition {
-public:
-    virtual int init(const pb::PartitionInfo& pi, int64_t table_id, int64_t partition_num) = 0;
-};
-
 struct TableInfo {
     int64_t     id = -1;
     int64_t     db_id = -1;
@@ -48,6 +44,10 @@ struct TableInfo {
     int64_t     replica_num = 3;
     int32_t     region_num;
     uint32_t    timestamp = 0;
+    std::string comment;
+    pb::Engine  engine;
+    std::string short_name;
+    std::vector<std::string> learner_resource_tags;
 };
 
 struct IndexInfo {

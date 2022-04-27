@@ -59,10 +59,44 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
     } else {
         table_info.region_split_lines = table.region_size() / table_info.byte_size_per_record;
     }
-    // partition info 
-    if (table.partition_num() > 1 && table.has_partition_info()) {
-        // set partition info
+    // SETTING PARTITION INFO HERE
+    table_info.name = db_name + "." + table_name;
+    table_info.short_name = table_name;
+    table_info.namesp = namesp;
+    table_info.resource_tag = table.resource_tag();
+    table_info.main_logical_room = table.main_logical_room();
+    if (table.has_comment()) {
+        table_info.comment = table.comment();
     }
+    table_info.engine = pb::ROCKSDB;
+    if (table.has_engine()) {
+        table_info.engine = table.engine();
+    }
+    if (table.has_region_num()) {
+        table_info.region_num = table.region_num();
+    }
+    // SETTING TTL DURATION HERE
+    for (auto& r : table.learner_resource_tags()) {
+        table_info.learner_resource_tags.emplace_back(r);
+    }
+    for (auto& d : table.dists()) {
+        DistInfo dist_info;
+        dist_info.logical_room = d.logical_room();
+        dist_info.count = d.count();
+        table_info.dists.emplace_back(dist_info);
+    }
+    
+    // create db_name -> db_id mapping
+    db_name_id_mapping[transfer_to_lower(namesp + "." + db_name)] = db_id;
+    DB_WARNING("db_name_id_mapping: %s -> %ld", std::string(namesp + "." + db_name).c_str(), db_id);
+    
+    // create table_name -> table_id
+    std::string db_table(transfer_to_lower(namesp + "." + db_name + "." + table_name));
+    table_name_id_mapping[db_table] = table_id;
+    
+    db_info_mapping[db_id] = db_info;
+    table_info_mapping[table_id] = table_info_ptr;
+    return 1; // SUCCESS NUM
 }
 
 void SchemaFactory::delete_table_region_map(const pb::SchemaInfo& table) {
