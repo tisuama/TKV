@@ -137,5 +137,16 @@ void SchemaFactory::delete_table(const pb::SchemaInfo& table, SchemaMapping& bac
     return ;
 }
 
+void SchemaFactory::get_all_table_version(std::unordered_map<int64_t, int64_t>& table_id_version_map) {
+    DoubleBufferedTable::ScopedPtr table_ptr;
+    if (_double_buffer_table.Read(&table_ptr) != 0) {
+        DB_WARNING("read double buffer table failed");
+        return ;
+    }
+    for (auto t : table_ptr->table_id_to_table_info) {
+        table_id_version_map[t.first] = t.second->version;
+    }
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -34,12 +34,14 @@ public:
     int init_before_listen(std::vector<std::int64_t>& init_region_ids);
 
     int init_after_listen(const std::vector<std::int64_t>& init_region_ids);
-    
 
     virtual void init_region(::google::protobuf::RpcController* controller,
                          const ::TKV::pb::InitRegion* request,
                          ::TKV::pb::StoreRes* response,
                          ::google::protobuf::Closure* done) override;
+    
+    // construct heartbeat
+    void construct_heart_beat_request(pb::StoreHBRequest& request);
 
     bool doing_snapshot_when_stop(int64_t region_id) {
         if (doing_snapshot_regions.find(region_id) != doing_snapshot_regions.end()) {
@@ -85,6 +87,7 @@ private:
     bvar::Status<int64_t>   _disk_used;
     
     bvar::LatencyRecorder   _raft_total_cost;
+    bvar::LatencyRecorder   _select_time_cost;
     bvar::Adder<int64_t>    _heart_beat_count;
 
     // queue

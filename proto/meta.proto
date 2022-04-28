@@ -41,7 +41,7 @@ message PeerStateInfo {
 message InstanceInfo {
     required string address = 1;
     optional int64 capacity = 2; 
-    optional int64 used_sze = 3;
+    optional int64 used_size = 3;
     optional string resource_tag = 4;
     optional string physical_room = 5;
     optional Status status = 6;
@@ -56,7 +56,7 @@ message InstanceInfo {
 };
 
 message SchemaHB {
-    required int64 talbe_id = 1;
+    required int64 table_id = 1;
     required int64 version = 2;
 };
 
@@ -166,11 +166,20 @@ message SchemaInfo {
     optional Engine  engine = 25;
 };
 
+message LearnerHB {
+    repeated RegionInfo region = 1;
+    optional RegionStatus status =  2;
+    optional PeerStatus state = 3;
+};
+
 message StoreHBRequest {
     required InstanceInfo instance_info = 1;
     repeated SchemaHB schema_info = 2;
-    repeated LeaderHB leader_info = 3;
+    repeated LeaderHB leader_regions = 3;
     repeated PeerHB peer_info = 4;
+    optional bool need_leader_balance = 5;
+    optional bool need_peer_balance = 6;
+    repeated LearnerHB learner_regions = 7;
 };
 
 message AddPeer {
