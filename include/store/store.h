@@ -22,6 +22,7 @@ DECLARE_int32(snapshot_load_num);
 DECLARE_int32(raft_write_concurrency);
 DECLARE_int32(service_write_concurrency);
 DECLARE_int32(store_port);
+using DoubleBufRegion = butil::DoublyBufferedData<std::unordered_map<int64_t, SmartRegion>>;
 
 class Store: public pb::StoreService {
 public:
@@ -42,14 +43,18 @@ public:
     
     // construct heartbeat
     void construct_heart_beat_request(pb::StoreHBRequest& request);
-
+    
     bool doing_snapshot_when_stop(int64_t region_id) {
-        if (doing_snapshot_regions.find(region_id) != doing_snapshot_regions.end()) {
+        if (_doing_snapshot_regions.find(region_id) != _doing_snapshot_regions.end()) {
             return true;
         }
         return false;
     }
-    std::set<int64_t>    doing_snapshot_regions;
+
+
+    // traverse region
+    void traverse_region_map(const std::function<void(const SmartRegion& region)>& call) {
+    }
 
 private:
     Store()
@@ -101,6 +106,7 @@ private:
     std::map<std::string, std::string> _param_map;
     
     SchemaFactory*           _factory;
+    std::set<int64_t>        _doing_snapshot_regions;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

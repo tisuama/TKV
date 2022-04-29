@@ -120,6 +120,7 @@ void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
     }
 
     // 构造所有region的version信息
+    
 }
 
 Store::~Store() {
