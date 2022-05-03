@@ -80,6 +80,12 @@ void MetaStateMachine::store_heartbeat(::google::protobuf::RpcController* contro
     
     DB_DEBUG("TKV store %s heart beat, time cost: %ld log_id: %lu",
             request->instance_info().address().c_str(), time_cost.get_time(), log_id);
+    
+    // 判断Instance信息
+    // 判断Peer信息
+    // 判断Table信息
+    // 判断Peer所在Table
+    // 更新Leader信息
 }
 
 

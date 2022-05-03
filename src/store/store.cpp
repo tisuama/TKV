@@ -54,8 +54,9 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     }
     int heartbeat_cost = time_cost.get_time();
     time_cost.reset();
+    DB_WARNING("get schema info from meta server sucess");
 
-    // do something
+    // Set region info has been exist before
     
     return 0;
 }

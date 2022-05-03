@@ -43,6 +43,12 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
         *table_info_ptr = *table_info_mapping[table_id];
         TableInfo& table_info = *table_info_ptr; 
         table_info.dists.clear();
+        // Check table version is match
+        if (table_info.version >= table.version()) {
+            DB_WARNING("Not need to update, origin version: %ld, new version: %ld", table_id: %ld", 
+                    table_info.version, table.version(), table_id);
+            return 0;
+        }
     }
     TableInfo& table_info = *table_info_ptr;
     table_info.id = table_id;

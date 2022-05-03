@@ -164,6 +164,7 @@ message SchemaInfo {
     optional int64 partition_num = 23;
     optional string resource_tag = 24;
     optional Engine  engine = 25;
+    optional int64 version = 26;
 };
 
 message LearnerHB {
