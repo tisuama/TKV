@@ -1,9 +1,10 @@
 #pragma once
 #include "common/key_encoder.h"
-#include "meta/schema_factory.h"
+#include "common/schema_factory.h"
 #include <rocksdb/slice.h>
 
 namespace TKV {
+class MutableKey;
 class TableKey {
 public:
     virtual ~TableKey() {}
@@ -18,11 +19,8 @@ public:
         , _data(key._data)  
     {}
     
-    TableKey(const MutableKey& key) 
-        : _full(key.get_full())
-        , _data(key.get_data())
-    {}
-
+    TableKey(const MutableKey& key);
+    
     int8_t extract_i8(int pos) const {
         char* c = const_cast<char*>(_data.data_ + pos);
         return KeyEncoder::decode_i8(*reinterpret_cast<uint8_t*>(c));
@@ -76,7 +74,7 @@ public:
     void set_full(bool full) {
         _full = full;
     }
-    void get_full() const {
+    bool get_full() const {
         return _full;
     }
     size_t size() const {

@@ -18,6 +18,13 @@ if ((NOT GFLAGS_INCLUDE_DIR) OR (NOT GFLAGS_LIBRARIES))
 	message(FATAL_ERROR "Fail to find glog")
 endif()
 
+# gtest
+find_path(GTEST_INCLUDE_DIR NAMES gtest/gtest.h)
+find_library(GTEST_LIBRARIES NAMES gtest)
+if ((NOT GTEST_INCLUDE_DIR) OR (NOT GTEST_LIBRARIES)) 
+	message(FATAL_ERROR "Fail to find gtest")
+endif()
+
 # brpc
 find_path(BRPC_INCLUDE_DIR NAMES brpc/server.h)
 find_library(BRPC_LIBRARIES NAMES brpc)
@@ -81,6 +88,7 @@ add_library(store_src_lib OBJECT ${STORE_SRC})
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto/
 	${GFLAGS_INCLUDE_DIR}
+	${GTEST_INCLUDE_DIR}
 	${BRPC_INCLUDE_DIR}
 	${BRAFT_INCLUDE_DIR}
 	${PROTOBUF_INCLUDE_DIR}
@@ -96,6 +104,7 @@ include_directories(
 SET(DEP_LIB
 	${CMAKE_THREAD_LIBS_INIT}
 	${GFLAGS_LIBRARIES}
+	${GTEST_LIBRARIES}
 	${BRAFT_LIBRARIES}
 	${BRPC_LIBRARIES}
 	${PROTOBUF_LIBRARIES}
@@ -136,4 +145,13 @@ add_executable(test_meta_server
 	$<TARGET_OBJECTS:engine_src_lib>
 	)
 target_link_libraries(test_meta_server ${DEP_LIB})
+
+add_executable(test_table_key
+	test/test_table_key.cpp
+	$<TARGET_OBJECTS:common_src_lib>
+	$<TARGET_OBJECTS:proto_src_lib>
+	$<TARGET_OBJECTS:meta_server_lib>
+	$<TARGET_OBJECTS:engine_src_lib>
+	)
+target_link_libraries(test_table_key ${DEP_LIB})
 

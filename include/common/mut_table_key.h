@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/key_encoder.h"
+#include "common/table_key.h"
 #include <rocksdb/slice.h>
 
 namespace TKV {
@@ -53,14 +54,61 @@ public:
         return *this;
     }
     MutableKey& append_u32(uint32_t val) {
-        uint16_t encode = KeyEncoder::to_endian_u16(val);
+        uint32_t encode = KeyEncoder::to_endian_u16(val);
         _data.append((char*)&encode, sizeof(uint16_t));
         return *this;
+    }
+
+    MutableKey& append_i64(int64_t val) {
+        uint64_t encode = KeyEncoder::to_endian_u64(KeyEncoder::encode_i64(val));
+        _data.append((char*)&encode, sizeof(uint64_t));
+        return *this;
+    }
+    MutableKey& append_u64(uint64_t val) {
+        uint16_t encode = KeyEncoder::to_endian_u64(val);
+        _data.append((char*)&encode, sizeof(uint64_t));
+        return *this;
+    }
+
+    MutableKey& append_float(float val) {
+        uint32_t encode = KeyEncoder::to_endian_u32(KeyEncoder::encode_f32(val));
+        _data.append((char*)&encode, sizeof(uint32_t));
+        return *this;
+    }
+    
+    // append string
+    MutableKey& append_string(const std::string& val) {
+        _data.append(val);
+        _data.append(1, 0);
+        return *this;
+    }
+    
+    // appned boolean
+    MutableKey& append_boolean(bool val) {
+        uint8_t encode = val? uint8_t(1): uint8_t(0);
+        _data.append((char*)&encode, sizeof(uint8_t));
+        return *this;
+    } 
+    
+    void set_full(bool full) {
+        _full = full;
+    }
+    bool get_full() const {
+        return _full;
+    }
+    size_t size() const {
+        return _data.size();
+    }
+    const std::string& data() const {
+        return _data;
+    }
+    std::string& data() {
+        return _data;
     }
 
 private:
     bool _full;// full key or just a prefix
     std::string _data;
-}
+};
 }// namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

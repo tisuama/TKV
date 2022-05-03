@@ -1,4 +1,5 @@
 #include "store/store.h"
+#include "common/mut_table_key.h"
 #include <sys/statfs.h>
 
 namespace TKV {
@@ -121,6 +122,7 @@ void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
     }
 
     // 构造所有region的version信息
+    MutableKey key;
     
 }
 

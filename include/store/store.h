@@ -22,6 +22,9 @@ DECLARE_int32(snapshot_load_num);
 DECLARE_int32(raft_write_concurrency);
 DECLARE_int32(service_write_concurrency);
 DECLARE_int32(store_port);
+
+class Region;
+typedef std::shared_ptr<Region> SmartRegion;
 using DoubleBufRegion = butil::DoublyBufferedData<std::unordered_map<int64_t, SmartRegion>>;
 
 class Store: public pb::StoreService {
