@@ -10,6 +10,7 @@
 #include <bvar/status.h>
 
 
+#include "store/region.h"
 #include "common/common.h"
 #include "proto/meta.pb.h"
 #include "proto/store.pb.h"
@@ -22,7 +23,7 @@ DECLARE_int32(snapshot_load_num);
 DECLARE_int32(raft_write_concurrency);
 DECLARE_int32(service_write_concurrency);
 DECLARE_int32(store_port);
-
+class MetaWriter;
 class Region;
 typedef std::shared_ptr<Region> SmartRegion;
 using DoubleBufRegion = butil::DoublyBufferedData<std::unordered_map<int64_t, SmartRegion>>;
@@ -54,9 +55,59 @@ public:
         return false;
     }
 
+    SmartRegion get_region(int64_t region_id) {
+        DoubleBufRegion::ScopedPtr ptr;
+        if (_region_mapping.Read(&ptr) == 0) {
+            auto iter = ptr->find(region_id);
+            if (iter != ptr->end()) {
+                return iter->second;
+            }
+        }
+        return SmartRegion();
+    }
+    
+    void set_region(SmartRegion& region) {
+        if (region == nullptr) {
+            return ;
+        }
+        auto call = [](std::unordered_map<int64_t, SmartRegion>& mp, const SmartRegion& region) {
+           mp[region->get_region_id()] = region; 
+           return 1;
+        };
+        _region_mapping.Modify(call, region);
+    }
+    
+    void erase_region(int64_t region_id) {
+        auto call = [](std::unordered_map<int64_t, SmartRegion>& mp, const int64_t region_id) {
+            mp.erase(region_id);
+            return 1;
+        };
+        _region_mapping.Modify(call, region_id);//region_i
+    }
 
     // traverse region
     void traverse_region_map(const std::function<void(const SmartRegion& region)>& call) {
+        DoubleBufRegion::ScopedPtr ptr;
+        // Read -1: Failed 0: success
+        if (_region_mapping.Read(&ptr) == 0) {
+            for (auto it : *ptr) {
+                call(it.second);
+            }
+        }
+    }
+    
+    void traverse_copy_region_map(const std::function<void(const SmartRegion& region)>& call) {
+        std::unordered_map<int64_t, SmartRegion> copy_region_mapping;
+        {
+            DoubleBufRegion::ScopedPtr ptr;
+            if (_region_mapping.Read(&ptr) == 0) {
+                copy_region_mapping = *ptr;
+            }
+        }
+        for (auto it : copy_region_mapping) {
+            call(it.second);
+        }
+        
     }
 
 private:
@@ -73,7 +124,8 @@ private:
     std::string              _resource_tag;
     RocksWrapper*            _rocksdb;
     
-    // std::unordered_map<int64_t, SmartRegion> _region_map;
+    DoubleBufRegion          _region_mapping;
+    
     MetaServerInteract*                       _meta_server_interact;
 
     Bthread                 _heart_beat_bth;
@@ -110,6 +162,8 @@ private:
     
     SchemaFactory*           _factory;
     std::set<int64_t>        _doing_snapshot_regions;
+    
+    MetaWriter*             _meta_writer {nullptr};
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

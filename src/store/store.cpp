@@ -1,4 +1,5 @@
 #include "store/store.h"
+#include "store/meta_writer.h"
 #include "common/mut_table_key.h"
 #include <sys/statfs.h>
 
@@ -8,7 +9,8 @@ DECLARE_int32(store_port);
 DECLARE_string(resource_tag);
 DECLARE_string(db_path);
 DECLARE_int32(balance_periodicity);
-DECLARE_int64(store_heart_beat_interval_us);
+
+DEFINE_int64(store_heart_beat_interval_us, 30 * 1000 * 1000, "store heartbeat interval, default: 30s"); 
 
 int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     butil::EndPoint addr;
@@ -36,6 +38,8 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         return -1;
     }
     // MetaWriter
+    _meta_writer = MetaWriter::get_instance();
+    _meta_writer->init(_rocksdb, _rocksdb->get_meta_info_handle());
     
     // LogEntryReader
     
@@ -122,8 +126,9 @@ void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
     }
 
     // 构造所有region的version信息
-    MutableKey key;
-    
+    traverse_copy_region_map([&request, need_peer_balance](const SmartRegion& region) {
+        region->construct_heart_beat_request(request, need_peer_balance);       
+    });
 }
 
 Store::~Store() {
