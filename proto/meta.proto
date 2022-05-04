@@ -68,7 +68,7 @@ message RegionInfo {
     required int64 version = 5;
     optional bytes start_key = 6;
     optional bytes end_key = 7;
-    repeated string peers = 8;
+    repeated string peers = 8; // 包含leader
     optional string leader = 9;
     optional RegionStatus status = 10;
     optional int64 used_size = 11;

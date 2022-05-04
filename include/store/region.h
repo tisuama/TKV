@@ -42,6 +42,14 @@ public:
     int64_t get_region_id() const {
         return _region_id;
     }
+    
+    void set_restart(bool restart) {
+        _restart = restart;
+    }
+
+
+    // override virtual functions from braft::StateMachine
+    virtual void on_apply(braft::Iterator& iter) override; 
 
 private:
     RocksWrapper*           _rocksdb;
@@ -73,6 +81,9 @@ private:
     // Legal 
     std::mutex              _legal_mutex;
     bool                    _legal_region = true;
+    
+    // restart
+    bool                    _restart = false;
 
     // 计算存储分离开关
     bool                    _storage_compute_separate = false;

@@ -34,25 +34,25 @@ public:
         char* c = const_cast<char*>(_data.data_ + pos);
         return KeyEncoder::decode_i16(KeyEncoder::to_endian_u16(*reinterpret_cast<uint16_t*>(c)));
     }
-    uint16_t ectract_u16(int pos) const {
+    uint16_t extract_u16(int pos) const {
         char* c = const_cast<char*>(_data.data_ + pos);
         return KeyEncoder::to_endian_u16(*reinterpret_cast<uint16_t*>(c));
     }
     
-    int32_t ectract_i32(int pos) const {
+    int32_t extract_i32(int pos) const {
         char* c = const_cast<char*>(_data.data_ + pos);
         return KeyEncoder::decode_i32(KeyEncoder::to_endian_u32(*reinterpret_cast<uint32_t*>(c)));
     }
-    uint32_t ectract_u32(int pos) const {
+    uint32_t extract_u32(int pos) const {
         char* c = const_cast<char*>(_data.data_ + pos);
         return KeyEncoder::to_endian_u32(*reinterpret_cast<uint32_t*>(c));
     }
     
-    int32_t ectract_i64(int pos) const {
+    int32_t extract_i64(int pos) const {
         char* c = const_cast<char*>(_data.data_ + pos);
         return KeyEncoder::decode_i64(KeyEncoder::to_endian_u64(*reinterpret_cast<uint64_t*>(c)));
     }
-    uint32_t ectract_u64(int pos) const {
+    uint32_t extract_u64(int pos) const {
         char* c = const_cast<char*>(_data.data_ + pos);
         return KeyEncoder::to_endian_u64(*reinterpret_cast<uint64_t*>(c));
     }
@@ -67,8 +67,12 @@ public:
        return *reinterpret_cast<uint8_t*>(c) != 0;
     }
     
-    void extrace_string(int pos, std::string& out) const {
+    void extract_string(int pos, std::string& out) const {
         out.assign(_data.data_ + pos);
+    }
+    
+    void extract_char(int pos, size_t len, std::string& out) {
+        out.assign(_data.data_ + pos, len);
     }
     
     void set_full(bool full) {

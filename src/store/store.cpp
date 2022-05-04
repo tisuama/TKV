@@ -57,11 +57,71 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         DB_FATAL("send heartbeat request to meta server failed");
         return -1;
     }
-    int heartbeat_cost = time_cost.get_time();
     time_cost.reset();
     DB_WARNING("get schema info from meta server sucess");
 
     // Set region info has been exist before
+    std::vector<pb::RegionInfo> region_infos;
+    int ret = _meta_writer->parse_region_infos(region_infos);
+    if (ret < 0) {
+        DB_FATAL("read region infos from rocksdb failed");
+        return ret;
+    }
+    for (auto& r : region_infos) {
+        DB_WARNING("region info: %s when init store", r.ShortDebugString().data());
+        int64_t region_id = r.region_id();
+        // version info
+        if (r.version() == 0) {
+            DB_WARNING("region_id: %ld version: %ld is 0, dropped. region_info: %s",
+                    region_id, r.version(), r.ShortDebugString().data());
+            // RegionControl
+            continue;
+        }
+        braft::GroupId groupid(std::string("region_") + std::to_string(region_id)); 
+        butil::EndPoint addr;
+        str2endpoint(_address.c_str(), &addr);
+        braft::PeerId peerid(addr, 0);
+        bool is_learner = _meta_writer->read_learner_key(region_id) == 1? true: false;
+        DB_DEBUG("region_id: %ld, is_learner: %d", region_id, is_learner);
+        
+        // clear peers info
+        if (!is_learner) {
+            r.clear_peers();
+        }
+        SmartRegion region(new(std::nothrow) Region(
+                    _rocksdb,
+                    _factory,
+                    _address,
+                    groupid,
+                    peerid,
+                    r,
+                    region_id,
+                    is_learner));
+        if (!region) {
+            DB_FATAL("New region fail, mme allocate fail, region_info: %s",
+                    r.ShortDebugString().data());
+            return -1;
+        }
+        region->set_restart(true);
+        // Inset SmartRegion into _region_mapping
+        this->set_region(region);
+        init_region_ids.push_back(region_id);
+    }
+    
+    // process doing snapshot region 
+    ret = _meta_writer->parse_doing_snapshot(_doing_snapshot_regions);
+    if (ret < 0) {
+        DB_FATAL("read doing snapshot regions from rocksdb failed");
+        return -1;
+    } else {
+        for (auto r : _doing_snapshot_regions) {
+            DB_WARNING("region_id: %ld is doing snapshot load when store stop", r);
+        }
+    }
+    
+    // start db statitics
+    
+    DB_WARNING("store init before listen success, region size: %ld, doing snapshot region size: %ld", init_region_ids.size(), _doing_snapshot_regions.size());
     
     return 0;
 }

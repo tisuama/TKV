@@ -55,7 +55,7 @@ public:
     int64_t read_num_table_lines(int64_t region_id);
     int read_region_info(int64_t region_id, pb::RegionInfo& region_info);
     int read_learner_key(int64_t region_id);
-    int write_learner_key(int64_t region_id);
+    int write_learner_key(int64_t region_id, bool is_learner);
     int read_doing_snapshot(int64_t region_id);
 
 public:
@@ -71,7 +71,7 @@ public:
     std::string encode_applied_index(int64_t applied_index, int64_t data_index) const;
     std::string encode_num_table_lines(int64_t line) const;
     std::string encode_region_info(const pb::RegionInfo& region_info) const;
-    std::string encode_learner_flag(int64_t ts) const;
+    std::string encode_learner_flag(int64_t learner_flag) const;
 
     // decode
     uint64_t decode_log_index_key(const rocksdb::Slice& key);

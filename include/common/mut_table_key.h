@@ -83,6 +83,12 @@ public:
         return *this;
     }
     
+    // append char
+    MutableKey& append_char(const char* data, size_t size) {
+        _data.append(data, size);
+        return *this;
+    }
+    
     // appned boolean
     MutableKey& append_boolean(bool val) {
         uint8_t encode = val? uint8_t(1): uint8_t(0);
