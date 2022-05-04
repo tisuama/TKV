@@ -41,7 +41,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     _meta_writer = MetaWriter::get_instance();
     _meta_writer->init(_rocksdb, _rocksdb->get_meta_info_handle());
     
-    // LogEntryReader
+    // TODO: LogEntryReader
     
     // First heartbeat
     pb::StoreHBRequest  request;
@@ -52,7 +52,6 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     if (_meta_server_interact->send_request("store_heartbeat", request, response) == 0){
         _factory->update_tables_double_buffer_sync(response.schema_change_info());
         DB_WARNING("send heartbeat request to meta server success");
-        // do something
     } else {
         DB_FATAL("send heartbeat request to meta server failed");
         return -1;
@@ -74,7 +73,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         if (r.version() == 0) {
             DB_WARNING("region_id: %ld version: %ld is 0, dropped. region_info: %s",
                     region_id, r.version(), r.ShortDebugString().data());
-            // RegionControl
+            // TODO: RegionControl
             continue;
         }
         braft::GroupId groupid(std::string("region_") + std::to_string(region_id)); 
@@ -119,7 +118,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         }
     }
     
-    // start db statitics
+    // TODO: start db statitics
     
     DB_WARNING("store init before listen success, region size: %ld, doing snapshot region size: %ld", init_region_ids.size(), _doing_snapshot_regions.size());
     

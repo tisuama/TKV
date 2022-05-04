@@ -1,7 +1,13 @@
 #include "store/region.h"
 namespace TKV {
 void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need_peer_balance) {
-    // do something
+    if (_shutdown || !_can_heartbeat || _removed) {
+        return ;
+    }
+    // TODO: multi-thread cond
+    // TODO: 删除大量数据后做compact
+    
+
 }
 
 void Region::on_apply(braft::Iterator& iter) {

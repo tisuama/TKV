@@ -106,6 +106,8 @@ private:
     // table line
     std::atomic<int64_t>    _num_table_lines;
     std::atomic<int64_t>    _num_delete_lines;
+    
+    bool                    _removed = false;
 
 };
 } // namespace TKV
