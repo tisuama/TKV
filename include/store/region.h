@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <mutex>
 #include <butil/iobuf.h>
 #include <butil/time.h>
 #include <braft/storage.h>
@@ -46,7 +47,30 @@ public:
     void set_restart(bool restart) {
         _restart = restart;
     }
+    
+    void copy_region(pb::RegionInfo* region_info) {
+        std::lock_guard<std::mutex> lock(_region_lock);
+        region_info->CopyFrom(_region_info);
+    }
+    
+    bool is_learner() const {
+        return _is_learner;
+    }
+    
+    bool is_leader() const {
+        return _is_leader.load();
+    }
+    
+    bool is_merged() {
+        std::lock_guard<std::mutex> lock(_region_lock);
+        if (!_region_info.start_key().empty()) {
+            return _region_info.start_key() == _region_info.end_key();
+        }
+        return false;
+    }
 
+    // public
+    void compact_data_in_queue();
 
     // override virtual functions from braft::StateMachine
     virtual void on_apply(braft::Iterator& iter) override; 
@@ -108,6 +132,12 @@ private:
     std::atomic<int64_t>    _num_delete_lines;
     
     bool                    _removed = false;
+
+
+    // learner
+    bool                    _is_learner = false;
+    bool                    _learner_ready_for_read = false;
+    TimeCost                _learner_time;
 
 };
 } // namespace TKV
