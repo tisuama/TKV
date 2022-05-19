@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
-project(TVK C CXX)
+project(TKV C CXX)
 
 option(DEBUG "print debug log" ON)
 option(WITH_TESTS "With tests" ON)
@@ -119,16 +119,16 @@ SET(DEP_LIB
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++11 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -std=c99 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
 
-add_executable(TKVMeta
+add_executable(TkvMeta
 	src/meta/main.cpp
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
 	)
-target_link_libraries(TKVMeta ${DEP_LIB})
+target_link_libraries(TkvMeta ${DEP_LIB})
 
-add_executable(TKVStore
+add_executable(TkvStore
 	src/store/main.cpp
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:proto_src_lib>
@@ -136,7 +136,7 @@ add_executable(TKVStore
 	$<TARGET_OBJECTS:engine_src_lib>
 	$<TARGET_OBJECTS:store_src_lib>
 	)
-target_link_libraries(TKVStore ${DEP_LIB})
+target_link_libraries(TkvStore ${DEP_LIB})
 
 # add_executable for test
 add_executable(test_meta_server
@@ -157,3 +157,9 @@ add_executable(test_table_key
 	)
 target_link_libraries(test_table_key ${DEP_LIB})
 
+add_executable(rocks_bench
+	bench/rocks_bench.cpp
+	$<TARGET_OBJECTS:common_src_lib>
+	$<TARGET_OBJECTS:engine_src_lib>
+	)
+target_link_libraries(rocks_bench ${DEP_LIB})
