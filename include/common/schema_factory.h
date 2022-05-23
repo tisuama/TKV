@@ -158,6 +158,7 @@ public:
 
     void update_tables_double_buffer_sync(const SchemaVec& tables);
     void get_all_table_version(std::unordered_map<int64_t, int64_t>& table_id_version_map); 
+    bool exist_table_id(int64_t table_id);
     
 private:
     SchemaFactory() {

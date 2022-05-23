@@ -158,7 +158,7 @@ add_executable(test_table_key
 target_link_libraries(test_table_key ${DEP_LIB})
 
 add_executable(rocks_bench
-	bench/rocks_bench.cpp
+	tool/rocks_bench.cpp
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
 	)

@@ -40,6 +40,23 @@ public:
 
     void construct_heart_beat_request(pb::StoreHBRequest& request, bool need_peer_balance);
     
+    butil::EndPoint get_leader() {
+        if (is_learner()) {
+            butil::EndPoint leader;
+            butil::str2endpoint(region_info().leader().c_str(), &leader);
+            return leader;
+        }
+        return _node.leader_id().addr;
+    }
+    
+    pb::RegionInfo& region_info() {
+        return _region_info;
+    }
+    
+    int64_t get_table_id() {
+        return _table_id;
+    }
+    
     int64_t get_region_id() const {
         return _region_id;
     }

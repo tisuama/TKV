@@ -28,9 +28,20 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
     }
     _region_info.set_num_table_lines(_num_delete_lines.load());
     
-    // TODO: 增加peer心跳信息
-    if (need_peer_balance || is_merged()) {
-        // do something
+    if (need_peer_balance || is_merged()
+            && _report_peer_info) {
+        pb::PeerHB* peer_info = request.add_peer_info(); 
+        peer_info->set_table_id(copy_region_info.table_id());
+        peer_info->set_region_id(_region_id);
+        peer_info->set_log_index(_applied_index);
+        peer_info->set_start_key(copy_region_info.start_key());
+        peer_info->set_end_key(copy_region_info.end_key());
+        peer_info->set_is_learner(is_learner());
+        if (get_leader().ip != butil::IP_ANY) {
+            peer_info->set_exist_leader(true);
+        } else {
+            peer_info->set_exist_leader(false);
+        }
     } 
     
     // Leader心跳信息
