@@ -251,7 +251,7 @@ message UserPrivilege {
     optional string     password = 2;
     required string     namespace_name = 3;
     optional int64      namespace_id = 4;
-    repeated PrivilegeDatabase database = 5;
+    repeated PrivilegeDatabase privilege_database = 5;
     repeated PrivilegeTable    table = 6;
     repeated string     bns = 7;
     repeated string     ip = 8;

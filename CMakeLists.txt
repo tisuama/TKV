@@ -119,16 +119,16 @@ SET(DEP_LIB
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++11 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -std=c99 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
 
-add_executable(TkvMeta
+add_executable(TKVMeta
 	src/meta/main.cpp
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
 	)
-target_link_libraries(TkvMeta ${DEP_LIB})
+target_link_libraries(TKVMeta ${DEP_LIB})
 
-add_executable(TkvStore
+add_executable(TKVStore
 	src/store/main.cpp
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:proto_src_lib>
@@ -136,7 +136,7 @@ add_executable(TkvStore
 	$<TARGET_OBJECTS:engine_src_lib>
 	$<TARGET_OBJECTS:store_src_lib>
 	)
-target_link_libraries(TkvStore ${DEP_LIB})
+target_link_libraries(TKVStore ${DEP_LIB})
 
 # add_executable for test
 add_executable(test_meta_server

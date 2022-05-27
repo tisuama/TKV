@@ -45,9 +45,14 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
         log_id = cntl->log_id();
     }     
     RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
+    DB_DEBUG("meta manager request: %s",  request->ShortDebugString().c_str());
     if (request->op_type() == pb::OP_ADD_INSTANCE) {
         ClusterManager::get_instance()->process_cluster_info(controller, request, response, done_guard.release());
         return ;
+    } else if (request->op_type() == pb::OP_CREATE_USER) {
+        // TODO: privilege manager 
+        // PrivilegeManager::get_instance()->process_user_privilege(controller, request, response, done_guard.release()); 
+        return;
     } else {
         DB_WARNING("unknow op_type, requrest: %s", request->ShortDebugString().c_str());
     }
