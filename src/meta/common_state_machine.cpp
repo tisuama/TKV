@@ -42,6 +42,7 @@ int CommonStateMachine::init(const std::vector<braft::PeerId>& peers) {
     braft::NodeOptions options;
     options.election_timeout_ms = FLAGS_election_timeout_ms;
     options.fsm = this;
+    // Can get replica num from peers
     options.initial_conf = braft::Configuration(peers);
     options.snapshot_interval_s = FLAGS_snapshot_interval_s;
     options.log_uri = FLAGS_log_uri;

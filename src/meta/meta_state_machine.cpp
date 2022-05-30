@@ -1,5 +1,6 @@
 #include "meta/meta_state_machine.h"
 #include "meta/cluster_manager.h"
+#include "meta/privilege_manager.h"
 #include <braft/util.h>
 
 namespace TKV {
@@ -35,6 +36,9 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
         switch (request.op_type()) {
         case pb::OP_ADD_INSTANCE:
             ClusterManager::get_instance()->add_instance(request, done);
+            break;
+        case pb::OP_CREATE_USER:
+            PrivilegeManager::get_instance()->create_user(request, done);
             break;
         default:
             DB_FATAL("unsupport request op_type, type: %s", request.op_type());
