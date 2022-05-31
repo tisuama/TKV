@@ -1,4 +1,5 @@
 #include "meta/privilege_manager.h"
+#include "meta/schema_manager.h"
 
 namespace TKV {
 void PrivilegeManager::process_user_privilege(google::protobuf::RpcController* controller,
@@ -49,6 +50,13 @@ void PrivilegeManager::create_user(const pb::MetaManagerRequest& request, braft:
         IF_DONE_SET_RESPONSE(done, pb::INPUT_PARAM_ERROR, "username has been exist");
         return ;
     }
+    int ret = SchemaManager::get_instance()->check_and_get_for_privilege(user_privilege);
+    if (ret < 0) {
+        DB_WARNING("request not illegal, request: %s", request.ShortDebugString().c_str());
+        IF_DONE_SET_RESPONSE(done, pb::INPUT_PARAM_ERROR, "request invalid");
+        return ;
+    }
+    // TODO: next
 }
 
 void PrivilegeManager::add_privilege(const pb::MetaManagerRequest& request, braft::Closure* done) {
