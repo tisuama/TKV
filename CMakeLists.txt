@@ -74,6 +74,7 @@ file(GLOB META_SERVER
 	src/meta/meta_server_interact.cpp
 	src/meta/privilege_manager.cpp
 	src/meta/schema_manager.cpp
+	src/meta/namespace_manager.cpp
 	)
 add_library(meta_server_lib OBJECT ${META_SERVER})
 
