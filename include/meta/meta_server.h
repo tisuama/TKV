@@ -13,6 +13,7 @@ public:
     static const std::string CLUSTER_IDENTIFY;
     static const std::string INSTANCE_CLUSTER_IDENTIFY;
     static const std::string SCHEMA_IDENTIFY;
+    static const std::string PRIVILEGE_IDENTIFY;
     
     // Layer 2
     static const std::string NAMESPACE_SCHEMA_IDENTIFY;

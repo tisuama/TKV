@@ -18,6 +18,10 @@ public:
 		return &instance;
 	}
 	~SchemaManager() {}
+    
+    void set_meta_state_machine(MetaStateMachine* s) {
+        _meta_state_machine = s;
+    }
 
 	int check_and_get_for_privilege(pb::UserPrivilege& user_privilege);
 

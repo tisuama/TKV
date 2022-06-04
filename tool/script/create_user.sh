@@ -22,9 +22,9 @@ curl -s -d '{
 	
 # 查询权限
 
-curl -s -d '{
-	"op_type": "QUERY_USERRPRIVILEG"
-}' http://$1/MetaService/query
+# curl -s -d '{
+# 	"op_type": "QUERY_USERRPRIVILEG"
+# }' http://$1/MetaService/meta_manager
 
 echo -e "\n"
 	

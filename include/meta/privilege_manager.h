@@ -27,13 +27,17 @@ public:
     void create_user(const pb::MetaManagerRequest& request, braft::Closure* done);
     void add_privilege(const pb::MetaManagerRequest& request, braft::Closure* done);
 
-    void set_meta_state_machine(MetaStateMachine* meta_state_machine) {
-        _meta_state_machine = meta_state_machine;
+    void set_meta_state_machine(MetaStateMachine* s) {
+        _meta_state_machine = s;
     }
 
 private:
     PrivilegeManager() {
         bthread_mutex_init(&_user_mutex, NULL);
+    }
+    
+    std::string construct_privilege_key(const std::string& user_name) {
+        return MetaServer::PRIVILEGE_IDENTIFY + user_name;
     }
         
     bthread_mutex_t _user_mutex;

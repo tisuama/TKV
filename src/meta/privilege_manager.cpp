@@ -1,3 +1,4 @@
+#include "meta/meta_rocksdb.h"
 #include "meta/privilege_manager.h"
 #include "meta/schema_manager.h"
 
@@ -56,7 +57,27 @@ void PrivilegeManager::create_user(const pb::MetaManagerRequest& request, braft:
         IF_DONE_SET_RESPONSE(done, pb::INPUT_PARAM_ERROR, "request invalid");
         return ;
     }
-    // TODO: next
+    // set version
+    user_privilege.set_version(1);
+    // build key and value
+    std::string value;
+    if (!user_privilege.SerializeToString(&value)) {
+        DB_WARNING("request serialize to string fail, request: %s", request.ShortDebugString().c_str());  
+        IF_DONE_SET_RESPONSE(done, pb::PARSE_TO_PB_FAIL, "serialize to string failed");
+        return ;
+    }
+    // write to db
+    ret = MetaRocksdb::get_instance()->put_meta_info(construct_privilege_key(user_name), value);
+    if (ret < 0) {
+        DB_WARNING("add user_name: %s to rocksdb failed", user_name.c_str());
+        IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "write to db failed");
+        return ;
+    }
+    // update mem info
+    BAIDU_SCOPED_LOCK(_user_mutex);
+    _user_privilege[user_name] = user_privilege;
+    IF_DONE_SET_RESPONSE(done, pb::SUCCESS, "success");
+    DB_NOTICE("create user: %s success, request: %s", user_name.c_str(), request.ShortDebugString().c_str());
 }
 
 void PrivilegeManager::add_privilege(const pb::MetaManagerRequest& request, braft::Closure* done) {

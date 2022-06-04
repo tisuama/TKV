@@ -2,6 +2,11 @@
 #include "engine/rocks_wrapper.h"
 #include "meta/cluster_manager.h"
 #include "meta/meta_rocksdb.h"
+#include "meta/privilege_manager.h"
+#include "meta/schema_manager.h"
+#include "meta/namespace_manager.h"
+#include "meta/table_manager.h"
+#include "meta/database_manager.h"
 
 namespace TKV {
 DECLARE_int32(meta_port); 
@@ -13,6 +18,7 @@ DECLARE_string(default_physical_room);
 const std::string MetaServer::CLUSTER_IDENTIFY(1, 0x1);
 const std::string MetaServer::INSTANCE_CLUSTER_IDENTIFY(1, 0x3);
 const std::string MetaServer::SCHEMA_IDENTIFY(1, 0x02);
+const std::string MetaServer::PRIVILEGE_IDENTIFY(1, 0x03);
 
 const std::string MetaServer::MAX_ID_SCHEMA_IDENTIFY(1, 0x01);
 const std::string MetaServer::NAMESPACE_SCHEMA_IDENTIFY(1, 0x02);
@@ -55,8 +61,7 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
         ClusterManager::get_instance()->process_cluster_info(controller, request, response, done_guard.release());
         return ;
     } else if (request->op_type() == pb::OP_CREATE_USER) {
-        // TODO: privilege manager 
-        // PrivilegeManager::get_instance()->process_user_privilege(controller, request, response, done_guard.release()); 
+        PrivilegeManager::get_instance()->process_user_privilege(controller, request, response, done_guard.release()); 
         return;
     } else {
         DB_WARNING("unknow op_type, requrest: %s", request->ShortDebugString().c_str());
@@ -97,6 +102,13 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     }
     DB_WARNING("meta state machine init sucess");
     _init_sucess = true;
+
+    // set state machine for all kind of manager
+    SchemaManager::get_instance()->set_meta_state_machine(_meta_state_machine);
+    PrivilegeManager::get_instance()->set_meta_state_machine(_meta_state_machine);
+    ClusterManager::get_instance()->set_meta_state_machine(_meta_state_machine);
+    
+    
     return 0;
 }
 } //namespace of TKV

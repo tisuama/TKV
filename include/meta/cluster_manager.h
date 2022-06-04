@@ -75,6 +75,10 @@ public:
                MetaServer::INSTANCE_CLUSTER_IDENTIFY + 
                instance;
     }
+    
+    void set_meta_state_machine(MetaStateMachine* s) {
+        _meta_state_machine = s;
+    }
 
 private:
     ClusterManager() {
