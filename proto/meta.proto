@@ -235,7 +235,7 @@ message NameSpaceInfo {
     optional string    resource_tag = 6;
 };
 
-message DataBaseInfo {
+message DatabaseInfo {
     required string     database_name = 1;
     optional int64      database_id = 2;
     required string     namespace_name = 3;
@@ -252,7 +252,7 @@ message UserPrivilege {
     required string     namespace_name = 3;
     optional int64      namespace_id = 4;
     repeated PrivilegeDatabase privilege_database = 5;
-    repeated PrivilegeTable    table = 6;
+    repeated PrivilegeTable    privilege_table = 6;
     repeated string     bns = 7;
     repeated string     ip = 8;
     optional int64      version = 9;
@@ -310,7 +310,7 @@ message MetaManagerRequest {
     required OpType                  op_type         = 1;
     optional SchemaInfo              table_info      = 2;// 建立、删除表
     optional NameSpaceInfo           namespace_info  = 3;// 建立、删除、修改namespace
-    optional DataBaseInfo            database_info   = 4;// 建立、删除、修改database
+    optional DatabaseInfo            database_info   = 4;// 建立、删除、修改database
     optional UserPrivilege           user_privilege  = 5;// 创建用户、增加权限
     // 加字段、索引，删除字段、索引，改字段、索引名称，改类型
     // optional AlterTableRequest       alter_table     = 6;

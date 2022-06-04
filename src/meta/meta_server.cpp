@@ -13,7 +13,10 @@ DECLARE_string(default_physical_room);
 const std::string MetaServer::CLUSTER_IDENTIFY(1, 0x1);
 const std::string MetaServer::INSTANCE_CLUSTER_IDENTIFY(1, 0x3);
 const std::string MetaServer::SCHEMA_IDENTIFY(1, 0x02);
+
+const std::string MetaServer::MAX_ID_SCHEMA_IDENTIFY(1, 0x01);
 const std::string MetaServer::NAMESPACE_SCHEMA_IDENTIFY(1, 0x02);
+const std::string MetaServer::DATABASE_SCHEMA_IDENTIFY(1, 0x03);
 
 void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
      const ::TKV::pb::StoreHBRequest* request,

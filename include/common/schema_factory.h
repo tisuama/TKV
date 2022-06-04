@@ -145,7 +145,7 @@ using DoubleBufferStringSet = DoubleBufferedSet<std::string>;
 class SchemaFactory {
 typedef RepeatedPtrField<pb::RegionInfo> RegionVec;
 typedef RepeatedPtrField<pb::SchemaInfo> SchemaVec;
-typedef RepeatedPtrField<pb::DataBaseInfo>  DataBaseVec;
+typedef RepeatedPtrField<pb::DatabaseInfo>  DataBaseVec;
 public:
     virtual ~SchemaFactory() {
         bthread_mutex_destroy(&_update_slow_db_mutex);
