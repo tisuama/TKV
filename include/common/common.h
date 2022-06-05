@@ -45,6 +45,29 @@ namespace TKV {
         }\
     } while(0);
 
+class ScopeGuard {
+public:
+    explicit ScopeGuard(std::function<void()> exit_func): 
+       _exit_func(exit_func) {}
+    ~ScopeGuard() {
+        if (!_is_release) {
+            _exit_func();
+        }
+    } 
+    
+    void release() {
+        _is_release = true;
+    }
+
+private:
+    std::function<void()> _exit_func;        
+    bool _is_release {false};
+    DISALLOW_COPY_AND_ASSIGN(ScopeGuard);
+};
+
+#define SCOPEGUARD_LINENAME_CAT(name, line) name##line
+#define SCOPEGUARD_LINENAME(name, line) SCOPEGUARD_LINENAME_CAT(name, line) 
+#define ON_SCOPED_EXIT(callback) ScopeGuard SCOPEGUARD_LINENAME(scoped_gurad, __LINE__)(callback)
 
 class Bthread {
 public:

@@ -24,6 +24,11 @@ public:
     }
 
 	int check_and_get_for_privilege(pb::UserPrivilege& user_privilege);
+    
+    void process_schema_info(google::protobuf::RpcController* controller, 
+                            const pb::MetaManagerRequest* request, 
+                            pb::MetaManagerResponse* response, 
+                            google::protobuf::Closure* done);
 
 private:
 	SchemaManager() {};

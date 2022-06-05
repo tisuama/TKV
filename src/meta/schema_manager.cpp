@@ -49,5 +49,53 @@ int SchemaManager::check_and_get_for_privilege(pb::UserPrivilege& user_privilege
     
 	return 0;
 }
+
+void SchemaManager::process_schema_info(google::protobuf::RpcController* controller, 
+                        const pb::MetaManagerRequest* request, 
+                        pb::MetaManagerResponse* response, 
+                        google::protobuf::Closure* done) {
+    brpc::ClosureGuard done_gurad(done);    
+    int64_t log_id = 0;
+    brpc::Controller* cntl;
+    if (controller) {
+        cntl = static_cast<brpc::Controller*>(controller); 
+        if (cntl->has_log_id()) {
+            log_id = cntl->log_id();
+        }
+    }
+    if (!_meta_state_machine->is_leader()) {
+        ERROR_SET_RESPONSE(response, pb::NOT_LEADER, "not leader", request->op_type(), log_id);
+        return ;
+    }
+    ON_SCOPED_EXIT(([cntl, log_id, response]() {
+        if (response!= nullptr && response->errcode() != pb::SUCCESS) {
+            const auto& remote_side = butil::endpoint2str(cntl->remote_side());
+            DB_WARNING("response error, remote_side: %s, log_id: %ld", remote_side, log_id);
+        }
+    }));
+    
+    // do something
+    switch(request->op_type()) {
+        case pb::OP_CREATE_NAMESPACE:
+            if (!request->has_namespace_info()) {
+                ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR, 
+                        "no namespace info", request->op_type(), log_id);
+                return ;
+            }
+            if (request->op_type() == pb::OP_MODIFY_NAMESPACE
+                    && !request->namespace_info().has_quota()) {
+                ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
+                        "no namesace quota", request->op_type(), log_id);
+                return ;
+            }
+            _meta_state_machine->process(controller, request, response, done_gurad.release());
+            return ;
+        default:
+            ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
+                    "invalid op_type", request->op_type(), log_id);
+            return;
+    }
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
