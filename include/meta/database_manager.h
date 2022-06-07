@@ -2,6 +2,7 @@
 #include <unordered_map>
 #include "proto/meta.pb.h"
 #include "meta/meta_server.h"
+#include "meta/schema_manager.h"
 
 namespace TKV {
 class DatabaseManager {
@@ -21,6 +22,9 @@ public:
         }
         return 0;
     }
+
+    // Raft串行访问
+    void create_database(const pb::MetaManagerRequest& request, braft::Closure* done);
 
 private:
     DatabaseManager(): _max_db_id(0) {

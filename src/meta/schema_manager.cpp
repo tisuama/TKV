@@ -90,6 +90,20 @@ void SchemaManager::process_schema_info(google::protobuf::RpcController* control
             }
             _meta_state_machine->process(controller, request, response, done_gurad.release());
             return ;
+        case pb::OP_CREATE_DATABASE:
+            if (!request->has_database_info()) {
+                ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
+                        "no database info", request->op_type(), log_id);
+                return ;
+            }
+            if (request->op_type() == pb::OP_CREATE_DATABASE
+                    && !request->database_info().has_quota()) {
+                ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
+                        "no database quota", request->op_type(), log_id);
+                return ;
+            }
+            _meta_state_machine->process(controller, request, response, done_gurad.release());
+            return ;
         default:
             ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
                     "invalid op_type", request->op_type(), log_id);
