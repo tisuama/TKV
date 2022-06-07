@@ -27,6 +27,22 @@ public:
         return _nid_map[nname];
     }
 
+    void set_namespace_info(const pb::NamespaceInfo& ninfo) {
+        BAIDU_SCOPED_LOCK(_nmutex);
+        _nid_map[ninfo.namespace_name()] = ninfo.namespace_id();
+        _ninfo_map[ninfo.namespace_id()] = ninfo;
+    }
+    
+    void set_max_namespace_id(int64_t max_nid) {
+        BAIDU_SCOPED_LOCK(_nmutex);
+        _max_nid = max_nid;
+    }
+    
+    int64_t get_max_namspace_id() {
+        BAIDU_SCOPED_LOCK(_nmutex);
+        return _max_nid;
+    }
+
     // Raft串行接口访问
     void create_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);
     void drop_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);
@@ -45,7 +61,7 @@ private:
         return nkey;
     }
     
-    std::string construct_max_namespace_key() {
+    std::string construct_max_namespace_id_key() {
         std::string max_nkey = MetaServer::SCHEMA_IDENTIFY + 
             MetaServer::MAX_ID_SCHEMA_IDENTIFY + 
             SchemaManager::MAX_NAMESPACE_ID_KEY;
@@ -57,7 +73,7 @@ private:
     // namespace name -> namespace id
     std::unordered_map<std::string, int64_t> _nid_map;
     // namespace name -> namespace info
-    std::unordered_map<int64_t, pb::NameSpaceInfo> _ninfo_map;
+    std::unordered_map<int64_t, pb::NamespaceInfo> _ninfo_map;
     std::unordered_map<int64_t, std::set<int64_t>> _db_ids;
     
 };
