@@ -42,6 +42,19 @@ public:
         BAIDU_SCOPED_LOCK(_nmutex);
         return _max_nid;
     }
+    
+    const std::string get_resource_tag(const int64_t nid) {
+        BAIDU_SCOPED_LOCK(_nmutex);
+        if (_ninfo_map.find(nid) == _ninfo_map.end()) {
+            return "";
+        }
+        return _ninfo_map[nid].resource_tag();
+    }
+
+    void add_database_id(int64_t nid, int64_t db_id) {
+        BAIDU_SCOPED_LOCK(_nmutex);
+        _db_ids[nid].insert(db_id);
+    }
 
     // Raft串行接口访问
     void create_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);

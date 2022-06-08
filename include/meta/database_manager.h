@@ -23,6 +23,19 @@ public:
         return 0;
     }
 
+    void set_database_info(const pb::DatabaseInfo& db_info) {
+        BAIDU_SCOPED_LOCK(_db_mutex);
+        std::string db_name = db_info.namespace_name() + 
+            "\001" + db_info.database_name();
+        _db_id_map[db_name] = db_info.database_id();
+        _db_info_map[db_info.database_id()] = db_info;
+    }
+    
+    void set_max_database_id(const int64_t db_id) {
+        BAIDU_SCOPED_LOCK(_db_mutex);
+        _max_db_id = db_id;
+    }
+
     // Raft串行访问
     void create_database(const pb::MetaManagerRequest& request, braft::Closure* done);
 
@@ -50,8 +63,8 @@ private:
     int64_t         _max_db_id;
     // database_name -> database_id
     std::unordered_map<std::string, int64_t> _db_id_map;
-    std::unordered_map<std::string, pb::DatabaseInfo> _db_info_map;
-    std::unordered_map<std::int64_t, std::set<int64_t>> _table_ids;
+    std::unordered_map<int64_t, pb::DatabaseInfo> _db_info_map;
+    std::unordered_map<int64_t, std::set<int64_t>> _table_ids;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
