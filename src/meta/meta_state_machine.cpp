@@ -48,6 +48,9 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
         case pb::OP_CREATE_DATABASE:
             DatabaseManager::get_instance()->create_database(request, done);
             break;
+        case pb::OP_CREATE_TABLE:
+            TableManager::get_instance()->create_table(request, iter.index(), done);
+            break;
         default:
             DB_FATAL("unsupport request op_type, type: %s", request.op_type());
             IF_DONE_SET_RESPONSE(done, pb::UNSUPPORT_REQ_TYPE,  "unsupport request type");

@@ -104,6 +104,17 @@ void SchemaManager::process_schema_info(google::protobuf::RpcController* control
             }
             _meta_state_machine->process(controller, request, response, done_gurad.release());
             return ;
+        case pb::OP_CREATE_TABLE:
+            if (!request->has_table_info()) {
+                ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
+                        "no schema info", request->op_type(), log_id);
+            }
+            if (request->op_type() == pb::OP_CREATE_TABLE) {
+                auto ret = pre_process_for_create_table(request, response, log_id);
+                if (ret < 0) return ;
+            }
+            _meta_state_machine->process(controller, request, response, done_gurad.release()); 
+            return ;
         default:
             ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
                     "invalid op_type", request->op_type(), log_id);

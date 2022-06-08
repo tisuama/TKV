@@ -72,6 +72,9 @@ public:
         return 0;
     }
 
+    // Raft 串行调用接口
+    void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
+
 private:
     TableManager(): _max_table_id(0) {
         bthread_mutex_init(&_table_mutex, NULL);

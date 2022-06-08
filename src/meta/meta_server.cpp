@@ -69,6 +69,9 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
     } else if (request->op_type() == pb::OP_CREATE_DATABASE) {
         SchemaManager::get_instance()->process_schema_info(controller, request, response, done_guard.release());
         return ;
+    } else if (request->op_type() == pb::OP_CREATE_TABLE) {
+        SchemaManager::get_instance()->process_schema_info(controller, request, response, done_guard.release());
+        return ;
     } else {
         DB_WARNING("unknow op_type, requrest: %s", request->ShortDebugString().c_str());
     }
