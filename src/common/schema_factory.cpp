@@ -19,14 +19,14 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
     
     if (!table.has_database_id() ||
             !table.has_table_id() ||
-            !table.has_database() ||
+            !table.has_database_name() ||
             !table.has_table_name()) {
         DB_FATAL("missing field in schemainfo: %s", table.ShortDebugString().data());
         return -1;
     }
     int64_t db_id = table.database_id();
     int64_t table_id = table.table_id();
-    const std::string& db_name = table.database();
+    const std::string& db_name = table.database_name();
     const std::string& table_name = table.table_name();
     const std::string& namesp = table.namespace_name();
 

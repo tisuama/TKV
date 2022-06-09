@@ -3,6 +3,7 @@
 #include "meta/privilege_manager.h"
 #include "meta/namespace_manager.h"
 #include "meta/database_manager.h"
+#include "meta/table_manager.h"
 #include <braft/util.h>
 
 namespace TKV {

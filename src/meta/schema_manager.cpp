@@ -2,6 +2,7 @@
 #include "meta/namespace_manager.h"
 #include "meta/database_manager.h"
 #include "meta/table_manager.h"
+#include "proto/meta.pb.h"
 
 namespace TKV {
 const std::string SchemaManager::MAX_NAMESPACE_ID_KEY = "max_namespace_id";
@@ -122,5 +123,45 @@ void SchemaManager::process_schema_info(google::protobuf::RpcController* control
     }
 }
 
+int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* request, 
+       pb::MetaManagerResponse* response,
+       uint64_t log_id) {
+    auto& table_info = const_cast<pb::SchemaInfo&>(request->table_info());
+    int partition_num = 1;
+    if (table_info.has_partition_num()) {
+        partition_num = table_info.partition_num();
+    }
+    // 分区表多region
+    if (table_info.has_region_num()) {
+        int32_t region_num = table_info.region_num();
+        if (region_num > 1) {
+            auto skey = table_info.add_split_keys();
+            // split->keys->set_index_name(primary_index_name);
+            for (auto r = 1; r < region_num; r++) {
+                skey->add_split_keys(std::string(r + 1, 0x01));
+            }
+        }
+    }
+    // 校验split_key有序
+    // split_index
+    // split_keys(0)
+    // split_keys(1)
+    int total_region_cnt = 0;
+    for (auto& skey: request->table_info().split_keys()) {
+        for (auto i = 1; i < skey.split_keys_size(); i++) {
+            if (skey.split_keys(i) <= skey.split_keys(i - 1)) {
+                ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR, 
+                        "split key not sorted", request->op_type(), log_id);
+                return -1;
+            }
+        }
+        total_region_cnt += skey.split_keys_size() + 1;
+    }
+    
+    auto request = const_cast<pb::MetaManagerRequest*>(request);
+    std::string logical_room;
+    // 指定跨机房
+    // TODO: next
+} 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

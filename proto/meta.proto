@@ -149,7 +149,7 @@ message SchemaInfo {
     optional int64 table_id = 1;
     required string table_name = 2;
     optional string new_table_name = 3;
-    required string database = 4;
+    required string database_name = 4;
     optional int64 database_id = 5;
     required string namespace_name = 6;
     optional int64 namespace_id = 7;
@@ -162,7 +162,7 @@ message SchemaInfo {
     repeated ReplicaDist dists = 14;
     optional string main_logical_room = 15;
     optional int64  region_split_lines = 16;
-    optional SplitKey split_keys = 17;
+    repeated SplitKey split_keys = 17;
     repeated string  learner_resource_tags = 19;
     optional int32 region_num = 20;
     optional string comment = 21; 
