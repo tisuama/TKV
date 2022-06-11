@@ -35,6 +35,14 @@ public:
         BAIDU_SCOPED_LOCK(_db_mutex);
         _max_db_id = db_id;
     }
+    
+    const std::string get_resource_tag(const int64_t db_id) {
+        BAIDU_SCOPED_LOCK(_db_mutex);
+        if (_db_info_map.find(db_id) == _db_info_map.end()) {
+            return "";
+        }
+        return  _db_info_map[db_id].resource_tag();
+    }
 
     // Raft串行访问
     void create_database(const pb::MetaManagerRequest& request, braft::Closure* done);

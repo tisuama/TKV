@@ -24,6 +24,10 @@ public:
     }
 
 	int check_and_get_for_privilege(pb::UserPrivilege& user_privilege);
+    int whether_dists_legal(pb::MetaManagerRequest* request,
+            pb::MetaManagerResponse* response, 
+            std::string& logical_room,
+            uint64_t log_id);
     
     // Raft接口之前调用
     void process_schema_info(google::protobuf::RpcController* controller, 
@@ -33,7 +37,6 @@ public:
     int pre_process_for_create_table(const pb::MetaManagerRequest* request, 
            pb::MetaManagerResponse* response,
            uint64_t log_id); 
-
 
         
 private:

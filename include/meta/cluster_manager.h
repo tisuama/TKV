@@ -70,6 +70,8 @@ public:
     // called when on_apply
     void add_instance(const meta_req& request, Closure* done);
 
+    
+    // comon fun
     std::string construct_instance_key(const std::string& instance) {
         return MetaServer::CLUSTER_IDENTIFY +
                MetaServer::INSTANCE_CLUSTER_IDENTIFY + 
@@ -79,6 +81,15 @@ public:
     void set_meta_state_machine(MetaStateMachine* s) {
         _meta_state_machine = s;
     }
+    
+    bool logical_room_exist(const std::string& logical_room) {
+        BAIDU_SCOPED_LOCK(_phy_mutex);
+        if (_log_phy_map.find(logical_room) != _log_phy_map.end() &&
+               _log_phy_map[logical_room].size() != 0)  {
+            return true;
+        }
+        return false;
+    } 
 
 private:
     ClusterManager() {

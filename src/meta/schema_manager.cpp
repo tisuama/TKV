@@ -3,6 +3,7 @@
 #include "meta/database_manager.h"
 #include "meta/table_manager.h"
 #include "proto/meta.pb.h"
+#include "meta/cluster_manager.h"
 
 namespace TKV {
 const std::string SchemaManager::MAX_NAMESPACE_ID_KEY = "max_namespace_id";
@@ -142,7 +143,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
             }
         }
     }
-    // 校验split_key有序
+    // 校验split_key有序, split_key.index_name必须在index_name中
     // split_index
     // split_keys(0)
     // split_keys(1)
@@ -158,10 +159,82 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         total_region_cnt += skey.split_keys_size() + 1;
     }
     
-    auto request = const_cast<pb::MetaManagerRequest*>(request);
-    std::string logical_room;
-    // 指定跨机房
-    // TODO: next
+    auto mutable_request = const_cast<pb::MetaManagerRequest*>(request);
+    std::string main_logical_room;
+    auto ret = whether_dists_legal(mutable_request, response, main_logical_room, log_id);
+    if (ret < 0) {
+        DB_WARNING("select main logical room failed, exit now");
+        return -1;
+    }
+    if (request->table_info().has_main_logical_room()) {
+        main_logical_room = request->table_info().main_logical_room();
+    } 
+
+    // partition_num * total_region_cnt 
+    total_region_cnt += partition_num * total_region_cnt;
+    std::string tag = request->table_info().resource_tag();
+    if (!table_info.has_resource_tag()) {
+        std::string nname = table_info.namespace_name();
+        std::string db_name = nname + "\001" + table_info.database_name();
+        int64_t db_id = DatabaseManager::get_instance()->get_database_id(db_name);
+        std::string db_tag = DatabaseManager::get_instance()->get_resource_tag(db_id);
+        if (tag != "") {
+            tag = db_tag;
+        }
+    }
+    mutable_request->mutable_table_info()->set_resource_tag(tag);
+    DB_WARNING("create table should select intance count: %ld", total_region_cnt);
+    for (int i = 0; i < total_region_cnt; i++) {
+        std::string instance;
+        int ret = ClusterManager::get_instance()->select_instance_rolling(
+                tag, {}, main_logical_room, instance);
+        if (ret < 0) {
+            ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR, 
+                    "select instance fail", request->op_type(), log_id);
+            return -1;
+        }
+        mutable_request->mutable_table_info()->add_instance_sotre(instance);
+    }
+    return 0;
 } 
+
+int whether_dists_legal(pb::MetaManagerRequest* request,
+        pb::MetaManagerResponse* response, 
+        std::string& candidate_logical_room,
+        uint64_t log_id) {
+    if (request->table_info().dists_size() == 0) {
+        return -1;
+    }
+    // 检查逻辑机房是否存在
+    uint64_t total_count = 0;
+    for (auto& d : request->table_info().dists()) {
+        std::string room = d.logical_room();
+        if (ClusterManager::get_instance()->logical_room_exist(room)) {
+            total_count += d.count();
+            continue;
+        }
+        ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR, 
+                "logical room not exist, select intance fail",
+                request->op_type(), log_id);
+        return -1;
+    }
+    if (request->table_info().main_logical_room().size() != 0) {
+        int max_count = 0;
+        // 副本数量最多的是主机房
+        for (auto& d : request->table_info().dists()) {
+            if (d.count() > max_count) {
+                max_count = d.count();
+                candidate_logical_room = d.logical_room();
+            }
+        }
+    }
+    // sum(dists.count) = replica_num
+    if (total_count != (uint64_t)request->table_info().replica_num()) {
+        ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
+                "replica num not match", request->op_type(), log_id);
+        return -1;
+    }
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
