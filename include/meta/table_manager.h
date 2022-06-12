@@ -39,6 +39,7 @@ struct TableMem {
     // 存放key发生变化的region，以该region为准，查找merge和split涉及到的所有region
     std::map<int64_t, SmartRegionInfo> id_to_region_map; 
     int64_t main_table_id {0}; 
+    int64_t global_index_id {0};
     bool    is_partition {false};
     std::vector<std::string> learner_resource_tag;
     int64_t statis_version {0};

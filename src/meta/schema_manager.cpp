@@ -133,6 +133,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         partition_num = table_info.partition_num();
     }
     // 分区表多region
+    // Set split_key
     if (table_info.has_region_num()) {
         int32_t region_num = table_info.region_num();
         if (region_num > 1) {
@@ -159,6 +160,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         total_region_cnt += skey.split_keys_size() + 1;
     }
     
+    // Set schema main_logical_room
     auto mutable_request = const_cast<pb::MetaManagerRequest*>(request);
     std::string main_logical_room;
     auto ret = whether_dists_legal(mutable_request, response, main_logical_room, log_id);
@@ -170,6 +172,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         main_logical_room = request->table_info().main_logical_room();
     } 
 
+    // Set schema resource tag
     // partition_num * total_region_cnt 
     total_region_cnt += partition_num * total_region_cnt;
     std::string tag = request->table_info().resource_tag();
@@ -193,7 +196,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
                     "select instance fail", request->op_type(), log_id);
             return -1;
         }
-        mutable_request->mutable_table_info()->add_instance_sotre(instance);
+        mutable_request->mutable_table_info()->add_init_sotre(instance);
     }
     return 0;
 } 
