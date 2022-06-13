@@ -1,8 +1,10 @@
 #include "meta/table_manager.h"
+#include "meta/namespace_manager.h"
+#include "meta/database_manager.h"
 
 namespace TKV {
 void TableManager::create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done) {
-    auto& table_info = const_cast<pb::SchemaInfo&>(request->table_info());
+    auto& table_info = const_cast<pb::SchemaInfo&>(request.table_info());
     table_info.set_timestamp(time(NULL));
     table_info.set_version(1);
     
@@ -30,10 +32,10 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
     table_info.set_database_id(db_id);
 
     // 分配table id
-    int64_t max_table_id = _max_table_id;
+    int64_t max_table_id = this->_max_table_id;
     table_info.set_table_id(++max_table_id);
     table_mem.main_table_id = max_table_id;
-    talbe_mem.global_index_id = max_table_id;
+    table_mem.global_index_id = max_table_id;
     // whether_level_table = false 
     if (!table_info.has_partition_num()) {
         table_info.set_partition_num(1);
@@ -41,7 +43,7 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
     if (!table_info.has_region_size()) {
         table_info.set_region_size(FLAGS_region_size);
     }
-    if (!talbe_info.has_replica_num()) {
+    if (!table_info.has_replica_num()) {
         table_info.set_replica_num(FLAGS_replica_num);
     }
     // TODO: 分配field_id，index_id
@@ -56,8 +58,37 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
     bool has_auto_increament = false;
     // auto ret = write_schema_for_not_level(table_mem, done, max_table_id, has_auto_increament);
      
-
-
 }
+
+
+void TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
+                                int64_t max_table_id, bool has_auto_increment) {
+    // 如果创建成功，则不需要任何操作
+    // 如果创建失败，则需要手动调用table接口删除
+    std::vector<std::string> rocksdb_keys;
+    std::vector<std::string> rocksdb_values;
+
+    std::string max_table_id_value;
+    max_table_id_value.append((char*)&max_table_id, sizeof(max_table_id));
+    rocksdb_keys.push_back(this->construct_max_table_id_key());
+    rocksdb_values.push_back(max_table_id_value);
+
+    // 持久话region_info，与store交互
+    // 准备partition_num个数的region_info
+    int64_t max_region_id = RegionManager::get_instance()->get_max_region_id();
+    int64_t start_region_id = max_region_id + 1;
+
+    std::shared_ptr<std::vector<pb::InitRegion>> init_regions(new std::vector<pb::InitRegion>{});
+    // schema_pb.init_store set in pre_process_for_create_table()
+    init_regions->reserve(table_mem.schema_pb.init_store_size());
+    int64_t instance_count = 0;
+    pb::SchemaInfo schema_info = table_mem.schema_pb;
+    int64_t main_table_id = schema_info.table_id();
+    schema_info.clear_init_store();
+    schema_info.clear_split_keys();
+    // 全局索引和主键索引需要建region
+    // 有split_key的先处理 
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

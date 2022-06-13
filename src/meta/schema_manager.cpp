@@ -187,6 +187,8 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
     }
     mutable_request->mutable_table_info()->set_resource_tag(tag);
     DB_WARNING("create table should select intance count: %ld", total_region_cnt);
+    
+    // Add instance
     for (int i = 0; i < total_region_cnt; i++) {
         std::string instance;
         int ret = ClusterManager::get_instance()->select_instance_rolling(
@@ -196,7 +198,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
                     "select instance fail", request->op_type(), log_id);
             return -1;
         }
-        mutable_request->mutable_table_info()->add_init_sotre(instance);
+        mutable_request->mutable_table_info()->add_init_store(instance);
     }
     return 0;
 } 

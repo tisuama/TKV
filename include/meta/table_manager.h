@@ -75,8 +75,16 @@ public:
 
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
+    void write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
+                                    int64_t max_table_id, bool has_auto_increment = false);
 
 private:
+    std::string construct_max_table_id_key() {
+        std::string max_table_id_key = MetaServer::SCHEMA_IDENTIFY + 
+                MetaServer::MAX_ID_SCHEMA_IDENTIFY + SchemaManager::MAX_TABLE_ID_KEY;
+        return max_table_id_key;
+    }
+
     TableManager(): _max_table_id(0) {
         bthread_mutex_init(&_table_mutex, NULL);
     }
