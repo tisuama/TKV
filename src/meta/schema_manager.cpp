@@ -138,6 +138,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         int32_t region_num = table_info.region_num();
         if (region_num > 1) {
             auto skey = table_info.add_split_keys();
+            // split_key index_name为primary_index_name
             // split->keys->set_index_name(primary_index_name);
             for (auto r = 1; r < region_num; r++) {
                 skey->add_split_keys(std::string(r + 1, 0x01));
@@ -145,9 +146,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         }
     }
     // 校验split_key有序, split_key.index_name必须在index_name中
-    // split_index
-    // split_keys(0)
-    // split_keys(1)
+    // split_index split_keys(0) split_keys(1)
     int total_region_cnt = 0;
     for (auto& skey: request->table_info().split_keys()) {
         for (auto i = 1; i < skey.split_keys_size(); i++) {

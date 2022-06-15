@@ -1,8 +1,13 @@
 #include "meta/table_manager.h"
 #include "meta/namespace_manager.h"
 #include "meta/database_manager.h"
+#include "meta/region_manager.h"
+#include "proto/store.pb.h"
 
 namespace TKV {
+DEFINE_int32(region_size, 100 * 1024 * 1024, "region capacity, default: 100M");
+DEFINE_int32(replica_num, 3, "region replica num, default: 3");
+
 void TableManager::create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done) {
     auto& table_info = const_cast<pb::SchemaInfo&>(request.table_info());
     table_info.set_timestamp(time(NULL));
@@ -87,7 +92,21 @@ void TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closur
     schema_info.clear_init_store();
     schema_info.clear_split_keys();
     // 全局索引和主键索引需要建region
-    // 有split_key的先处理 
+    // 处理含有split_key的index
+    for (int i = 0; i < table_mem.schema_pb.partition_num(); i++) {
+        if (table_mem.schema_pb.engine() != pb::ROCKSDB ||
+            table_mem.schema_pb.engine() != pb::ROCKSDB_CSTORE) {
+            continue;
+        }    
+
+        for (auto& split_key : table_mem.schema_pb.split_keys()) {
+            CHECK(!split_key.has_index_name());  
+            for (auto j = 0; j <= split_key.split_keys_size(); j++) {
+                pb::InitRegion region_request;
+                pb::RegionInfo* region_info = region_request.mutable_region_info();                 
+            }
+        }
+    }
 }
 
 } // namespace TKV
