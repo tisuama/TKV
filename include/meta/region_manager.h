@@ -1,21 +1,53 @@
 #pragma once
 
-#include <unordered_set>
+#include "meta/schema_manager.h"
+
+#include "common/common.h"
+#include <unordered_map>
 #include <set>
 
 namespace TKV {
+struct RegionStateInfo {
+    int64_t timestamp;
+    pb::Status status;
+};    
+
+struct RegionPeerState {
+    std::vector<pb::PeerStateInfo> legal_peers_state;   // peers in raft group
+    std::vector<pb::PeerStateInfo> ilegal_peers_state;  // peers not in raft group
+};
+
+struct RegionLearnerState {
+    std::map<std::string, pb::PeerStateInfo> learner_state_map;
+    TimeCost                                 tc;
+};
+
+typedef std::shared_ptr<RegionStateInfo> SmartRegionStateInfo;
 class RegionManager {
 public:
     ~RegionManager() {
+        bthread_mutex_destroy(&_ins_region_mutex);
+        bthread_mutex_destroy(&_ins_learner_mutex);
+        bthread_mutex_destroy(&_cond_mutex);
+        bthread_mutex_destroy(&_doing_mutex);
     }
     static RegionManager* get_instance() {
         static RegionManager instance;
         return &instance;
     }
+    
+    int64_t get_max_region_id() const {
+        return _max_region_id;
+    }
+
 private:
     RegionManager(): _max_region_id(0) {
         _doing_recovery = false;
         _last_opt_times = butil::gettimeofday_us();
+        bthread_mutex_init(&_ins_region_mutex, NULL);
+        bthread_mutex_init(&_ins_learner_mutex, NULL);
+        bthread_mutex_init(&_cond_mutex, NULL);
+        bthread_mutex_init(&_doing_mutex, NULL);
     }
     int64_t                                 _max_region_id;
     int64_t                                 _last_opt_times;
@@ -32,6 +64,18 @@ private:
     ThreadSafeMap<int64_t, RegionPeerState> _region_peer_state_map;
     ThreadSafeMap<int64_t, RegionLearnerState> _region_leader_state_map;
     
+    bthread_mutex_t _cond_mutex;
+    std::unordered_map<std::string, std::unordered_map<int64_t, int64_t>> _ins_leader_count; 
+    // instance_table_id -> pk_prefix -> leader region count
+    std::unordered_map<std::string, std::unordered_map<std::string, int64_t>> _ins_pk_leader_count;
+    // region_id -> logical room
+    // 处理store心跳发现大户不均，标记需要迁移的region_id及候选store需要在logical_room
+    // check_peer_count发现region_id在map里，直接按照大户的维度删除peer数量最多的candidate，
+    // 否则按照table的维度删除peer
+    std::unordered_map<int64_t, std::string> _remove_region_peer_on_pk_prefix;
 
+    bthread_mutex_t       _doing_mutex;
+    std::set<std::string> _doing_migrate;
+};    
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

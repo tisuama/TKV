@@ -91,6 +91,8 @@ public:
         return false;
     } 
 
+
+
 private:
     ClusterManager() {
         bthread_mutex_init(&_phy_mutex, NULL);

@@ -73,6 +73,18 @@ public:
         return 0;
     }
 
+    void construct_region_common(pb::RegionInfo* region_info, int32_t replica_num) {
+        region_info->set_version(1);
+        region_info->set_conf_version(1);
+        region_info->set_replica_num(replica_num);
+        region_info->set_used_size(0);
+        region_info->set_log_index(0);
+        region_info->set_status(pb::IDLE);
+        region_info->set_can_add_peer(false);
+        region_info->set_parent(0);
+        region_info->set_timestamp(time(NULL));
+    }
+
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
     void write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,

@@ -77,6 +77,7 @@ file(GLOB META_SERVER
 	src/meta/namespace_manager.cpp
 	src/meta/database_manager.cpp
 	src/meta/table_manager.cpp
+	src/meta/region_manager.cpp
 	)
 add_library(meta_server_lib OBJECT ${META_SERVER})
 

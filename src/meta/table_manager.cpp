@@ -104,6 +104,26 @@ void TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closur
             for (auto j = 0; j <= split_key.split_keys_size(); j++) {
                 pb::InitRegion region_request;
                 pb::RegionInfo* region_info = region_request.mutable_region_info();                 
+                region_info->set_region_id(++max_region_id);
+                region_info->set_table_id(main_table_id);
+                region_info->set_main_table_id(main_table_id);
+                region_info->set_table_name(table_mem.schema_pb.table_name());
+                this->construct_region_common(region_info, table_mem.schema_pb.replica_num());
+                region_info->set_partition_id(i);
+                region_info->add_peers(table_mem.schema_pb.init_store(instance_count));
+                region_info->add_leader(table_mem.schema_pb.init_store(instance_count));
+                region_info->set_partition_num(table_mem.schema_pb.partition_num());
+                // region_info->set_is_binglog_region(table_mem.is_binglog);
+                if (j) {
+                    region_info->set_start_key(split_key.split_keys(j - 1));
+                }
+                if (j < split_key.split_keys_size()) {
+                    region_info->set_end_key(split_keys.split_keys(j));
+                }
+                *(region_request.mutable_schema_info()) = schema_info;
+                region_request.set_snapshot_times(2);
+                init_regions->push_back(region_request);
+                // TODO: next task
             }
         }
     }
