@@ -85,10 +85,20 @@ public:
         region_info->set_timestamp(time(NULL));
     }
 
+    std::string construct_table_key(int64_t table_id) {
+        std::string table_key;
+        table_key = MetaServer::SCHEMA_IDENTIFY + MetaServer::TABLE_SCHEMA_IDENTIFY;
+        table_key.append((char*)&table_id, sizeof(int64_t));
+        return table_key;
+    }
+
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
-    void write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
+    int write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
                                     int64_t max_table_id, bool has_auto_increment = false);
+    void send_create_table_request(const std::string& namespace_name, 
+            const std::string& database_name, const std::string& table_name, 
+            std::shared_ptr<std::vector<pb::InitRegion>> init_regions); 
 
 private:
     std::string construct_max_table_id_key() {

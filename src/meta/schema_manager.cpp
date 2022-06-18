@@ -197,12 +197,13 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
                     "select instance fail", request->op_type(), log_id);
             return -1;
         }
+        // instance address
         mutable_request->mutable_table_info()->add_init_store(instance);
     }
     return 0;
 } 
 
-int whether_dists_legal(pb::MetaManagerRequest* request,
+int SchemaManager::whether_dists_legal(pb::MetaManagerRequest* request,
         pb::MetaManagerResponse* response, 
         std::string& candidate_logical_room,
         uint64_t log_id) {
@@ -232,7 +233,7 @@ int whether_dists_legal(pb::MetaManagerRequest* request,
             }
         }
     }
-    // sum(dists.count) = replica_num
+    // 检查sum(dists.count) = replica_num
     if (total_count != (uint64_t)request->table_info().replica_num()) {
         ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
                 "replica num not match", request->op_type(), log_id);

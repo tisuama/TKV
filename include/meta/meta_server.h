@@ -19,8 +19,8 @@ public:
     static const std::string NAMESPACE_SCHEMA_IDENTIFY;
     static const std::string MAX_ID_SCHEMA_IDENTIFY;
     static const std::string DATABASE_SCHEMA_IDENTIFY;
+    static const std::string TABLE_SCHEMA_IDENTIFY;
     
-
     virtual ~MetaServer() {}
     
     int init(const std::vector<braft::PeerId>& peers);

@@ -2,7 +2,9 @@
 #include "meta/namespace_manager.h"
 #include "meta/database_manager.h"
 #include "meta/region_manager.h"
+#include "meta/meta_rocksdb.h"
 #include "proto/store.pb.h"
+#include "store/store_server_interact.h"
 
 namespace TKV {
 DEFINE_int32(region_size, 100 * 1024 * 1024, "region capacity, default: 100M");
@@ -61,12 +63,12 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
 
     // 发起交互
     bool has_auto_increament = false;
-    // auto ret = write_schema_for_not_level(table_mem, done, max_table_id, has_auto_increament);
+    auto ret = write_schema_for_not_level(table_mem, done, max_table_id, has_auto_increament);
      
 }
 
 
-void TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
+int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
                                 int64_t max_table_id, bool has_auto_increment) {
     // 如果创建成功，则不需要任何操作
     // 如果创建失败，则需要手动调用table接口删除
@@ -111,23 +113,115 @@ void TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closur
                 this->construct_region_common(region_info, table_mem.schema_pb.replica_num());
                 region_info->set_partition_id(i);
                 region_info->add_peers(table_mem.schema_pb.init_store(instance_count));
-                region_info->add_leader(table_mem.schema_pb.init_store(instance_count));
+                region_info->set_leader(table_mem.schema_pb.init_store(instance_count));
                 region_info->set_partition_num(table_mem.schema_pb.partition_num());
                 // region_info->set_is_binglog_region(table_mem.is_binglog);
                 if (j) {
                     region_info->set_start_key(split_key.split_keys(j - 1));
                 }
                 if (j < split_key.split_keys_size()) {
-                    region_info->set_end_key(split_keys.split_keys(j));
+                    region_info->set_end_key(split_key.split_keys(j));
                 }
                 *(region_request.mutable_schema_info()) = schema_info;
                 region_request.set_snapshot_times(2);
                 init_regions->push_back(region_request);
-                // TODO: next task
             }
         }
     }
+
+    // persist region_id
+    std::string max_region_id_key = RegionManager::get_instance()->construct_max_region_id_key();
+    std::string max_region_value;
+    max_region_value.append((char*)&max_region_id, sizeof(int64_t));
+    rocksdb_keys.push_back(max_region_id_key);
+    rocksdb_values.push_back(max_region_value);
+
+    // persist schema_info
+    int64_t table_id = table_mem.schema_pb.table_id();
+    std::string table_value;
+    if (!schema_info.SerializeToString(&table_value)) {
+        DB_WARNING("request serialize to string fail when create not level table, request: %s",
+                schema_info.ShortDebugString().c_str());
+        IF_DONE_SET_RESPONSE(done, pb::PARSE_TO_PB_FAIL, "serialze to array fail");
+        return -1;
+    }
+    rocksdb_keys.push_back(this->construct_table_key(table_id));
+    rocksdb_values.push_back(table_value);
+
+    // write to rocksdb
+    int ret = MetaRocksdb::get_instance()->put_meta_info(rocksdb_keys, rocksdb_values);
+    if (ret < 0) {
+        DB_WARNING("Add new table %s to rocksdb fail", 
+                schema_info.ShortDebugString().c_str());
+        IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "write to db fail");
+        return -1;
+    }
+    RegionManager::get_instance()->set_max_region_id(max_region_id);
+    
+    // Leader发送请求
+    std::string nname = table_mem.schema_pb.namespace_name();
+    std::string db_name = table_mem.schema_pb.database_name();        
+    std::string table_name = table_mem.schema_pb.table_name();
+    if (done && table_mem.schema_pb.engine() == pb::ROCKSDB ||
+        table_mem.schema_pb.engine() == pb::ROCKSDB_CSTORE) {
+
+        auto create_table_fn = [this, nname, db_name, table_name, init_regions, table_id] () {
+            send_create_table_request(nname, db_name, table_name, init_regions); 
+        };
+        Bthread bth;
+        bth.run(create_table_fn);
+    }
+    IF_DONE_SET_RESPONSE(done, pb::SUCCESS, "success"); 
+    DB_WARNING("Create table, db_name: %s, table_id: %ld, table_name: %s, max_table_id: %ld"
+            " alloc [start_region_id, end_region_id]: [%ld, %ld]",
+            db_name.c_str(), table_id, max_table_id, start_region_id, max_region_id);
+    return 0;
 }
+
+
+void TableManager::send_create_table_request(const std::string& namespace_name, 
+            const std::string& database_name, const std::string& table_name, 
+            std::shared_ptr<std::vector<pb::InitRegion>> init_regions) {
+    uint64_t log_id = butil::fast_rand();
+    // 并发10线程发送
+    BthreadCond concurrency_cond(-10);
+    std::string full_table_name = namespace_name + "." + database_name + "." + table_name;
+    bool success = false;
+    for (auto& init_region_request: *init_regions) {
+        auto send_init_region_fn = [&init_region_request, &success, &concurrency_cond, 
+             log_id, full_table_name] () {
+            std::shared_ptr<BthreadCond> auto_decrease(&concurrency_cond, 
+                    [](BthreadCond *cond) { cond->decrease_signal(); }); // deleter
+            auto& r = init_region_request.region_info();
+            int64_t region_id = r.region_id();
+            StoreInteract store_interact(r.leader().c_str());
+            pb::StoreRes res;
+            auto ret = store_interact.send_request(log_id, "init_region", init_region_request, res);
+            if (ret < 0) {
+                // Send error 
+                DB_FATAL("Create table fail, address: %s, region_id: %ld",
+                        r.leader().c_str(), region_id);
+                success = false;
+                return ;
+            }
+            DB_NOTICE("New region id: %ld success, full_table_name: %s", full_table_name.c_str());
+        };
+        if (!success) {
+            break;
+        }
+        Bthread bth;
+        concurrency_cond.increase();
+        concurrency_cond.wait();
+        bth.run(send_init_region_fn);
+    }
+    concurrency_cond.wait(-10);
+    if (!success) {
+        DB_FATAL("Create table %s fail", full_table_name.c_str());
+        // send_drop_table_request(namespace_name, database_name, table_name);
+    } else {
+        DB_NOTICE("Create table %s success", full_table_name.c_str());
+    }
+} 
 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -81,6 +81,9 @@ message RegionInfo {
     optional bool is_learner = 18;
     optional int64 num_table_lines = 19; // region包含主表行数
     required int64 conf_version = 20;    // 同步peer和learner信息
+    optional int64 main_table_id = 21;
+    optional int64 partition_id = 22;
+    optional int64 partition_num = 23;
 };
 
 message LeaderHB {

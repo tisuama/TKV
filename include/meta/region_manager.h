@@ -1,7 +1,7 @@
 #pragma once
 
 #include "meta/schema_manager.h"
-
+#include "meta/meta_server.h"
 #include "common/common.h"
 #include <unordered_map>
 #include <set>
@@ -38,6 +38,17 @@ public:
     
     int64_t get_max_region_id() const {
         return _max_region_id;
+    }
+
+    void set_max_region_id(int64_t max_region_id) {
+        _max_region_id = max_region_id;
+    }
+    
+    std::string construct_max_region_id_key() {
+        std::string max_region_id_key = MetaServer::SCHEMA_IDENTIFY +
+            MetaServer::MAX_ID_SCHEMA_IDENTIFY + 
+            SchemaManager::MAX_REGION_ID_KEY;
+        return max_region_id_key;
     }
 
 private:
