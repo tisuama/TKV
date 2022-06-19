@@ -91,6 +91,26 @@ public:
         table_key.append((char*)&table_id, sizeof(int64_t));
         return table_key;
     }
+    
+    void set_max_table_id(int64_t max_table_id) {
+        _max_table_id = max_table_id;
+    }
+    
+    void set_table_info(const TableMem& table_mem) {
+        BAIDU_SCOPED_LOCK(_table_mutex);
+        std::string table_name = table_mem.schema_pb.namespace_name() + 
+            "\001" + table_mem.schema_pb.database_name() + 
+            "\001" + table_mem.schema_pb.table_name();
+        int64_t table_id = table_mem.schema_pb.table_id();
+        _table_info_map[table_id] = table_mem;
+        _table_id_map[table_name] = table_id;
+        
+        // table_tomstone
+        if (_table_tombstone_map.count(table_id) == 1) {
+            _table_tombstone_map.erase(table_id);
+        }
+        // no global index
+    }
 
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);

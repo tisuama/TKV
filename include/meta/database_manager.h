@@ -43,6 +43,11 @@ public:
         }
         return  _db_info_map[db_id].resource_tag();
     }
+    
+    void add_table_id(int64_t db_id, int64_t table_id) {
+        BAIDU_SCOPED_LOCK(_db_mutex);
+        _table_ids[db_id].insert(table_id);
+    }
 
     // Raft串行访问
     void create_database(const pb::MetaManagerRequest& request, braft::Closure* done);

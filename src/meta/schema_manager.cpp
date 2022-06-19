@@ -58,7 +58,7 @@ void SchemaManager::process_schema_info(google::protobuf::RpcController* control
                         google::protobuf::Closure* done) {
     brpc::ClosureGuard done_gurad(done);    
     int64_t log_id = 0;
-    brpc::Controller* cntl;
+    brpc::Controller* cntl = nullptr;
     if (controller) {
         cntl = static_cast<brpc::Controller*>(controller); 
         if (cntl->has_log_id()) {
@@ -139,6 +139,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         if (region_num > 1) {
             auto skey = table_info.add_split_keys();
             // split_key index_name为primary_index_name
+            // primary_index_name必然是primary_key或者global_index
             // split->keys->set_index_name(primary_index_name);
             for (auto r = 1; r < region_num; r++) {
                 skey->add_split_keys(std::string(r + 1, 0x01));

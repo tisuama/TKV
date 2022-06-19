@@ -64,7 +64,18 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
     // 发起交互
     bool has_auto_increament = false;
     auto ret = write_schema_for_not_level(table_mem, done, max_table_id, has_auto_increament);
-     
+    if (ret) {
+        DB_WARNING("write rocksdb fail when create table, table: %s", table_name.c_str());
+        IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "write db fail");
+        return ;
+    }
+    this->set_max_table_id(max_table_id);
+    table_mem.schema_pb.clear_init_store();     
+    table_mem.schema_pb.clear_split_keys();
+    this->set_table_info(table_mem);
+
+    DatabaseManager::get_instance()->add_table_id(db_id, table_info.table_id());
+    DB_NOTICE("create table completely, _max_table_id: %ld, table_name: %s", _max_table_id, table_name.c_str());
 }
 
 
@@ -217,6 +228,7 @@ void TableManager::send_create_table_request(const std::string& namespace_name,
     concurrency_cond.wait(-10);
     if (!success) {
         DB_FATAL("Create table %s fail", full_table_name.c_str());
+        // TODO: drop table request
         // send_drop_table_request(namespace_name, database_name, table_name);
     } else {
         DB_NOTICE("Create table %s success", full_table_name.c_str());
