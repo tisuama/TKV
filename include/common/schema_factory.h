@@ -103,9 +103,10 @@ struct SchemaMapping {
     std::unordered_map<int64_t, SmartIndex>     index_id_to_index_info;
     // table_id -> 代价统计信息
     std::map<int64_t, SmartStatistics>          table_id_to_statis;
-
+    // 全局二级索引与主表id的映射
+    // 全局二级索引有不同的table_id，主表主键索引的table_id是主表table_id
+    std::unordered_map<int64_t, int64_t>        global_index_id_mapping;
 };
-
 
 struct TableRegionInfo {
     void update_leader(int64_t region_id, const std::string& leader) {
@@ -159,6 +160,7 @@ public:
     void update_tables_double_buffer_sync(const SchemaVec& tables);
     void get_all_table_version(std::unordered_map<int64_t, int64_t>& table_id_version_map); 
     bool exist_table_id(int64_t table_id);
+    void update_table(const pb::SchemaInfo& table);
     
 private:
     SchemaFactory() {

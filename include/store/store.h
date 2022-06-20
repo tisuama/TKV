@@ -30,7 +30,8 @@ using DoubleBufRegion = butil::DoublyBufferedData<std::unordered_map<int64_t, Sm
 
 class Store: public pb::StoreService {
 public:
-    virtual ~Store();
+    virtual ~Store() {}
+
     static Store* get_instance() {
         static Store instance;
         return &instance;
@@ -40,6 +41,7 @@ public:
 
     int init_after_listen(const std::vector<std::int64_t>& init_region_ids);
 
+    // Fn called by meta_server
     virtual void init_region(::google::protobuf::RpcController* controller,
                          const ::TKV::pb::InitRegion* request,
                          ::TKV::pb::StoreRes* response,
@@ -109,6 +111,9 @@ public:
         }
         
     }
+
+
+    void update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, int64_t>* reverser_index_map);
 
 private:
     Store()

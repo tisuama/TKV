@@ -154,5 +154,24 @@ void SchemaFactory::get_all_table_version(std::unordered_map<int64_t, int64_t>& 
     }
 }
 
+bool SchemaFactory::exist_table_id(int64_t table_id) {
+    DoubleBufferedTable::ScopedPtr table_ptr;
+    if (_double_buffer_table.Read(&table_ptr) != 0) {
+        DB_WARNING("read double buffer table failed");
+        return false;
+    }
+    if (table_ptr->global_index_id_mapping.count(table_id) == 0) {
+        return false;
+    }
+    return true;
+}
+
+void SchemaFactory::update_table(const pb::SchemaInfo& table) {
+    std::function<int(SchemaMapping& m, const pb::SchemaInfo& table)> update_fn = 
+        std::bind(&SchemaFactory::update_table_internal, this, std::placeholders::_1, std::placeholders::_2);
+    delete_table_region_map(table);
+    _double_buffer_table.Modify(update_fn, table);
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

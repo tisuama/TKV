@@ -133,6 +133,48 @@ void Store::init_region(::google::protobuf::RpcController* controller,
                      const ::TKV::pb::InitRegion* request,
                      ::TKV::pb::StoreRes* response,
                      ::google::protobuf::Closure* done) {
+    // Called by create_table
+    TimeCost time_cost;
+    brpc::ClosureGuard done_gurad(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    if (!_factory) {
+        cntl->SetFailed(EINVAL, "record encoder not set");
+        return ;
+    }
+    if (!_shutdown) {
+        DB_WARNING("Store has been shutdown");
+        response->set_errcode(pb::INPUT_PARAM_ERROR);
+        response->set_errmsg("store has shutdown");
+        return ;
+    }
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    const pb::RegionInfo& region_info = request->region_info();
+    int64_t table_id = region_info.table_id();
+    int64_t region_id = region_info.region_id();
+    const auto& remote_side_tmp = butil::endpoint2str(cntl->remote_side());
+    const char* remote_side = remote_side_tmp.c_str();
+    
+    // 只有add_peer操作，can_add_peer设置为true
+    bool is_addpeer = request->region_info().can_add_peer();
+
+    // rocksdb stall -> cannot add peer
+    // TODO: Concurrency instance  
+    
+    // 新增Table信息
+    if (!_factory->exist_table_id(table_id)) {
+        if (request->has_schema_info()) {
+            this->update_schema_info(request->schema_info(), nullptr);
+        } else {
+            DB_FATAL("table info missing when add region, table_id: %lu, region_id: %ld, log_id: %ld",
+                    table_id, region_info.region_id(), log_id);
+            response->set_errcode(pb::INPUT_PARAM_ERROR);
+            response->set_errmsg("table info is missing when add region");
+            return ;
+        }
+    }
 }
 
 void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
@@ -190,8 +232,13 @@ void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
     });
 }
 
-Store::~Store() {
+void Store::update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, int64_t>* reverser_index_map) {
+    _factory->update_table(table);
+    if (table.has_deleted() && table.deleted()) {
+        return ;
+    }
+    // indexs not implement
+    (void*)reverser_index_map;
 }
-
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
