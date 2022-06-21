@@ -86,6 +86,10 @@ public:
         return false;
     }
 
+    bool removed() const {
+        return _removed;
+    }
+
     // public
     void compact_data_in_queue();
 

@@ -87,17 +87,11 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         if (!is_learner) {
             r.clear_peers();
         }
-        SmartRegion region(new(std::nothrow) Region(
-                    _rocksdb,
-                    _factory,
-                    _address,
-                    groupid,
-                    peerid,
-                    r,
-                    region_id,
-                    is_learner));
+        // new region info
+        SmartRegion region(new(std::nothrow) Region(_rocksdb, _factory, _address, groupid, 
+                    peerid, r, region_id, is_learner));
         if (!region) {
-            DB_FATAL("New region fail, mme allocate fail, region_info: %s",
+            DB_FATAL("new region fail, mme allocate fail, region_info: %s",
                     r.ShortDebugString().data());
             return -1;
         }
@@ -168,13 +162,44 @@ void Store::init_region(::google::protobuf::RpcController* controller,
         if (request->has_schema_info()) {
             this->update_schema_info(request->schema_info(), nullptr);
         } else {
-            DB_FATAL("table info missing when add region, table_id: %lu, region_id: %ld, log_id: %ld",
-                    table_id, region_info.region_id(), log_id);
-            response->set_errcode(pb::INPUT_PARAM_ERROR);
-            response->set_errmsg("table info is missing when add region");
+            ERROR_SET_RESPONSE_FAST(response, pb::INPUT_PARAM_ERROR, "table info is missing when add region", log_id);
             return ;
         }
     }
+    auto pre_region = this->get_region(region_id);
+    // 已经删除，遇到新建，此时需要马上删除
+    if (pre_region != nullptr && pre_region->removed()) {
+        drop_region_from_store(region_id, false);
+    }
+    pre_region = get_region(region_id);
+    if (pre_region) {
+        ERROR_SET_RESPONSE_FAST(response, pb::REGION_ALREADY_EXIST, "region id has exist and drop fail when init region", log_id);
+        return ;
+    }
+
+    // construct region
+    braft::GroupId groupid(std::string("region_") + std::to_string(region_id));
+    butil::EndPoint addr;
+    if (str2endpoint(_address.c_str(), &addr)) {
+        ERROR_SET_RESPONSE_FAST(response, pb::INTERNAL_ERROR, "address is illegal", log_id);
+        return ;
+    }
+    braft::PeerId peerid(addr, 0);
+    // new Region
+    SmartRegion region(new(std::nothrow) Region(_rocksdb, _factory, _address, groupid, 
+                peerid, request->region_info(), region_id, request->region_info().is_learner()));
+    if (!region) {
+        ERROR_SET_RESPONSE_FAST(response, pb::INTERNAL_ERROR, "new region failed", log_id);
+        return ;
+    }
+    // binglog region = false;
+    DB_WARNING("new region info: %s, log_id: %ld, remote_side: %s",
+            request->ShortDebugString().c_str(), log_id, remote_side);
+    // 更新内存信息
+    this->set_region(region);
+    // region init
+    // int ret = region->init(true, request->snapshot_times());
+    // TODO:
 }
 
 void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
@@ -240,5 +265,12 @@ void Store::update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, in
     // indexs not implement
     (void*)reverser_index_map;
 }
+
+int Store::drop_region_from_store(int64_t drop_region_id, bool need_delay_drop) {
+    // TODO: need to impl drop_region_from_store
+    DB_WARNING("region need remove, region_id: %ld, need_delay_drop: %d", drop_region_id, need_delay_drop);
+    return 0;
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

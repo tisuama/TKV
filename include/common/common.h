@@ -45,6 +45,16 @@ namespace TKV {
         }\
     } while(0);
 
+#define ERROR_SET_RESPONSE_FAST(response, errcode, err_msg, log_id) \
+    do {\
+        DB_FATAL("request failed errcode: %d, err_msg: %s, log_id: %lu", \
+                 err_msg, log_id);\
+        if (response) { \
+            response->set_errcode(errcode);\
+            response->set_errmsg(err_msg);\
+        }\
+    } while(0);
+
 class ScopeGuard {
 public:
     explicit ScopeGuard(std::function<void()> exit_func): 
