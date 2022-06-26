@@ -169,6 +169,7 @@ private:
     std::set<int64_t>        _doing_snapshot_regions;
     
     MetaWriter*             _meta_writer {nullptr};
+    std::shared_ptr<RegionResource> _resource;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -1,6 +1,17 @@
 #include "store/region.h"
+#include "common/mut_table_key.h"
+
+#include <butil/file_util.h>
+#include <butil/files/file_path.h>
+
+
 namespace TKV {
 DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
+DECLARE_int32(election_timeout_ms);
+
+DEFINE_string(raftlog_uri, "raft_log: //my_raft_log?id=", "raft_log uri");
+DEFINE_string(stable_uri, "raft_meta://my_raft_meta?id=", "raft stable path");
+DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");
 
 void Region::compact_data_in_queue() {
     _num_delete_lines = 0;
@@ -72,5 +83,84 @@ void Region::on_apply(braft::Iterator& iter) {
     // do something
 } 
 
+int Region::init(bool new_region, int32_t snapshot_times) {
+    _shutdown = false;
+    if (_init_success) {
+        DB_WARNING("region id %ld has inited before", _region_id);
+        return 0;
+    }
+    ON_SCOPED_EXIT([this]() {
+            _can_heartbeat = true;
+    });
+
+    // 设置region成员信息
+    MutableKey start;
+    MutableKey end;
+    start.append_i64(_region_id);
+    end.append_i64(_region_id);
+    end.append_u64(UINT64_MAX);
+    _rocksdb_start = start.data();
+    _rocksdb_end = end.data();
+    _data_cf = _rocksdb->get_data_handle();
+    _meta_cf = _rocksdb->get_meta_info_handle();
+    _meta_writer = MetaWriter::get_instance();
+    _resource.reset(new RegionResource);
+
+    // 新建region
+    if (new_region) {
+        std::string snapshot_path(FLAGS_snapshot_uri, FLAGS_snapshot_uri.find("//") + 2);
+        snapshot_path += "/region_" + std::to_string(_region_id);
+        auto file_path = butil::FilePath(snapshot_path);
+        // 数据没有删除完
+        if (butil::DirectoryExists(file_path)) {
+            DB_WARNING("new region_id: %ld exist snapshot path: %s",
+                    _region_id, snapshot_path.c_str());
+            // TODO: RegionControl
+        }
+        // 被add_peer的node不需要init meta
+        // on_snapshot_load时会ingest meta column sst
+        if (_region_info.peers_size() > 0) {
+            TimeCost write_db_sst;
+            if (_meta_writer->init_meta_info(_region_info) != 0) {
+                DB_WARNING("write region to rocksdb fail when init region id: %ld", _region_id);
+                return -1;
+            }
+            // Learner
+            if (_is_learner && _meta_writer->write_learner_key(_region_info.region_id(), _is_learner) != 0) {\
+                DB_FATAL("write learner to rocksdb fail when init region, region_id: %ld", _region_id);
+                return -1;
+            }
+            DB_WARNING("region_id: %ld write init region info: %ld", _region_id, write_db_sst.get_time());            
+        } else {
+            _report_peer_info = true;
+        }
+    }
+    // TODO: global index
+    // TODO: ttl info
+
+    // init raft node
+    braft::NodeOptions options;
+    std::vector<braft::PeerId> peers;
+    for (int i = 0; i < _region_info.peers_size(); i++) {
+        butil::EndPoint end_point;
+        if (butil::str2endpoint(_region_info.peers(i).c_str(), &end_point) != 0) {
+            DB_FATAL("str2endpoint fail, peers: %s, region_id: %ld", 
+                    _region_info.peers(i).c_str(), _region_id);
+            return -1;
+        }
+        peers.push_back(braft::PeerId(end_point));
+    }
+    options.election_timeout_ms = FLAGS_election_timeout_ms;
+    options.fsm = this;
+    options.initial_conf = braft::Configuration(peers);
+    options.snapshot_interval_s = 0; // 自己设置？
+    options.log_uri = FLAGS_raftlog_uri + std::to_string(_region_id);
+    options.raft_meta_uri = FLAGS_stable_uri + std::to_string(_region_id);
+    options.snapshot_uri = FLAGS_snapshot_uri + "/region_" + std::to_string(_region_id);
+    // TODO: snapshot_adaptor
+    // options.snapshot_file_system_adaptor = &_snapshot_adaptor;
+    
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

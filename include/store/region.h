@@ -12,8 +12,13 @@
 #include "engine/rocks_wrapper.h"
 #include "proto/meta.pb.h"
 #include "proto/store.pb.h"
+#include "store/meta_writer.h"
 
 namespace TKV {
+struct RegionResource {
+    pb::RegionInfo region_info;
+};
+
 class Region: public braft::StateMachine, public std::enable_shared_from_this<Region> {
 public:
     virtual ~Region() {}
@@ -92,6 +97,7 @@ public:
 
     // public
     void compact_data_in_queue();
+    int init(bool new_region, int32_t snapshot_times);
 
     // override virtual functions from braft::StateMachine
     virtual void on_apply(braft::Iterator& iter) override; 
@@ -153,12 +159,18 @@ private:
     std::atomic<int64_t>    _num_delete_lines;
     
     bool                    _removed = false;
+    std::string             _rocksdb_start;
+    std::string             _rocksdb_end;
+    pb::PeerStatus          _region_status = pb::STATUS_NORMAL;
 
 
     // learner
     bool                    _is_learner = false;
     bool                    _learner_ready_for_read = false;
     TimeCost                _learner_time;
+    
+    MetaWriter*              _meta_writer = nullptr;
+    std::shared_ptr<RegionResource> _resource;
 
 };
 } // namespace TKV
