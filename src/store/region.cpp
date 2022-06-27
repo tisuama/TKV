@@ -75,12 +75,10 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
     
     // TODO: is_learner
     if (is_learner()) {
-        // do something
     }
 }
 
 void Region::on_apply(braft::Iterator& iter) {
-    // do something
 } 
 
 int Region::init(bool new_region, int32_t snapshot_times) {
@@ -157,8 +155,39 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     options.log_uri = FLAGS_raftlog_uri + std::to_string(_region_id);
     options.raft_meta_uri = FLAGS_stable_uri + std::to_string(_region_id);
     options.snapshot_uri = FLAGS_snapshot_uri + "/region_" + std::to_string(_region_id);
-    // TODO: snapshot_adaptor
-    // options.snapshot_file_system_adaptor = &_snapshot_adaptor;
+    options.snapshot_file_system_adaptor = &_snapshot_adaptor;
+    
+    bool is_restart = _restart;
+    if (_is_learner) {
+        // TODO: not impl in braft
+        DB_WARNING("start init learner, region_id: %ld", _region_id);
+    } else {
+        DB_WARNING("start init node, region_id: %ld", _region_id);
+        if (_node.init(options) != 0) {
+            DB_FATAL("raft node init fail, region_id: %ld, region_info: %s",
+                    _region_id, _region_info.ShortDebugString().c_str());
+            return -1;
+        }
+        if (peers.size() == 1) {
+            _node.reset_election_timeout_ms(FLAGS_election_timeout_ms); // 10ms
+            DB_WARNING("region_id: %ld vote 0", _region_id);
+        }
+    }
+    if (!is_restart && can_add_peer()) {
+        _need_decrease = true;
+    }
+    
+    // snapshot_times = 2，为啥需要做两次快照
+    while(snapshot_times > 0) {
+        bthread_usleep(1 * 1000 * 1000LL);
+        // _region_control.sync_do_snapshot();
+        --snapshot_times;
+    }
+    this->copy_region(&_resource->region_info);
+    // TODO: compact时候删除多余数据
+    DB_WARNING("=== region_id: %ld init success, region_info: %s", _region_id, 
+            _resource->region_info.ShortDebugString().c_str());
+    _init_success = true;
     
     return 0;
 }

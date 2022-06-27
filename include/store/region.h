@@ -4,6 +4,7 @@
 #include <butil/iobuf.h>
 #include <butil/time.h>
 #include <braft/storage.h>
+#include <braft/file_system_adaptor.h>
 
 #include "common/common.h"
 #include "common/schema_factory.h"
@@ -41,6 +42,7 @@ public:
         , _shutdown(false)
         , _num_table_lines(0)
         , _num_delete_lines(0)
+        // , _snapshot_adaptor(new braft::FileSystemAdaptor(region_id)
     {}
 
     void construct_heart_beat_request(pb::StoreHBRequest& request, bool need_peer_balance);
@@ -93,6 +95,10 @@ public:
 
     bool removed() const {
         return _removed;
+    }
+
+    bool can_add_peer() const {
+        return _region_info.can_add_peer();
     }
 
     // public
@@ -171,6 +177,8 @@ private:
     
     MetaWriter*              _meta_writer = nullptr;
     std::shared_ptr<RegionResource> _resource;
+    // TODO: rocksdbfilesystemadaptor
+    scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor = nullptr;
 
 };
 } // namespace TKV
