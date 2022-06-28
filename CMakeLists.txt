@@ -90,6 +90,8 @@ file(GLOB STORE_SRC
 	src/store/store.cpp
 	src/store/region.cpp
 	src/store/meta_writer.cpp
+	src/store/region_control.cpp
+	src/store/rpc_sender.cpp
 	)
 add_library(store_src_lib OBJECT ${STORE_SRC})
 

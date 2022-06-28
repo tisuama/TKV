@@ -111,6 +111,10 @@ public:
         }
         
     }
+    
+    std::string address() const {
+        return _address;
+    }
 
     void update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, int64_t>* reverser_index_map);
     int drop_region_from_store(int64_t drop_region_id, bool need_delay_drop);
@@ -169,7 +173,6 @@ private:
     std::set<int64_t>        _doing_snapshot_regions;
     
     MetaWriter*             _meta_writer {nullptr};
-    std::shared_ptr<RegionResource> _resource;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

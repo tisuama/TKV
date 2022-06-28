@@ -21,6 +21,7 @@ struct RegionResource {
 };
 
 class Region: public braft::StateMachine, public std::enable_shared_from_this<Region> {
+friend class RegionControl;
 public:
     virtual ~Region() {}
    
