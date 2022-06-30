@@ -8,6 +8,8 @@ public:
     static int send_no_op_request(const std::string& instance, 
             int64_t recevie_region_id,
             int64_t request_version);
+    static int send_query_method(const pb::StoreReq& req, 
+            const std::string& instance, int64_t recevie_region_id);
 };
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

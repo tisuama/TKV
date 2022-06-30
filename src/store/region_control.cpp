@@ -14,7 +14,7 @@ void RegionControl::sync_do_snapshot() {
     if (ret < 0) {
         DB_WARNING("send no op fail, region_id: %ld", _region_id);
     }
-    // TODO: sync_do_snapshot 
+    BthreadCond sync_sign;
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

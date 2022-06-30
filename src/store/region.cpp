@@ -177,7 +177,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
         _need_decrease = true;
     }
     
-    // snapshot_times = 2，为啥需要做两次快照
+    // snapshot_times = 2
     while(snapshot_times > 0) {
         // init 的region会马上选主，等一会成为Leader
         bthread_usleep(1 * 1000 * 1000LL);
