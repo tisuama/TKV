@@ -65,6 +65,16 @@ file(GLOB COMMON_SRC
 	)
 add_library(common_src_lib OBJECT ${COMMON_SRC})
 
+file(GLOB META_INTERACT 
+	src/meta/meta_server_interact.cpp
+	)
+add_library(meta_interact_lib OBJECT ${META_INTERACT})
+
+file(GLOB STORE_INTERACT 
+	src/store/store_server_interact.cpp
+	)
+add_library(store_interact_lib OBJECT ${STORE_INTERACT})
+
 file(GLOB META_SERVER
 	src/meta/meta_server.cpp
 	src/meta/common_state_machine.cpp
@@ -79,7 +89,7 @@ file(GLOB META_SERVER
 	src/meta/table_manager.cpp
 	src/meta/region_manager.cpp
 	)
-add_library(meta_server_lib OBJECT ${META_SERVER})
+add_library(meta_server_lib OBJECT ${META_SERVER} ${META_INTERACT} ${STORE_INTERACT})
 
 file(GLOB ENGINE_SRC
 	src/engine/*.cpp
@@ -93,7 +103,7 @@ file(GLOB STORE_SRC
 	src/store/region_control.cpp
 	src/store/rpc_sender.cpp
 	)
-add_library(store_src_lib OBJECT ${STORE_SRC})
+add_library(store_src_lib OBJECT ${STORE_SRC} ${META_INTERACT} ${STORE_INTERACT})
 
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto/
@@ -140,7 +150,6 @@ add_executable(TKVStore
 	src/store/main.cpp
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:proto_src_lib>
-	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
 	$<TARGET_OBJECTS:store_src_lib>
 	)

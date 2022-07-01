@@ -72,6 +72,7 @@ public:
     std::string encode_num_table_lines(int64_t line) const;
     std::string encode_region_info(const pb::RegionInfo& region_info) const;
     std::string encode_learner_flag(int64_t learner_flag) const;
+    std::string encode_region_info(const pb::RegionInfo& region_info) const;
 
     // decode
     uint64_t decode_log_index_key(const rocksdb::Slice& key);

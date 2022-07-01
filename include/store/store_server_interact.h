@@ -9,8 +9,8 @@
 #include "common/common.h"
 
 namespace TKV {
-DEFINE_int32(store_request_timeout, 60000, "store request timeout");
-DEFINE_int32(store_connect_timeout, 5000, "store connect timeout");
+DECLARE_int32(store_request_timeout);
+DECLARE_int32(store_connect_timeout);
 
 struct StoreReqOptions {
     int32_t request_timeout;

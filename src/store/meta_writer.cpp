@@ -123,5 +123,53 @@ int MetaWriter::write_doing_snapshot(int64_t region_id) {
     return 0;
 }
 
+std::string MetaWriter::encode_region_info(const pb::RegionInfo& region_info) const {
+    std::string str;
+    if (!region_info.SerializeToString(&str)) {
+        DB_FATAL("region info: %s serialze to string fail", region_info.ShortDebugString().c_str());
+        str.clear();
+    }
+    return str;
+}
+
+std::string MetaWriter::region_info_key(int64_t region_id) const {
+    MutableKey key;
+    key.append_char(MetaWriter::META_IDENTIFY.data(), 1);
+    key.append_i64(region_id);
+    key.append_char(MetaWriter::REGION_INFO_IDENTIFY.data(), 1);
+    return key.data();
+}
+
+/* init a new region's meta info */
+int MetaWriter::init_meta_info(const pb::RegionInfo& region_info) const {
+    std::vector<std::string> keys;
+    std::vector<std::string> values;
+    std::string region_info_str = encode_region_info(region_info); 
+    if (region_info_str.empty()) {
+        return -1;
+    }
+
+    // persistent regioin info
+    int64_t region_id = region_info.region_id();
+    keys.push_back(region_info_key(region_id));
+    values.push_back(region_info_str);
+
+    // persistent applied index
+    keys.push_back(applied_index_key(region_id));
+    values.push_back(encode_applied_index(0, 0));
+
+    // persistent num table line
+    keys.push_back(num_table_lines_key(region_id));
+    values.push_back(encode_num_table_lines(0));
+
+    // Learner key?
+    auto status = _rocksdb->Write(MetaWriter::WriteOptions, _meta_cf, keys, values);
+    if (!status.ok()) {
+        DB_FATAL("persistent init meta info failed, region_id: %ld, err_msg: %s",
+                region_id, status.ToString().c_str());
+        return -1;
+    }
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

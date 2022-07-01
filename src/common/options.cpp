@@ -10,7 +10,7 @@ DEFINE_bool(meta_with_any_ip, false ,"meta server ip is ip_any or meta_ip");
 DEFINE_string(meta_ip, "127.0.0.1", "meta serer ip when meta_with_any_ip = false");
 DEFINE_int32(meta_port, 8010, "meta port");
 
-// raft service
+// Raft Service
 DEFINE_string(default_logical_room, "default", "default logical room");
 DEFINE_string(default_physical_room, "default", "default physical room");
 DEFINE_string(resource_tag, "", "resource_tag");
@@ -20,6 +20,9 @@ DEFINE_int32(raft_write_concurrency, 40, "raft_write_concurrency, default: 40");
 DEFINE_int32(service_write_concurrency, 40, "service_write_concurrency");
 DEFINE_int32(balance_periodicity, 60, "times of store heart beat");
 DEFINE_int64(store_heart_beat_interval, 30 * 1000 * 1000, "store heart beat interval, defautl: 30s");
+DEFINE_int32(snapshot_interval_s, 600, "raft snapshot interval");
+DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms)");
+
 }
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
