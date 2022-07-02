@@ -181,7 +181,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     while(snapshot_times > 0) {
         // init 的region会马上选主，等一会成为Leader
         bthread_usleep(1 * 1000 * 1000LL);
-        // _region_control.sync_do_snapshot();
+        _region_control.sync_do_snapshot();
         --snapshot_times;
     }
     this->copy_region(&_resource->region_info);

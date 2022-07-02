@@ -102,6 +102,7 @@ file(GLOB STORE_SRC
 	src/store/meta_writer.cpp
 	src/store/region_control.cpp
 	src/store/rpc_sender.cpp
+	src/store/closure.cpp
 	)
 add_library(store_src_lib OBJECT ${STORE_SRC} ${META_INTERACT} ${STORE_INTERACT})
 

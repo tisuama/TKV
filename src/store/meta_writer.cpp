@@ -132,6 +132,19 @@ std::string MetaWriter::encode_region_info(const pb::RegionInfo& region_info) co
     return str;
 }
 
+std::string MetaWriter::encode_applied_index(int64_t applied_index, int64_t data_index) const {
+    MutableKey key;
+    key.append_i64(applied_index);
+    key.append_i64(data_index);
+    return key.data();
+}
+
+std::string MetaWriter::encode_num_table_lines(int64_t line) const {
+    MutableKey key;
+    key.append_i64(line);
+    return key.data();
+}
+
 std::string MetaWriter::region_info_key(int64_t region_id) const {
     MutableKey key;
     key.append_char(MetaWriter::META_IDENTIFY.data(), 1);
@@ -140,8 +153,23 @@ std::string MetaWriter::region_info_key(int64_t region_id) const {
     return key.data();
 }
 
+std::string MetaWriter::applied_index_key(int64_t region_id) const {
+    MutableKey key;
+    key.append_char(MetaWriter::META_IDENTIFY.data(), 1);
+    key.append_i64(region_id);
+    key.append_char(MetaWriter::APPLIED_INDEX_IDENTIFY.data(), 1);
+    return key.data();
+}
+std::string MetaWriter::num_table_lines_key(int64_t region_id) const {
+    MutableKey key;
+    key.append_char(MetaWriter::META_IDENTIFY.data(), 1);
+    key.append_i64(region_id);
+    key.append_char(MetaWriter::NUM_TABLE_LINE_IDENTIFY.data(), 1);
+    return key.data();
+}
+
 /* init a new region's meta info */
-int MetaWriter::init_meta_info(const pb::RegionInfo& region_info) const {
+int MetaWriter::init_meta_info(const pb::RegionInfo& region_info) {
     std::vector<std::string> keys;
     std::vector<std::string> values;
     std::string region_info_str = encode_region_info(region_info); 
@@ -163,7 +191,7 @@ int MetaWriter::init_meta_info(const pb::RegionInfo& region_info) const {
     values.push_back(encode_num_table_lines(0));
 
     // Learner key?
-    auto status = _rocksdb->Write(MetaWriter::WriteOptions, _meta_cf, keys, values);
+    auto status = _rocksdb->write(MetaWriter::write_options, _meta_cf, keys, values);
     if (!status.ok()) {
         DB_FATAL("persistent init meta info failed, region_id: %ld, err_msg: %s",
                 region_id, status.ToString().c_str());

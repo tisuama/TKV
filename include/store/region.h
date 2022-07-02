@@ -14,6 +14,7 @@
 #include "proto/meta.pb.h"
 #include "proto/store.pb.h"
 #include "store/meta_writer.h"
+#include "store/region_control.h"
 
 namespace TKV {
 struct RegionResource {
@@ -43,8 +44,14 @@ public:
         , _shutdown(false)
         , _num_table_lines(0)
         , _num_delete_lines(0)
+        , _region_control(this, region_id)  
         // , _snapshot_adaptor(new braft::FileSystemAdaptor(region_id)
-    {}
+    {
+        _region_control.set_status(_region_info.status());
+        _version = _region_info.version();
+        // not global index => _region_info.main_table_id() = _region_info.table_id()
+        _table_id = _region_info.table_id();
+    }
 
     void construct_heart_beat_request(pb::StoreHBRequest& request, bool need_peer_balance);
     
@@ -176,11 +183,11 @@ private:
     bool                    _learner_ready_for_read = false;
     TimeCost                _learner_time;
     
-    MetaWriter*              _meta_writer = nullptr;
+    MetaWriter*             _meta_writer = nullptr;
     std::shared_ptr<RegionResource> _resource;
     // TODO: rocksdbfilesystemadaptor
     scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor = nullptr;
-
+    RegionControl           _region_control;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
