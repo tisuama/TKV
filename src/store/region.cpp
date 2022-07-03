@@ -192,5 +192,24 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     
     return 0;
 }
+
+void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) {
+    brpc::ClosureGuard done_gurad(done);
+    if (this->get_version() == 0) {
+        // 等待异步队列为空
+        this->wait_async_apply_log_queue_empty();
+    }
+    if (writer->add_file(SNAPSHOT_META_FILE) != 0 ||
+        writer->add_file(SNAPSHOT_DATA_FILE) != 0) {
+        done.status().set_error(EINVAL, "Fail to add snapshot");
+        DB_WARNING("Error while add extra_fs to writer, region_id: %ld", _region_id);
+        return ;
+    }
+}
+
+void Region::reset_snapshot_status() {
+    // TODO: snapshot interval
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

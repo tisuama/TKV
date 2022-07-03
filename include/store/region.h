@@ -108,13 +108,28 @@ public:
     bool can_add_peer() const {
         return _region_info.can_add_peer();
     }
+    
+    int64_t get_version() const {
+        return _version;
+    }
+
+    void wait_async_apply_log_queue_empty() {
+        BthreadCond cond;
+        cond.increase();
+        _async_apply_log_queue.run([&cond] {
+            cond.decrease();
+        });
+        cond.wait();
+    }
 
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
+    void reset_snapshot_status();
 
     // override virtual functions from braft::StateMachine
     virtual void on_apply(braft::Iterator& iter) override; 
+    virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) override;
 
 private:
     RocksWrapper*           _rocksdb;
@@ -188,6 +203,9 @@ private:
     // TODO: rocksdbfilesystemadaptor
     scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor = nullptr;
     RegionControl           _region_control;
+    
+    // 异步执行队列
+    ExecutionQueue          _async_apply_log_queue;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

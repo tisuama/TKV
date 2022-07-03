@@ -1,6 +1,7 @@
 #include <gflags/gflags.h>
 
 namespace TKV {
+// Meta Service
 DEFINE_string(log_path, "./", "log_file of meta or store");
 DEFINE_bool(enable_debug, true, "if enable debug");
 DEFINE_bool(enable_self_trace, false, "if enable self trace");
@@ -23,7 +24,6 @@ DEFINE_int64(store_heart_beat_interval, 30 * 1000 * 1000, "store heart beat inte
 DEFINE_int32(snapshot_interval_s, 600, "raft snapshot interval");
 DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms)");
 
-}
-
+} // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
 
