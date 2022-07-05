@@ -117,7 +117,7 @@ public:
         BthreadCond cond;
         cond.increase();
         _async_apply_log_queue.run([&cond] {
-            cond.decrease();
+            cond.decrease_signal();
         });
         cond.wait();
     }
@@ -184,8 +184,8 @@ private:
     bool                    _can_heartbeat = false;
 
     // table line
-    std::atomic<int64_t>    _num_table_lines;
-    std::atomic<int64_t>    _num_delete_lines;
+    std::atomic<int64_t>    _num_table_lines;  // total number of pk record of this region
+    std::atomic<int64_t>    _num_delete_lines; // number of deleted rows of last compact
     
     bool                    _removed = false;
     std::string             _rocksdb_start;
@@ -206,6 +206,10 @@ private:
     
     // 异步执行队列
     ExecutionQueue          _async_apply_log_queue;
+    // Snapshot
+    int64_t                 _snapshot_num_table_lines = 0; // last snapshot number
+    int64_t                 _snapshot_index = 0;           // snapshot index
+    TimeCost                _snapshot_time_cost;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

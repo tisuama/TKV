@@ -20,9 +20,9 @@ DEFINE_int32(snapshot_load_num, 4, "snapshot_load_num, default: 4");
 DEFINE_int32(raft_write_concurrency, 40, "raft_write_concurrency, default: 40");
 DEFINE_int32(service_write_concurrency, 40, "service_write_concurrency");
 DEFINE_int32(balance_periodicity, 60, "times of store heart beat");
-DEFINE_int64(store_heart_beat_interval, 30 * 1000 * 1000, "store heart beat interval, defautl: 30s");
-DEFINE_int32(snapshot_interval_s, 600, "raft snapshot interval");
-DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms)");
+DEFINE_int64(store_heart_beat_interval, 30 * 1000 * 1000, "store heart beat interval, default: 30s");
+DEFINE_int32(snapshot_interval_s, 600, "raft snapshot interval, default: 600s");
+DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms), default: 1s");
 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

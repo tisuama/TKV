@@ -1,5 +1,6 @@
 #include "store/region.h"
 #include "common/mut_table_key.h"
+#include "raft/rocksdb_file_system_adaptor.h"
 
 #include <butil/file_util.h>
 #include <butil/files/file_path.h>
@@ -8,6 +9,7 @@
 namespace TKV {
 DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
 DECLARE_int32(election_timeout_ms);
+DECLARE_int32(snapshot_interval_s);
 
 DEFINE_string(raftlog_uri, "raft_log: //my_raft_log?id=", "raft_log uri");
 DEFINE_string(stable_uri, "raft_meta://my_raft_meta?id=", "raft stable path");
@@ -194,6 +196,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
 }
 
 void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) {
+    TimeCost cost;
     brpc::ClosureGuard done_gurad(done);
     if (this->get_version() == 0) {
         // 等待异步队列为空
@@ -201,14 +204,22 @@ void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* don
     }
     if (writer->add_file(SNAPSHOT_META_FILE) != 0 ||
         writer->add_file(SNAPSHOT_DATA_FILE) != 0) {
-        done.status().set_error(EINVAL, "Fail to add snapshot");
+        done->status().set_error(EINVAL, "Fail to add snapshot");
         DB_WARNING("Error while add extra_fs to writer, region_id: %ld", _region_id);
         return ;
     }
+    DB_WARNING("region_id: %ld snapshot save complete, time cost: %ld",
+            _region_id, cost.get_time());
+    this->reset_snapshot_status();
 }
 
 void Region::reset_snapshot_status() {
-    // TODO: snapshot interval
+    // 后续判断是否需要快照的标准
+    if (_snapshot_time_cost.get_time() > FLAGS_snapshot_interval_s * 1000 * 1000) {
+        _snapshot_num_table_lines = _num_table_lines.load();
+        _snapshot_index = _applied_index;
+        _snapshot_time_cost.reset();
+    }
 }
 
 } // namespace TKV

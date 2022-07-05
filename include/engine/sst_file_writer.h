@@ -5,7 +5,7 @@
 
 namespace TKV {
 class SstFileWriter {
-pulic:
+public:
     SstFileWriter(const rocksdb::Options& options): _options(options) {
         _options.bottommost_compression = rocksdb::kLZ4Compression;
         _options.bottommost_compression_opts = rocksdb::CompressionOptions();
@@ -24,7 +24,7 @@ pulic:
         return _sst_writer->FileSize();
     }
 
-    Virtual ~SstFileWriter() {}
+    virtual ~SstFileWriter() {}
 
 private:
     rocksdb::Options _options;

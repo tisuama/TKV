@@ -16,12 +16,38 @@ class RocksdbFileSystemAdaptor;
 class Region;
 class std::shared_ptr<Region> SmartRegion;
 
-class RocksdbFileSystemAdaptor: public braft::FileSytemAdaptor {
+/* TODO: snapshot
+struct SnapshotContext {
+    SnapshotContext()
+        : snapshot(RocksdbWrapper::get_instance()->get_snapshot()) 
+    {}
+    ~SnapshotContext() {
+        if (snapshot) {
+            RocksdbWrapper::get_instance()->release_snapshot();
+        }
+    }
+
+    const rocksdb::Snapshot* snapshot = nullptr;
+};
+*/
+
+typedef std::shared_ptr<SnapshotContext> SnapshotContextPtr;
+
+class RocksdbFileSystemAdaptor: public braft::FileSystemAdaptor {
 public:
 private:
+    struct ContextEnv {
+        SnapshotContextPtr ptr;
+        int64_t            count = 0;
+        TimeCost           cost;
+    };
+
     int64_t     _region_id;
     bthread::Mutex _snapshot_mutex;
-        
+    bthread::Mutex _open_reader_adaptor_mutex;
+    BthreadCond    _snapshot_cond;
+    typedef std::map<std::string, ContextEnv> SnapshotMap;
+    SnapshotMap    _snapshots;
 };
 
 } // namespace TKV
