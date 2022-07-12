@@ -16,25 +16,57 @@ class RocksdbFileSystemAdaptor;
 class Region;
 class std::shared_ptr<Region> SmartRegion;
 
-/* TODO: snapshot
+struct IteratorContext {
+    bool    reading = false;
+    bool    is_meta_sst = false;
+    bool    done = false;
+    std::string prefix;
+    std::string upper_bound;
+    rocksdb::Slice upper_bound_slice;
+    std::unique_ptr<rocksdb::Iterator> iter;
+
+    int64_t offset = 0;
+    int64_t snapshot_index = 0;
+    int64_t applied_index = 0;
+};
+
 struct SnapshotContext {
     SnapshotContext()
-        : snapshot(RocksdbWrapper::get_instance()->get_snapshot()) 
+        : snapshot(RocksWrapper::get_instance()->get_snapshot()) 
     {}
     ~SnapshotContext() {
         if (snapshot) {
-            RocksdbWrapper::get_instance()->release_snapshot();
+            RocksWrapper::get_instance()->release_snapshot(snapshot);
+        }
+        if (data_context) {
+            delete data_context;
+        }
+        if (meta_conext) {
+            delete meta_conext;
         }
     }
 
     const rocksdb::Snapshot* snapshot = nullptr;
+    IteratorContext* data_context = nullptr;
+    IteratorContext* meta_conext = nullptr;
+    int64_t data_index = 0;
+    bool    need_copy_data = true;
 };
-*/
 
 typedef std::shared_ptr<SnapshotContext> SnapshotContextPtr;
 
+/* Manage snapshot for each region */
 class RocksdbFileSystemAdaptor: public braft::FileSystemAdaptor {
 public:
+    RocksdbFileSystemAdaptor(int64_t region_id)
+        : _region_id(region_id)
+    {}
+
+    virtual ~RocksdbFileSystemAdaptor() {
+        _snapshot_cond.wait();
+        DB_WARNING("region_id: %ld rocksdb file_system_adaptor release", _region_id);
+    } 
+
 private:
     struct ContextEnv {
         SnapshotContextPtr ptr;

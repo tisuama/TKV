@@ -115,7 +115,7 @@ public:
     const rocksdb::Snapshot* get_snapshot() {
         return _db->GetSnapshot();
     }
-    void releas_snapshot(const rocksdb::Snapshot* snapshot) {
+    void release_snapshot(const rocksdb::Snapshot* snapshot) {
         _db->ReleaseSnapshot(snapshot);
     }
     void close() {
