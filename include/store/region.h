@@ -15,6 +15,7 @@
 #include "proto/store.pb.h"
 #include "store/meta_writer.h"
 #include "store/region_control.h"
+#include "raft/rocksdb_file_system_adaptor.h"
 
 namespace TKV {
 struct RegionResource {
@@ -45,7 +46,7 @@ public:
         , _num_table_lines(0)
         , _num_delete_lines(0)
         , _region_control(this, region_id)  
-        // , _snapshot_adaptor(new braft::FileSystemAdaptor(region_id)
+        , _snapshot_adaptor(new RocksdbFileSystemAdaptor(region_id))
     {
         _region_control.set_status(_region_info.status());
         _version = _region_info.version();
