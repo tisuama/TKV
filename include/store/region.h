@@ -123,6 +123,30 @@ public:
         cond.wait();
     }
 
+    int64_t get_log_index() const {
+        return _applied_index;
+    }
+
+    int64_t get_data_index() const {
+        return _data_index;
+    }
+
+    void set_snapshot_meta_size(size_t sz) {
+        _snapshot_meta_size = sz;
+    } 
+    
+    void set_snapshot_data_size(size_t sz) {
+        _snapshot_data_size = sz;
+    }
+    
+    int64_t get_timecost() const {
+        return _time_cost.get_time();
+    }
+    
+    void reset_timecost() {
+        return _time_cost.reset();
+    }
+
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
@@ -211,6 +235,8 @@ private:
     int64_t                 _snapshot_num_table_lines = 0; // last snapshot number
     int64_t                 _snapshot_index = 0;           // snapshot index
     TimeCost                _snapshot_time_cost;
+    
+    TimeCost                _time_cost;                    // 上次收到请求的时间
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

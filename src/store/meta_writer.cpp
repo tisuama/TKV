@@ -190,7 +190,6 @@ int MetaWriter::init_meta_info(const pb::RegionInfo& region_info) {
     keys.push_back(num_table_lines_key(region_id));
     values.push_back(encode_num_table_lines(0));
 
-    // Learner key?
     auto status = _rocksdb->write(MetaWriter::write_options, _meta_cf, keys, values);
     if (!status.ok()) {
         DB_FATAL("persistent init meta info failed, region_id: %ld, err_msg: %s",

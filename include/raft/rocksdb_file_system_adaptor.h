@@ -10,11 +10,27 @@ const std::string SNAPSHOT_DATA_FILE = "region_data_snapshot.sst";
 const std::string SNAPSHOT_META_FILE = "region_meta_snapshot.sst";
 const std::string SNAPSHOT_DATA_FILE_WITH_SLASH = "/" + SNAPSHOT_DATA_FILE;
 const std::string SNAPSHOT_META_FILE_WITH_SLASH = "/" + SNAPSHOT_META_FILE;
-const size_t SST_FILE_LENGTH = 128 * 1024 * 1024;
+const size_t SST_FILE_LENGTH = 128 * 1024 * 1024;  // SST file size: 128MB
 
 class RocksdbFileSystemAdaptor;
 class Region;
 typedef std::shared_ptr<Region> SmartRegion;
+
+bool inline is_snapshot_data_file(const std::string& path) {
+    butil::StringPiece p(path);
+    if (p.ends_with(SNAPSHOT_DATA_FILE_WITH_SLASH)) {
+        return true;
+    }
+    return false;
+}
+
+bool inline is_meta_data_file(const std::string& path) {
+    butil::StringPiece p(path);
+    if (p.ends_with(SNAPSHOT_META_FILE_WITH_SLASH)) {
+        return true;
+    }
+    return false;
+}
 
 struct IteratorContext {
     bool    reading = false;
@@ -59,6 +75,9 @@ typedef std::shared_ptr<SnapshotContext> SnapshotContextPtr;
 class SstWriterAdaptor: public braft::FileAdaptor {
 friend class RocksdbFileSystemAdaptor;
 public:
+    virtual ~SstWriterAdaptor();
+    int open();
+
     virtual ssize_t write(const butil::IOBuf& data, off_t offset) override;
     virtual ssize_t read(butil::IOBuf* portal, off_t offset, size_t size) override;
     virtual ssize_t size() override;
@@ -70,12 +89,13 @@ public:
 private:
     bool filish_sst();
     int iobuf_to_sst(butil::IOBuf data);
+
     int64_t _region_id;
-    SmartRegion _regin_ptr;
+    SmartRegion _regin;
     std::string _path;
     int _sst_idx = 0;
-    size_t _count = 0;
-    size_t _data_size = 0;
+    size_t _count = 0;  // write成功的kv对
+    size_t _data_size = 0; 
     bool   _closed = true;
     bool   _is_meta = false;
     std::unique_ptr<SstFileWriter> _writer; 
@@ -206,7 +226,7 @@ private:
     BthreadCond    _snapshot_cond;
     // path -> snapshot
     typedef std::map<std::string, ContextEnv> SnapshotMap;
-    SnapshotMap    _snapshots;
+    SnapshotMap    _snapshot;
 };
 
 } // namespace TKV
