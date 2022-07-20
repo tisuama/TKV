@@ -1,4 +1,8 @@
 #include "raft/rocksdb_file_system_adaptor.h"
+#include "store/meta_writer.h"
+
+#include <braft/util.h>
+#include <braft/fsync.h>
 
 namespace TKV {
 SstWriterAdaptor::SstWriterAdaptor(int64_t region_id, 
@@ -79,9 +83,68 @@ ssize_t SstWriterAdaptor::write(const butil::IOBuf& data, off_t offset) {
 }
 
 int SstWriterAdaptor::iobuf_to_sst(butil::IOBuf data) {
+    std::string region_info_key = MetaWriter::get_instance()->region_info_key(_region_id);
+    std::string applied_index_key = MetaWriter::get_instance()->applied_index_key(_region_id);
+    char key_buf[1024];
+    char value_buf[10 * 1024];
+    while (!data.empty()) {
+        size_t key_size = 0;
+        size_t nbytes = data.cutn((void*)&key_size, sizeof(size_t));
+        if (nbytes < sizeof(size_t)) {
+            DB_FATAL("read key size from data failed, region_id: %ld", _region_id);
+            return -1;
+        }
+        rocksdb::Slice key;
+        std::unique_ptr<char[]> big_key_buf;
+        if (key_size <= sizeof(key_buf)) {
+            key.data_ = static_cast<const char*>(data.fetch(key_buf, key_sie));
+        } else {
+            big_key_buf.reset(new char[key_size]);
+            key.data_ = static_cast<const char*>(data.fetch(big_key_buf.get(), key_size));
+        }
+        key.size_ = key_size;
+        if (key.data_ == nullptr) {
+            DB_FATAL("read key from data failed, region_id: %ld, key_size: %ld",
+                    _region_id, key_size);
+            return -1;
+        }
+        data.pop_front(key_size);
+
+        rocksdb::Slice value;
+        std::unique_ptr<char[]> big_value_buf;
+        nbytes = data.cutn((void*)&value_size, sizeof(size_t));
+        if (nbytes < sizeof(size_t)) {
+            DB_FATAL("read value size from data failed, region_id: %ld", _region_id);
+            return -1;
+        }
+        size_t value_size = 0;
+        if (value_size <= sizeof(value_buf)) {
+            value.data_ = static_cast<const char*>(data.fetch(value_buf, value_size)); 
+        } else {
+            big_value_buf.reset(new char[value_size]); 
+            value.data_ = static_cast<const char*>(data.fetch(big_value_buf.get(), value_size));
+        }
+        value.size_ = value_size;
+        if (value.data_ == nullptr) {
+            DB_FATAL("read value from data failed, region_id: %ld", _region_id);
+            return -1;
+        }
+        data.pop_front(value_size);
+
+        _count++;
+        auto s = _writer->put(key, value);
+        if (!s.ok()) {
+            DB_FATAL("write sst failed, err: %s, region_id: %ld", 
+                    s.ToString().c_str(), _region_id);
+            return -1;
+        }
+    }
+    return 0;
 }
 
 ssize_t SstWriterAdaptor::read(butil::IOBuf* portal, off_t offset, size_t size) {
+    DB_FATAL("SstWriterAdaptor::read not impl");
+    return -1;
 }
 
 ssize_t SstWriterAdaptor::size() {
@@ -90,6 +153,7 @@ ssize_t SstWriterAdaptor::size() {
 }
 
 bool SstWriterAdaptor::sync() {
+    // Already sync
     return true;
 }
 
@@ -129,6 +193,46 @@ bool SstWriterAdaptor::finish_sst() {
             DB_FATAL("delete sst file path: %s failed, region_id: %ld", path.c_str(), _region_id);
         }
     }
+}
+
+PosixFileAdaptor::~PosixFileAdaptor() {
+    this->close();
+}
+
+PosixFileAdaptor::open(int flag) {
+    flag &= (~O_CLOEXEC);
+    _fd = ::open(_path.c_str(), flag, 0644);
+    if (_fd <= 0) {
+        return -1;
+    }
+    return _fd;
+}
+
+ssize_t PosixFileAdaptor::write(const butil::IOBuf& data, off_t offset) }
+    ssize_t ret = braft::file_pwrite(data, _fd, offset);
+    return ret;
+}
+
+ssize_t PosixFileAdaptor::read(butil::IOBuf* portal, off_t offset, size_t size) {
+    return braft::file_pread(portal, _fd, offset, size);
+}
+
+ssize_t PosixFileAdaptor::size() {
+    off_t sz = lseek(_fd, 0, SEEK_END);
+    return ssize_t(sz);
+}
+
+bool PosixFileAdaptor::sync() {
+    return braft::raft_fsync(_fd) == 0;
+}
+
+bool PosixFileAdaptor::close() {
+    if (_fd > 0) {
+        bool res = ::close(_fd) == 0;
+        _fd = -1;
+        return res;
+    }
+    return true;
 }
 
 ssize_t RocksbReaderAdaptor::write(const butil::IOBuf& data, off_t offset) {
@@ -182,6 +286,23 @@ braft::DirReader* RocksdbFileSystemAdaptor::directory_reader(const std::string& 
 braft::FileAdaptor* RocksdbFileSystemAdaptor::open(const std::string& path, int flag,
     const ::google::protobuf::Message* file_meta,
     butil::File::Error* e) {
+    // 根据文件后缀判断
+    if (!is_snapshot_data_file(path) && !is_snapshot_meta_file(path)) {
+        PosixFileAdaptor* adaptor = new PosixFileAdaptor(path);
+        int ret = adator->open(flag);
+        if (ret) {
+            *e = butil::File::OSErrorToFileError(errno);
+            delete adaptor;
+            return nullptr;
+        }
+        DB_WARNING("open file: %s, region_id: %ld, flag: %d", path.c_str(), _region_id, flag & O_WRONLY);
+        return adaptor;
+    }
+    bool is_write = (O_WRONLY & flag);
+    if (is_write) {
+        return this->open_writer_adaptor(path, flag, file_meta, e);
+    }
+    return this->open_reader_adaptor(path, flag, file_meta, e);
 }
 
 bool RocksdbFileSystemAdaptor::open_snapshot(const std::string& snapshot_path) {
@@ -256,6 +377,16 @@ braft::FileAdaptor* RocksdbFileSystemAdaptor::open_writer_adaptor(const std::str
     
     // Create new SstWriterAdaptor
     SstWriterAdaptor* writer = new SstWriterAdaptor(_region_id, path, options);
+    int ret = writer->open();
+    if (ret) {
+        if (e) {
+            *e = butil::File::FILE_ERROR_FAILED;
+        }
+        delete writer;
+        return nullptr;
+    }
+    DB_WARNING("open for write file path: %s, region_id: %ld", path.c_str(), _region_id);
+    return writer;
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

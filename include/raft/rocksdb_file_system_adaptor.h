@@ -72,6 +72,7 @@ struct SnapshotContext {
 typedef std::shared_ptr<SnapshotContext> SnapshotContextPtr;
 
 // Writer and Reader
+// Adaptor for SstWriter
 class SstWriterAdaptor: public braft::FileAdaptor {
 friend class RocksdbFileSystemAdaptor;
 public:
