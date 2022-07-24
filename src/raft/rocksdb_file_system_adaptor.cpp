@@ -68,6 +68,7 @@ ssize_t SstWriterAdaptor::write(const butil::IOBuf& data, off_t offset) {
         _count = 0;
         ++_sst_idx;
         path = _path + std::string(_sst_idx);
+        // 重新打开新的sst
         auto s = _writer->open(path);
         if (!s.ok()) {
             DB_FATAL("open sst file path: %s failed, err: %s, region_id: %ld",
@@ -209,10 +210,10 @@ PosixFileAdaptor::open(int flag) {
 }
 
 ssize_t PosixFileAdaptor::write(const butil::IOBuf& data, off_t offset) }
+    // braft/util.cpp
     ssize_t ret = braft::file_pwrite(data, _fd, offset);
     return ret;
 }
-
 ssize_t PosixFileAdaptor::read(butil::IOBuf* portal, off_t offset, size_t size) {
     return braft::file_pread(portal, _fd, offset, size);
 }
@@ -235,19 +236,71 @@ bool PosixFileAdaptor::close() {
     return true;
 }
 
-ssize_t RocksbReaderAdaptor::write(const butil::IOBuf& data, off_t offset) {
+
+PosixDirReader::bool is_valid() const {
+    return _dir_reader.IsValid();
 }
 
-ssize_t RocksbReaderAdaptor::read(butil::IOBuf* portal, off_t offset, size_t size) {
+PosixDirReader::bool next() {
+    bool ret = _dir_reader.Next();
+    // 过滤掉..文件
+    while (rc && (strcmp(name(), ".") == 0 || strcmp(name(), "..") == 0)) {
+        ret = _dir_reader.Next();
+    }
+    return ret;
 }
 
-ssize_t RocksbReaderAdaptor::size() {
+PosixDirReader::const char* name() const {
+    return _dir_reader.name();
 }
 
-bool RocksbReaderAdaptor::sync() {
+ssize_t RocksdbReaderAdaptor::write(const butil::IOBuf& data, off_t offset) {
+    (void)offset;
+    (void)data;
+    DB_FATAL("RocksdbReaderAdaptor::write not impl");
+    return -1;
 }
 
-bool RocksbReaderAdaptor::close() {
+// Called by braft::FileService::get_file
+ssize_t RocksdbReaderAdaptor::read(butil::IOBuf* portal, off_t offset, size_t size) {
+    if (_closed) {
+        DB_FATAL("rocksdb reader has been closed, region_id: %ld, offset: %ld",
+                _region_id, offset);
+        return -1;
+    }
+    if (offset < 0) {
+        DB_FATAL("region_id: %ld ret error, offset: %ld", _region_id, offset);
+        return -1;
+    }
+    
+    // Start read file 
+}
+
+ssize_t RocksdbReaderAdaptor::size() {
+    IteratorContext* ctx = _countext->data_context;
+    if (_is_meta_reader) {
+        ctx = _countext->meta_context;
+    }
+    // 和IteratorContext->done啥关系
+    if (ctx->have_done) {
+        return ctx->offset;
+    }
+    return std::numeric_limits<ssize_t>::max();
+}
+
+bool RocksdbReaderAdaptor::sync() {
+    return true;
+}
+
+bool RocksdbReaderAdaptor::close() {
+    if (_closed) {
+        DB_WARNING("file has been closed, region_id: %ld, num_lines: %ld, path: %s",
+                _region_id, _num_lines, _path.c_str());
+        return true;
+    }
+    _fs->close(_path);
+    _closed = true;
+    return true;
 }
 bool RocksdbFileSystemAdaptor::delete_file(const std::string& path, bool recursive) {
     butil::FilePath file_path(path);
@@ -286,7 +339,7 @@ braft::DirReader* RocksdbFileSystemAdaptor::directory_reader(const std::string& 
 braft::FileAdaptor* RocksdbFileSystemAdaptor::open(const std::string& path, int flag,
     const ::google::protobuf::Message* file_meta,
     butil::File::Error* e) {
-    // 根据文件后缀判断
+    // 根据文件后缀判断是Meta还是Data
     if (!is_snapshot_data_file(path) && !is_snapshot_meta_file(path)) {
         PosixFileAdaptor* adaptor = new PosixFileAdaptor(path);
         int ret = adator->open(flag);
@@ -352,12 +405,158 @@ void RocksdbFileSystemAdaptor::close_snapshot(const std::string& snapshot_path) 
 }
 
 void RocksdbFileSystemAdaptor::close(const std::string& path) {
-    // TODO: close 
+    size_t len = path.size();
+    if (is_snapshot_data_file(path)) {
+        len -= SNAPSHOT_DATA_FILE_WITH_SLASH.size();
+    } else {
+        CHECK(is_snapshot_meta_file(path));
+        len -= SNAPSHOT_META_FILE_WITH_SLASH.size();
+    }
+    const std::string snapshot_path = path.substr(0, len);
+
+    BAIDU_SCOPED_LOCK(_snapshot_mutex);
+    auto iter = _snapshot.find(snapshot_path);
+    if (iter == _snapshot.end()) {
+        DB_FATAL("no snapshot found when close reader, path: %s, region_id: %ld",
+                path.c_str(), _region_id);
+        return ;
+    }
+    // set reading = false
+    auto& snapshot_ctx = iter->second;
+    if (is_snapshot_data_file(path) && snapshot_ctx.ptr->data_context != nullptr) {
+        DB_WARNING("read snapshot data file close, path: %s", path.c_str());
+        snapshot_ctx.ptr->data_context->reading = false;
+    } else if (snapshot_ctx.ptr->meta_context != nullptr) {
+        DB_WARNING("read snapshot meta file close, path: %s", path.c_str());
+        snapshot_ctx.ptr->meta_context->reading = false;
+    }
 }
 
 braft::FileAdaptor* RocksdbFileSystemAdaptor::open_reader_adaptor(const std::string& path, int flag,
         const ::google::protobuf::Message* file_meta,
         butil::File::Error* e) {
+    TimeCost cost;
+    (void) file_meta;
+    std::string prefix;
+    std::string upper_bound;
+    size_t len = path.size();
+    if (is_snapshot_data_file(path)) {
+        len -= SNAPSHOT_DATA_FILE.size();
+        MutableKey key;
+        key.append_i64(_region_id);
+        // prefix: region_id
+        prefix = key.data();
+        key.append_u64(UINT64_MAX);
+        // key = upper_bound: region_id + UINT64_MAX
+        upper_bound = key.data();
+    } else {
+        len -= SNAPSHOT_META_FILE;
+        prefix = MetaWriter::get_instance()->meta_info_prefix(_region_id);
+    }
+    const std::string snapshot_path = path.substr(0, len - 1);
+    SnapshotContextPtr snapshot_ctx = get_snapshot(snapshot_path);
+    if (snapshot_ctx == nullptr) {
+        DB_FATAL("snapshot not found, path: %s, region_id: %ld", snapshot_path.c_str(), _region_id);
+        if (e) {
+            *e = butil::File::FILE_ERROR_FAILED;
+        }
+        return nullptr;
+    }
+
+    bool is_meta_reader = false;
+    IteratorContext* iter_context = nullptr;
+    if (is_snapshot_data_file(path)) {
+        is_meta_reader = false;
+        iter_context = snapshot_ctx->data_context;
+        // first open snapshot file
+        // Set data_context
+        if (iter_context == nullptr) {
+            iter_context = new IteratorContext;
+            iter_context->prefix = prefix;
+            iter_context->is_meta_sst = false;
+            iter_context->upper_bound = upper_bound;
+            iter_context->upper_bound_slice = upper_bound;
+
+            // rocksdb option
+            rocksdb::ReadOptions read_option;
+            read_option.snapshot = snapshot_ctx->snapshot;
+            read_option.total_order_seek = true;
+            read_option.fill_cache = false;
+            // upper_bound: region_id{UINT64_MAX}
+            read_option.iterate_upper_bound = &iter_context->upper_bound_slice;
+            rocksdb::ColumnFamilyHandle* cf_handle = RocksWrapper::get_instance()->get_data_handle();
+            iter_context->iter.reset(RocksWrapper::get_instance()->new_iterator(read_option, cf_handle));
+            // Seek: first key at or past the target
+            iter_context->iter->Seek(prefix);
+
+            braft::NodeStatus status;
+            auto region = Store::get_instance()->get_region(_region_id);
+            region->get_node_status(&status);
+            int64_t peer_next_index = 0;
+            // 根据Peer状态和data_index判断是否需要复制数据
+            // addpeer在unstable里，peer_next_index = 0就会走复制流程
+            for (auto iter : status.stable_followers) {
+                auto& peer = iter.second;
+                DB_WARNING("region_id: %ld peer: %s installing_snapshot: %d, next_index: %ld",
+                       _region_id, iter.first.to_string().c_str(), peer.installing_snapshot, peer.next_index); 
+                if (peer.installing_snapshot) {
+                    peer_next_index = peer.next_index;
+                    break;
+                }
+            }
+            if (snapshot_ctx->data_index < peer_next_index) {
+                snapshot_ctx->need_copy_data = false;
+            }
+            snapshot_ctx->data_context = iter_context;
+            DB_WARNING("region_id: %ld open reader, data_index: %ld, peer_next_index: %ld, path: %s, time_cost: %ld",
+                    _region_id, snapshot_ctx->data_index, path.c_str(), time_cost.get_time());
+        }
+    }
+    
+    int64_t applied_index = 0;
+    int64_t data_index = 0;
+    int64_t snapshot_index = 0;
+    if (is_snapshot_meta_file(path)) {
+        is_meta_reader = true;
+        iter_context = snapshot_ctx->meta_context;
+        // Set meta_context 
+        if (iter_context == nullptr) {
+            iter_context = new IteratorContext;
+            iter_context->prefix = prefix;
+            iter_context->is_meta_sst = true;
+
+            // rocksdb options
+            rocksdb::ReadOptions read_option;
+            read_option.snapshot = snapshot_ctx->snapshot;
+            // iter over same prefix 
+            read_option.prefix_same_as_start = true;
+            read_option.total_order_seek = false;
+            read_option.fill_cache = false;
+            rocksdb::ColumnFamilyHandle* cf_handle = RocksWrapper::get_instance()->get_meta_info_handle();
+            iter_context->iter.reset(RocksWrapper::get_instance()->new_iterator(read_option, cf_handle));
+            iter_context->iter->Seek(prefix);
+            snapshot_ctx->meta_context = iter_context;
+            snapshot_index = parse_snapshot_index_from_path(path, true);
+            iter_context->snapshot_index = snapshot_index;
+            MetaWriter::get_instance()->read_applied_index(_region_id, read_option, &applied_index, &data_index);
+            iter_context->applied_index = std::max(iter_context->snapshot_index, applied_index);
+        }
+    }
+    if (iter_context->reading) {
+        DB_WARNING("snapshot reader is busy, path: %s, region_id: %ld", path.c_str(), _region_id);
+        if (e != nullptr) {
+            *e = butil::File::FILE_ERROR_FAILED;
+        }
+        return nullptr;
+    }
+    iter_context->reading = true;
+    // init a reader
+    auto reader = new RocksdbReaderAdaptor(_region_id, path, this, snapshot_ctx, is_meta_reader);
+    // open this reader
+    reader->open();
+    DB_WARNING("region_id: %ld open reader: %s, snapshot_index: %ld, applied_index: %ld, data_index: %ld, time cost: %ld",
+            _region_id, path.c_str(), snapshot_index, applied_index, data_index, cost.get_time());
+    return reader;
 }
 
 braft::FileAdaptor* RocksdbFileSystemAdaptor::open_writer_adaptor(const std::string& path, int flag,
@@ -387,6 +586,15 @@ braft::FileAdaptor* RocksdbFileSystemAdaptor::open_writer_adaptor(const std::str
     }
     DB_WARNING("open for write file path: %s, region_id: %ld", path.c_str(), _region_id);
     return writer;
+}
+
+SnapshotContextPtr RocksdbFileSystemAdaptor::get_snapshot(const std::string& path) {
+    BAIDU_SCOPED_LOCK(_snapshot_mutex);
+    auto iter = _snapshot.find(path);
+    if (iter != _snapshot.end()) {
+        return iter->second.ptr;
+    }
+    return nullptr;
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

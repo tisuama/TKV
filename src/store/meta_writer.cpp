@@ -198,5 +198,12 @@ int MetaWriter::init_meta_info(const pb::RegionInfo& region_info) {
     }
     return 0;
 }
+
+std::string MetaWriter::meta_info_prefix(int64_t region_id) {
+    MutableKey key;
+    key.append_char(MetaWriter::META_IDENTIFY.c_str(), 1);
+    key.append_i64(region_id);
+    return key.data();
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

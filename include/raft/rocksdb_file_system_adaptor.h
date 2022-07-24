@@ -35,7 +35,7 @@ bool inline is_meta_data_file(const std::string& path) {
 struct IteratorContext {
     bool    reading = false;
     bool    is_meta_sst = false;
-    bool    done = false;
+    bool    have_done = false;       // now finish
     std::string prefix;
     std::string upper_bound;
     rocksdb::Slice upper_bound_slice;
@@ -62,6 +62,7 @@ struct SnapshotContext {
         }
     }
 
+    // rocksdb::Snapshot
     const rocksdb::Snapshot* snapshot = nullptr;
     IteratorContext* data_context = nullptr;
     IteratorContext* meta_conext = nullptr;
@@ -109,6 +110,7 @@ public:
     virtual bool is_valid() const override;
     virtual bool next() override;
     virtual const char* name() const override;
+
     PosixDirReader(const std::string& path)
         : _dir_reader(path.c_str()) 
     {}
@@ -155,7 +157,13 @@ public:
             const std::string& path,
             RocksdbFileSystemAdaptor* fs,
             SnapshotContextPtr context,
-            bool is_meta_reader);
+            bool is_meta_reader)
+        : _region_id(region_id)
+        , _path(path)
+        , _fs(fs)
+        , _context(context)
+        , _is_meta_reader(is_meta_reader)
+    {}
 private:
     int64_t serialize_to_iobuf(butil::IOPortal* portal, const rocksdb::Slice& key) {
         if (portal != nullptr) {

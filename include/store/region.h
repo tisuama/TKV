@@ -147,6 +147,10 @@ public:
         return _time_cost.reset();
     }
 
+    void get_node_status(braft::NodeStatus* status) {
+        _node.get_status(status);
+    }
+
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
@@ -187,18 +191,19 @@ private:
     std::mutex              _legal_mutex;
     bool                    _legal_region = true;
     
-    // restart
+    // Restart
     bool                    _restart = false;
 
     // 计算存储分离开关
     bool                    _storage_compute_separate = false;
 
-    // Raft
+    // Raft Service
     braft::Node             _node;
     std::atomic<bool>       _is_leader;
     
     int64_t                 _braft_apply_index = 0;
     int64_t                 _applied_index = 0;
+    // _applied_index
     int64_t                 _data_index = 0;
     int64_t                 _expect_term = -1; 
     
