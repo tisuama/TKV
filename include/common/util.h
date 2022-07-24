@@ -14,6 +14,5 @@ void split_string(std::vector<std::string>& ret, std::string src, char split_cha
         }
     }
 }
-
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

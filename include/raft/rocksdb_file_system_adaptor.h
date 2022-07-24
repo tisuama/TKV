@@ -3,6 +3,8 @@
 #include <braft/file_system_adaptor.h>
 #include "engine/rocks_wrapper.h"
 #include "engine/sst_file_writer.h"
+#include "common/common.h"
+#include "common/log.h"
 
 
 namespace TKV {
@@ -24,7 +26,7 @@ bool inline is_snapshot_data_file(const std::string& path) {
     return false;
 }
 
-bool inline is_meta_data_file(const std::string& path) {
+bool inline is_snapshot_meta_file(const std::string& path) {
     butil::StringPiece p(path);
     if (p.ends_with(SNAPSHOT_META_FILE_WITH_SLASH)) {
         return true;
@@ -47,6 +49,7 @@ struct IteratorContext {
 };
 
 struct SnapshotContext {
+    // open_snapshot时自动创建一个rocksdb的快照
     SnapshotContext()
         : snapshot(RocksWrapper::get_instance()->get_snapshot()) 
     {}
@@ -57,15 +60,15 @@ struct SnapshotContext {
         if (data_context) {
             delete data_context;
         }
-        if (meta_conext) {
-            delete meta_conext;
+        if (meta_context) {
+            delete meta_context;
         }
     }
 
     // rocksdb::Snapshot
     const rocksdb::Snapshot* snapshot = nullptr;
     IteratorContext* data_context = nullptr;
-    IteratorContext* meta_conext = nullptr;
+    IteratorContext* meta_context = nullptr;
     int64_t data_index = 0;
     bool    need_copy_data = true;
 };
@@ -81,7 +84,7 @@ public:
     int open();
 
     virtual ssize_t write(const butil::IOBuf& data, off_t offset) override;
-    virtual ssize_t read(butil::IOBuf* portal, off_t offset, size_t size) override;
+    virtual ssize_t read(butil::IOPortal* portal, off_t offset, size_t size) override;
     virtual ssize_t size() override;
     virtual bool sync() override;
     virtual bool close() override;
@@ -89,9 +92,10 @@ public:
     SstWriterAdaptor(int64_t region_id, const std::string& path, const rocksdb::Options& option);
 
 private:
-    bool filish_sst();
+    bool finish_sst();
     int iobuf_to_sst(butil::IOBuf data);
 
+    SmartRegion _region;
     int64_t _region_id;
     SmartRegion _regin;
     std::string _path;
@@ -125,7 +129,7 @@ public:
     virtual ~PosixFileAdaptor();
     int open(int flag);
     virtual ssize_t write(const butil::IOBuf& data, off_t offset) override;
-    virtual ssize_t read(butil::IOBuf* portal, off_t offset, size_t size) override;
+    virtual ssize_t read(butil::IOPortal* portal, off_t offset, size_t size) override;
     virtual ssize_t size() override;
     virtual bool sync() override;
     virtual bool close() override;
