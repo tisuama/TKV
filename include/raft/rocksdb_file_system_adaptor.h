@@ -148,7 +148,7 @@ private:
 class RocksdbReaderAdaptor: public braft::FileAdaptor {
     friend class RocksdbFileSystemAdaptor;
 public:
-    virtual ~RocksdbReaderAdaptor();
+    virtual ~RocksdbReaderAdaptor() { }
     virtual ssize_t read(butil::IOPortal* portal, off_t offset, size_t size) override;
     virtual ssize_t size() override;
     virtual bool close() override;
@@ -166,8 +166,9 @@ public:
         , _path(path)
         , _fs(fs)
         , _context(context)
-        , _is_meta_reader(is_meta_reader)
+        , _is_meta_reader(is_meta_reader) 
     {}
+
 private:
     int64_t serialize_to_iobuf(butil::IOPortal* portal, const rocksdb::Slice& key) {
         if (portal != nullptr) {

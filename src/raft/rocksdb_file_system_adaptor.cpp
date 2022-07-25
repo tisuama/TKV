@@ -1,3 +1,4 @@
+#include "common/common.h"
 #include "raft/rocksdb_file_system_adaptor.h"
 #include "store/meta_writer.h"
 #include "store/store.h"

@@ -230,9 +230,8 @@ private:
     
     MetaWriter*             _meta_writer = nullptr;
     std::shared_ptr<RegionResource> _resource;
-    // TODO: rocksdbfilesystemadaptor
-    scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor = nullptr;
     RegionControl           _region_control;
+    scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor = nullptr;
     
     // 异步执行队列
     ExecutionQueue          _async_apply_log_queue;

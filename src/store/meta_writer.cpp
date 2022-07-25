@@ -14,6 +14,7 @@ const std::string MetaWriter::REGION_INFO_IDENTIFY(1, 0x05);
 const std::string MetaWriter::DOING_SNAPSHOT_IDENTIFY(1, 0x07); 
 const std::string MetaWriter::LEARNER_IDENTIFY(1, 0x0C);
 const std::string MetaWriter::LOCAL_STORAGE_IDENTIFY(1, 0x0D);
+const std::string MetaWriter::PREPARE_TXN_LOG_INDEX_IDENTIFY(1, 0x03);
 
 int MetaWriter::parse_region_infos(std::vector<pb::RegionInfo>& region_infos) {
     rocksdb::ReadOptions read_options;
@@ -204,6 +205,42 @@ std::string MetaWriter::meta_info_prefix(int64_t region_id) {
     key.append_char(MetaWriter::META_IDENTIFY.c_str(), 1);
     key.append_i64(region_id);
     return key.data();
+}
+
+std::string MetaWriter::log_index_key_prefix(int64_t reigon_id) const {
+    MutableKey key;
+    key.append_char(MetaWriter::META_IDENTIFY.c_str(), 1);
+    key.append_i64(reigon_id);
+    key.append_char(MetaWriter::PREPARE_TXN_LOG_INDEX_IDENTIFY.c_str(), 1);
+    return key.data();
+}
+
+void MetaWriter::read_applied_index(int64_t region_id, 
+      int64_t* applied_index, int64_t* data_index) {
+    std::string value;
+    rocksdb::ReadOptions options;
+    read_applied_index(region_id, options, applied_index, data_index);
+}
+
+void MetaWriter::read_applied_index(int64_t region_id, 
+        const rocksdb::ReadOptions& options, int64_t* applied_index, int64_t* data_index) {
+    std::string value;
+    auto s = _rocksdb->get(options, _meta_cf, rocksdb::Slice(applied_index_key(region_id)), &value);
+    if (!s.ok()) {
+        DB_WARNING("read applied index failed, Err: %s, region_id: %ld",
+                s.ToString().c_str(), region_id);
+        *applied_index = -1;
+        *data_index = -1;
+        return ;
+    }
+    TableKey tkey(value);
+    *applied_index = tkey.extract_i64(0);
+    // 兼容
+    if (value.size() == 16) {
+        *data_index = tkey.extract_i64(8);
+    } else {
+        *data_index = *applied_index;
+    }
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

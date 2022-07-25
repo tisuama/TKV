@@ -118,6 +118,7 @@ public:
             _store_address = response.leader();
             ++retry_times;
         } while (retry_times < _req_options.retry_times);
+        return -1;
     }
 
     template<typename Request, typename Response>

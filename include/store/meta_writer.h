@@ -15,6 +15,7 @@ public:
     static const std::string DOING_SNAPSHOT_IDENTIFY; 
     static const std::string LEARNER_IDENTIFY;
     static const std::string LOCAL_STORAGE_IDENTIFY;
+    static const std::string PREPARE_TXN_LOG_INDEX_IDENTIFY;
     
     virtual ~MetaWriter() {}
     static MetaWriter* get_instance() {
