@@ -66,6 +66,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         DB_FATAL("read region infos from rocksdb failed");
         return ret;
     }
+    // restart region 
     for (auto& r : region_infos) {
         DB_WARNING("region info: %s when init store", r.ShortDebugString().data());
         int64_t region_id = r.region_id();
@@ -155,7 +156,23 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     bool is_addpeer = request->region_info().can_add_peer();
 
     // rocksdb stall -> cannot add peer
-    // TODO: Concurrency instance  
+    // received_add_peer_concurrency后，直到on_snapshot_load后才释放。
+    ON_SCOPED_EXIT([is_addpeer](){
+        if (is_addpeer) {
+            Concurrency::get_instance()->received_add_peer_concurrency.decrease_broadcase();
+        } 
+    });
+    if (is_addpeer) {
+        // Wait region::on_snapshot_load here
+        int ret = Concurrency::get_instance()->received_add_peer_concurrency.increase_time_wait(1000 * 1000 * 10);
+        if (ret != 0) {
+            DB_WARNING("received_add_peer_concurrency timeout, count: %d, log_id: %lu, remote_side: %s",
+                    Concurrency::get_instance()->received_add_peer_concurrency.count(), log_id, remote_side);
+            response->set_errcode(pb::CANNOT_ADD_PEER);
+            response->set_errmsg("received_add_peer_concurrency timeout");
+            return ;
+        }
+    }
     
     // 新增Table信息
     if (!_factory->exist_table_id(table_id)) {

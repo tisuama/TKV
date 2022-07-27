@@ -151,14 +151,21 @@ public:
         _node.get_status(status);
     }
 
+    bool is_addpeer() const {
+        return _region_info.can_add_peer();
+    }
+
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
     void reset_snapshot_status();
+    void on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
+            std::map<int64_t, std::string>& prepared_log_entrys);
 
     // override virtual functions from braft::StateMachine
     virtual void on_apply(braft::Iterator& iter) override; 
     virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) override;
+    virtual int  on_snapshot_load(braft::SnapshotReader* reader) override;
 
 private:
     RocksWrapper*           _rocksdb;

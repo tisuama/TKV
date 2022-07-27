@@ -67,6 +67,7 @@ ssize_t SstWriterAdaptor::write(const butil::IOBuf& data, off_t offset) {
         if (!this->finish_sst()) {
             return -1;
         }
+        // 此SST是否有有效数据
         _count = 0;
         ++_sst_idx;
         path = _path + std::to_string(_sst_idx);

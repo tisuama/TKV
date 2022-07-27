@@ -1,6 +1,7 @@
 #include "store/region.h"
 #include "common/mut_table_key.h"
 #include "raft/rocksdb_file_system_adaptor.h"
+#include "common/concurrency.h"
 
 #include <butil/file_util.h>
 #include <butil/files/file_path.h>
@@ -76,8 +77,6 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
     }
     
     // TODO: is_learner
-    if (is_learner()) {
-    }
 }
 
 void Region::on_apply(braft::Iterator& iter) {
@@ -135,8 +134,6 @@ int Region::init(bool new_region, int32_t snapshot_times) {
             _report_peer_info = true;
         }
     }
-    // TODO: global index
-    // TODO: ttl info
 
     // init raft node
     braft::NodeOptions options;
@@ -202,6 +199,7 @@ void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* don
         // 等待异步队列为空
         this->wait_async_apply_log_queue_empty();
     }
+    // META_CF和DATA_CF的数据要做快照
     if (writer->add_file(SNAPSHOT_META_FILE) != 0 ||
         writer->add_file(SNAPSHOT_DATA_FILE) != 0) {
         done->status().set_error(EINVAL, "Fail to add snapshot");
@@ -214,12 +212,90 @@ void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* don
 }
 
 void Region::reset_snapshot_status() {
-    // 后续判断是否需要快照的标准
+    // 重置后续判断是否需要快照的标准
     if (_snapshot_time_cost.get_time() > FLAGS_snapshot_interval_s * 1000 * 1000) {
         _snapshot_num_table_lines = _num_table_lines.load();
         _snapshot_index = _applied_index;
         _snapshot_time_cost.reset();
     }
+}
+
+int Region::on_snapshot_load(braft::SnapshotReader* reader) {
+    this->reset_timecost();
+    TimeCost time_cost;
+    DB_WARNING("region_id: %ld start to load snapshot, path: %s", _region_id, reader->get_path());
+    ON_SCOPED_EXIT([this]() {
+        _meta_writer->clear_doing_snapshot(_region_id);
+        DB_WARNING("region_id: %ld end  to laod snapshot", _region_id);
+    });
+
+    std::string data_sst_file = reader->get_path() + SNAPSHOT_DATA_FILE_WITH_SLASH;
+    std::string meta_sst_file = reader->get_path() + SNAPSHOT_META_FILE_WITH_SLASH;
+    std::map<int64_t, std::string> prepared_log_entrys;
+    // butil::FilePath  
+    butil::FilePath snapshot_meta_file(meta_sst_file);
+    if (_restart && !Store::get_instance()->doing_snapshot_when_stop(_region_id)) {
+        // 本地重启，不需要做过多的事情
+        DB_WARNING("region_id: %ld restart with no snapshot load", _region_id);
+        on_snapshot_load_for_restart(reader, prepared_log_entrys);
+     } else if (!butil::PathExists(snapshot_meta_file)) { // 文件是否存在
+         //数据不完整
+        DB_WARNING("region_id: %ld no meta sst file", _region_id); 
+        return -1;
+     } else {
+         // 正常流程的snapshot没有加载完，重启需要重新ingest sst
+         // 或者是Follower正常InstallSnapshot流程
+        _meta_writer->write_doing_snapshot(_region_id);
+        DB_WARNING("region_id: %d doing on snapshot load when closed", _region_id);
+        int ret = 0;
+        if (is_addpeer()) {
+            ret = Concurrency::get_instance()->snapshot_load_concurrency.increase_wait();
+            DB_WARNING("region_id: %ld snapshot load, wait_time: %ld, ret: %d",
+                    _region_id, time_cost.get_time(), ret);
+        }
+        ON_SCOPED_EXIT([this]() {
+            if (is_addpeer()) {
+                Concurrency::get_instance()->snapshot_load_concurrency.decrease_broadcast();
+                if (_need_decrease) {
+                    _need_decrease = false;
+                    Concurrency::get_instance()->received_add_peer_concurrency.decrease_broadcast();
+                }
+            }    
+        });
+
+        if (_region_info.version() != 0) {
+            int64_t old_data_index = _data_index;
+            DB_WARNING("region_id: %ld clear data on_snapshot_load", _region_id);
+            _meta_writer->clear_meta_info(_region_id);
+            ret = RegionControl::ingest_meta_sst(meta_sst_file, _region_id);
+            if (ret < 0) {
+                DB_FATAL("ingest sst fail, region_id: %ld", _region_id);
+                return -1;
+            }
+            // Read _applied_index and _data_index from rocksdb
+            _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
+            // 生成的data_cf的SST文件是从idx = 0开始
+            butil::FilePath file_path(data_sst_file + "0");                  
+            // 两种情况：1) 此次快照的data_index更大，包含数据更多
+            // 2) restart时有快照没有安装完成，因为data_sst_file还存在
+            if (_data_index > old_data_index || 
+                    (_restart && butil::PathExists(file_path))) {
+                RegionControl::remove_data(_region_id);
+                // reingest sst
+                // TODO: on_snapshot_load
+            }
+        }
+     }
+}
+
+void Region::on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
+        std::map<int64_t, std::string>& prepared_log_entrys) {
+    // TODO: 考虑没有committed的日志
+    // Read applied index from meta_cf 
+    _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
+    _num_table_lines = _meta_writer->read_num_table_lines(_region_id);
+    DB_WARNING("load snaphshot for restart, region_id: %ld, applied_index: %ld, data_index: %ld",
+            _region_id, _applied_index, _data_index);
 }
 
 } // namespace TKV

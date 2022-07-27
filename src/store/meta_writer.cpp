@@ -207,10 +207,10 @@ std::string MetaWriter::meta_info_prefix(int64_t region_id) {
     return key.data();
 }
 
-std::string MetaWriter::log_index_key_prefix(int64_t reigon_id) const {
+std::string MetaWriter::log_index_key_prefix(int64_t region_id) const {
     MutableKey key;
     key.append_char(MetaWriter::META_IDENTIFY.c_str(), 1);
-    key.append_i64(reigon_id);
+    key.append_i64(region_id);
     key.append_char(MetaWriter::PREPARE_TXN_LOG_INDEX_IDENTIFY.c_str(), 1);
     return key.data();
 }
@@ -241,6 +241,47 @@ void MetaWriter::read_applied_index(int64_t region_id,
     } else {
         *data_index = *applied_index;
     }
+}
+
+int64_t MetaWriter::read_num_table_lines(int64_t region_id) {
+    std::string value;
+    rocksdb::ReadOptions options;
+    auto s = _rocksdb->get(options, _meta_cf, rocksdb::Slice(num_table_lines_key(region_id)), &value);
+    if (!s.ok()) {
+        DB_WARNING("read num table lines failed, Err: %s, region_id: %ld",
+                s.ToString().c_str(), region_id);
+        return -1;
+    }
+    return TableKey(rocksdb::Slice(value)).extract_i64(0);
+}
+
+int MetaWriter::update_num_table_lines(int64_t region_id, int64_t num_table_lines) {
+    auto s = _rocksdb->put(MetaWriter::write_options, _meta_cf, 
+            rocksdb::Slice(num_table_lines_key(region_id)),
+            rocksdb::Slice(encode_num_table_lines(num_table_lines)));
+    if (!s.ok()) {
+        DB_FATAL("write update num table lines, Err: %s, region_id: %ld", 
+                s.ToString().c_str(), region_id);
+    }
+    return 0;
+}
+
+/* Install快照的时候 */
+int MetaWriter::clear_meta_info(int64_t drop_region_id) {
+    TimeCost time_cost;
+    rocksdb::WriteBatch batch;
+    rocksdb::WriteOptions options;
+    batch.Delete(_meta_cf, applied_index_key(drop_region_id));
+    batch.Delete(_meta_cf, num_table_lines_key(drop_region_id));
+    auto s = _rocksdb->write(options, &batch);
+    if (!s.ok()) {
+        DB_FATAL("drop region fail, err_msg: %s, code: %d, region_id: %ld",
+                s.code(), s.ToString().c_str(), drop_region_id);
+        return -1;
+    }
+    DB_WARNING("clear meta info success, cost: %ld, region_id: %ld",
+            drop_region_id, time_cost.get_time());
+    return 0;
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

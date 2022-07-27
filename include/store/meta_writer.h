@@ -64,7 +64,7 @@ public:
     std::string region_for_store_key(int64_t region_id) const;
     std::string applied_index_key(int64_t region_id) const;
     std::string num_table_lines_key(int64_t region_id) const;
-    std::string log_index_key_prefix(int64_t reigon_id) const;
+    std::string log_index_key_prefix(int64_t region) const;
     std::string doing_snapshot_key(int64_t region_id) const;
     std::string learner_key(int64_t region_id) const;
 
