@@ -283,5 +283,51 @@ int MetaWriter::clear_meta_info(int64_t drop_region_id) {
             drop_region_id, time_cost.get_time());
     return 0;
 }
+
+int MetaWriter::clear_all_meta_info(int64_t drop_region_id) {
+    TimeCost time_cost;
+    rocksdb::WriteBatch batch;
+    rocksdb::WriteOptions options;
+    batch.Delete(_meta_cf, applied_index_key(drop_region_id));
+    batch.Delete(_meta_cf, num_table_lines_key(drop_region_id));
+    // more meta info is deleted
+    batch.Delete(_meta_cf, region_info_key(drop_region_id));
+    batch.Delete(_meta_cf, doing_snapshot_key(drop_region_id));
+    batch.Delete(_meta_cf, learner_key(drop_region_id));
+
+    auto s = _rocksdb->write(options, &batch);
+    if (!s.ok()) {
+        DB_FATAL("drop region fail, err_msg: %s, code: %d, region_id: %ld",
+                s.code(), s.ToString().c_str(), drop_region_id);
+        return -1;
+    }
+    DB_WARNING("clear meta info success, cost: %ld, region_id: %ld",
+            drop_region_id, time_cost.get_time());
+    return 0;
+}
+
+/* meta 数据量很少，直接写到memtable减少ingest导致的Flush */
+int MetaWriter::ingest_meta_sst(const std::string& meta_sst_file, int64_t region_id) {
+    auto options = _rocksdb->get_options(_rocksdb->get_meta_info_handle());
+    rocksdb::SstFileReader reader(options);
+    auto s = reader.Open(meta_sst_file);
+    if (!s.ok()) {
+        DB_WARNING("SstFileReader open failed, region_id: %ld", 
+                s.ToString().c_str(), region_id);
+        return -1;
+    }
+    rocksdb::ReadOptions read_options;
+    std::unique_ptr<rocksdb::Iterator> iter(reader.NewIterator(read_options));
+    // Seek(""): 从第一条开始
+    for (iter->Seek(""); iter->Valid(); iter->Next()) {
+        s = _rocksdb->put(MetaWriter::write_options, _meta_cf, iter->key(), iter->value());
+        if (!s.ok()) {
+            DB_FATAL("region_id: %ld put meta fail, err_msg: %s", 
+                    region_id, s.ToString().c_str());
+            return -1;
+        }
+    }
+    return 0;
+} 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

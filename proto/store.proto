@@ -29,7 +29,7 @@ message StoreRes {
     repeated RegionLeader region_leaders = 8;
     optional bool        is_merge = 9;
     optional PeerStatus  region_status = 10;
-    optional RegionRaftStats region_raft_stats = 11;
+    optional RegionRaftStats region_raft_stat = 11;
 };
 
 message StoreReq {
@@ -59,7 +59,14 @@ message InitRegion {
     optional bool       is_learner = 5;
 };
 
+message GetAppliedIndex {
+    required int64 region_id = 1;
+};
+
 service StoreService {
     rpc init_region(InitRegion) returns (StoreRes);
+    // 1) 获取region的applied_index，用来分裂后优化选择transfer leader对象
+    // 2) 获取region的snapshot数据大小，用作校验
+    rpc get_applied_index(GetAppliedIndex) returns (StoreRes);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

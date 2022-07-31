@@ -29,5 +29,20 @@ int RpcSender::send_query_method(const pb::StoreReq& req,
     int ret = store_interact.send_request_for_leader(log_id, "query", req, res);
     return ret;
 }
+
+void RpcSender::get_peer_snaphsot_size(const std::string& peer, int64_t region_id,
+        uint64_t* data_size, uint64_t* meta_size, int64_t* snapshot_index) {
+    pb::GetAppliedIndex request;
+    request.set_region_id(region_id);
+    pb::StoreRes response;
+    
+    StoreInteract store_interact(peer);
+    int ret = store_interact.send_request("get_applied_index", request, response);
+    if (ret == 0) {
+        *data_size = response.region_raft_stat().snapshot_data_size();
+        *meta_size = response.region_raft_stat().snapshot_meta_size();
+        *snapshot_index = response.region_raft_stat().snapshot_index();
+    }
+}
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

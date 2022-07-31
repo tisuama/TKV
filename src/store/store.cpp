@@ -1,6 +1,7 @@
 #include "store/store.h"
 #include "store/meta_writer.h"
 #include "common/mut_table_key.h"
+#include "store/region_control.h"
 #include <sys/statfs.h>
 
 namespace TKV {
@@ -74,7 +75,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         if (r.version() == 0) {
             DB_WARNING("region_id: %ld version: %ld is 0, dropped. region_info: %s",
                     region_id, r.version(), r.ShortDebugString().data());
-            // TODO: RegionControl
+            RegionControl::clear_all_infos_for_region(region_id);
             continue;
         }
         braft::GroupId groupid(std::string("region_") + std::to_string(region_id)); 
@@ -96,6 +97,11 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
                     r.ShortDebugString().data());
             return -1;
         }
+        /*
+            重启的region和新创建的region区别：
+            1) 重启的region在on_snaphsot_load时不加载SST
+            2) 重启的region在on_snaphsot_load不受并发限制
+        */
         region->set_restart(true);
         // Inset SmartRegion into _region_mapping
         this->set_region(region);
@@ -215,8 +221,30 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     // 更新内存信息
     this->set_region(region);
     // region init
-    // int ret = region->init(true, request->snapshot_times());
-    // TODO:
+    int ret = region->init(true, request->snapshot_times());
+    if (ret < 0) {
+        // 删除该region所有的相关信息
+        RegionControl::clear_all_infos_for_region(region_id);
+        this->erase_region(region_id);
+        DB_FATAL("region_id: %ld init fail when add region, log_id: %lu",
+                region_id, log_id);
+        response->set_errcode(pb::INTERNAL_ERROR);
+        response->set_errmsg("region init failed when add region");
+        return ;
+    }
+    response->set_errcode(pb::SUCCESS);
+    response->set_errmsg("add region success");
+    if (request->region_info().version() == 0) {
+        Bthread bth;
+        std::function<void()> check = [this, region_id]() {
+            this->check_region_legal_complete(region_id);
+        };
+        bth.run(check);
+        DB_WARNING("region_id: %ld init region version is 0, should check region legal",
+                region_id, log_id);
+    }
+    DB_WARNING("region_id: %ld init region success, log_id: %lu, time_cost: %lu, remote_side: %s",
+           region_id, log_id, time_cost.get_time(), remote_side); 
 }
 
 void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
@@ -289,5 +317,27 @@ int Store::drop_region_from_store(int64_t drop_region_id, bool need_delay_drop) 
     return 0;
 }
 
+void Region::get_applied_index(::google::protobuf::RpcController* controller,
+             const ::TKV::pb::GetAppliedIndex* request,
+             ::TKV::pb::StoreRes* response,
+             ::google::protobuf::Closure* done) {
+    brpc::ClosureGuard done_gurad(done);
+    response->set_errcode(pb::SUCCESS);
+    response->set_errmsg("success");
+    SmartRegion region = get_region(request->region_id());
+    if (!region) {
+        DB_FATAL("region_id: %ld not exist, maybe removed", request->region_id());
+        response->set_errcode(pb::REGION_NOT_EXIST);
+        response->set_errmsg("region not exist");
+        return ;
+    }
+    response->set_reigon_status(region->region_status());
+    response->set_applied_index(region->get_log_index());
+    response->mutable_region_raft_stat()->set_applied_index(region->get_log_index());
+    response->mutable_region_raft_stat()->set_snapshot_meta_size(region->snapshot_meta_size());
+    response->mutable_region_raft_stat()->set_snapshot_data_size(region->snapshot_data_size());
+    response->mutable_region_raft_stat()->set_snapshot_index(region->snapshot_index());
+    response->set_leader(butil::endpoint2str(region->get_leader()).c_str());
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

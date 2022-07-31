@@ -114,7 +114,10 @@ int Region::init(bool new_region, int32_t snapshot_times) {
         if (butil::DirectoryExists(file_path)) {
             DB_WARNING("new region_id: %ld exist snapshot path: %s",
                     _region_id, snapshot_path.c_str());
-            // TODO: RegionControl
+            RegionControl::remove_data(_region_id);
+            RegionControl::remove_meta(_region_id);
+            RegionControl::remove_log_entry(_region_id);
+            RegionControl::remove_snapshot_path(_region_id);
         }
         // 被add_peer的node不需要init meta
         // on_snapshot_load时会ingest meta column sst
@@ -158,7 +161,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     
     bool is_restart = _restart;
     if (_is_learner) {
-        // TODO: not impl in braft
+        // TODO: Not impl in braft
         DB_WARNING("start init learner, region_id: %ld", _region_id);
     } else {
         DB_WARNING("start init node, region_id: %ld", _region_id);
@@ -193,7 +196,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
 }
 
 void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) {
-    TimeCost cost;
+    TimeCost time_cost;
     brpc::ClosureGuard done_gurad(done);
     if (this->get_version() == 0) {
         // 等待异步队列为空
@@ -207,7 +210,7 @@ void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* don
         return ;
     }
     DB_WARNING("region_id: %ld snapshot save complete, time cost: %ld",
-            _region_id, cost.get_time());
+            _region_id, time_cost.get_time());
     this->reset_snapshot_status();
 }
 
@@ -234,6 +237,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
     std::map<int64_t, std::string> prepared_log_entrys;
     // butil::FilePath  
     butil::FilePath snapshot_meta_file(meta_sst_file);
+    // 非restart情况下，不回Install不完整的SST
     if (_restart && !Store::get_instance()->doing_snapshot_when_stop(_region_id)) {
         // 本地重启，不需要做过多的事情
         DB_WARNING("region_id: %ld restart with no snapshot load", _region_id);
@@ -266,6 +270,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
         if (_region_info.version() != 0) {
             int64_t old_data_index = _data_index;
             DB_WARNING("region_id: %ld clear data on_snapshot_load", _region_id);
+            // 为on_snapshot_load的meta_info不能清除
             _meta_writer->clear_meta_info(_region_id);
             ret = RegionControl::ingest_meta_sst(meta_sst_file, _region_id);
             if (ret < 0) {
@@ -274,18 +279,68 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
             }
             // Read _applied_index and _data_index from rocksdb
             _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
-            // 生成的data_cf的SST文件是从idx = 0开始
+            // SST生成的data_cf的SST文件是从idx = 0开始，meta_cf没有idx
             butil::FilePath file_path(data_sst_file + "0");                  
             // 两种情况：1) 此次快照的data_index更大，包含数据更多
             // 2) restart时有快照没有安装完成，因为data_sst_file还存在
             if (_data_index > old_data_index || 
                     (_restart && butil::PathExists(file_path))) {
+                // remove old data
                 RegionControl::remove_data(_region_id);
-                // reingest sst
-                // TODO: on_snapshot_load
+                // ingest snapshot sst
+                ret = ingest_snapshot_sst(reader->get_path());
+                if (ret) {
+                    DB_FATAL("ingest sst fail when snapshot load, region_id: %ld", _region_id);
+                    return -1;
+                }
+            } else {
+                DB_WARNING("region_id: %ld no need clear data, data_index: %ld, old_data_index: %ld", 
+                        _region_id, data_index, old_data_index);
+            }
+        } else { // region_info.version() == 0，没有数据
+            if (is_learner()) {
+                // TODO: check learner snapshot
+            } else {
+                if (check_follower_snapshot(butil::endpoint2str(this->get_leader()).c_str()) != 0) {
+                    DB_FATAL("region_id: %ld check follower snapshot fail", _region_id);
+                    return -1;
+                }
+            }
+            // 先ingest data在ingest meta, meta_sst_file可能有新的version
+            // 这样add_peer遇到重启时，直接靠version=0可以清理掉残留的region
+            // Store::init_before_listen
+            ret = ingest_snapshot_sst(reader->get_path());
+            if (ret) {
+                DB_FATAL("ingest sst fail when on snapshot load, region_id: %ld", _region_id);
+                return -1;
+            }
+            ret = RegionControl::ingest_meta_sst(meta_sst_file, _region_id);
+            if (ret < 0) {
+                DB_FATAL("ingest sst fail, region_id: %ld", _region_id);
+                return -1;
             }
         }
-     }
+        DB_WARNING("region_id: %ld scuccess load snapshot, ingest sst file", _region_id);
+    }
+    _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
+    _num_table_lines = _meta_writer->read_num_table_lines(_region_id);
+    pb::RegionInfo region_info;
+    ret = _meta_writer->read_reigon_info(_region_id, region_info);
+    if (ret < 0) {
+        DB_FATAL("read region info fail on snapshot load, region_id: %ld", _region_id);
+        return -1;
+    } 
+    if (_applied_index <= 0) {
+        DB_FATAL("region_id: %ld applied_index <= 0", _region_id);
+        return -1;
+    }
+    if (_num_table_lines < 0) {
+        DB_WARNING("region_id: %ld num_table_lines: %ld", _region_id, _num_table_lines);
+        _meta_writer->update_num_table_lines(_region_id, 0);
+        _num_table_lines = 0;
+    }
+    region_info.set_can_add_peer(true);
+    // TODO: continue on snapshot load
 }
 
 void Region::on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
@@ -294,9 +349,71 @@ void Region::on_snapshot_load_for_restart(braft::SnapshotReader* reader,
     // Read applied index from meta_cf 
     _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
     _num_table_lines = _meta_writer->read_num_table_lines(_region_id);
-    DB_WARNING("load snaphshot for restart, region_id: %ld, applied_index: %ld, data_index: %ld",
+    DB_WARNING("load snapshot for restart, region_id: %ld, applied_index: %ld, data_index: %ld",
             _region_id, _applied_index, _data_index);
 }
 
+int Region::ingest_snapshot_sst(const std::string& dir) {
+    // ingest采用move的方式，先创建硬链接，再ingest
+    butil::DirReaderPosix dir_reader(dir.c_str());
+    if (!dir_reader.IsValid()) {
+        return -1;
+    }
+    int cnt = 0;
+    while (dir_reader->Next()) {
+        std::string sub_path = dir_reader->name();
+        std::vector<std::string> split_vec;
+        butil::SplitString(sub_path, '/', &split_vec);
+        std::string data_path = split_vec.back();
+        // stars_with
+        if (data_path.find(SNAPSHOT_DATA_FILE) == 0) {
+            std::string link_path = dir + "/link." + out_path;
+            ::link(sub_path.c_str(), link_path.c_str());
+            DB_WARNING("region_id: %ld ingest source path: %s", _region_id, link_path.c_str());
+            if (is_addpeer() && !_restart) {
+                // TODO: wait rocksdb not stall
+            }
+            int ret = RegionControl::ingest_data_sst(link_path, _region_id, true);
+            if (ret < 0) {
+                DB_FATAL("region_id: %ld ingest sst fail", _region_id);
+                return -1;
+            }
+            cnt++;
+        }
+    }
+    if (!cnt) {
+        DB_WARNING("region_id: %ld is empty when on snapshot load", _region_id);
+    }
+    return 0; 
+}
+
+int Region::check_follower_snapshot(const std::string& peer) {
+    uint64_t peer_data_size = 0;
+    uint64_t peer_meta_size = 0;
+    int64_t snapshot_index = 0;
+    RpcSender::get_peer_snapshot_size(peer, _region_id, 
+            &peer_data_size, &peer_meta_size, &snapshot_index);
+    DB_WARNING("region_id: %ld is new, no need clear data, "
+            "remote_data_size: %lu, cur_data_size: %lu, "
+            "remote_meta_size: %lu, cur_meta_size: %lu, "
+            "region_info: %s",
+            _region_id, peer_data_size, this->snapshot_data_size(),
+            peer_meta_size, this->snapshot_meta_size(),
+            _region_info.ShortDebugString().c_str());
+
+    if (peer_data_size != 0 && this->snapshot_data_size() != 0 && 
+            peer_data_size != this->snapshot_data_size()) {
+        DB_FATAL("region_id: %ld cur_data_size: %lu, remote_data_size: %lu", 
+                _region_id, this->snapshot_data_size(), peer_data_size);
+        return -1;
+    }
+    if (peer_meta_size != 0 && this->snapshot_meta_size() != 0 && 
+            peer_meta_size != this->snapshot_meta_size()) {
+        DB_FATAL("region_id: %ld cur_meta_size: %lu, remote_meta_size: %lu", 
+                _region_id, this->snapshot_meta_size(), peer_meta_size);
+        return -1;
+    }
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

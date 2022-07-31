@@ -155,17 +155,39 @@ public:
         return _region_info.can_add_peer();
     }
 
+    pb::PeerStatus region_status() const {
+        return _region_status;
+    }
+
+    uint64_t snapshot_data_size() const {
+        return _snapshot_data_size;
+    }
+    
+    uint64_t snapshot_meta_size() const {
+        return _snapshot_meta_size;
+    }
+    
+    uint64_t snapshot_index() const {
+        return _snapshot_index;
+    }
+
+
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
     void reset_snapshot_status();
-    void on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
-            std::map<int64_t, std::string>& prepared_log_entrys);
 
     // override virtual functions from braft::StateMachine
     virtual void on_apply(braft::Iterator& iter) override; 
     virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) override;
     virtual int  on_snapshot_load(braft::SnapshotReader* reader) override;
+
+private:
+    void on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
+            std::map<int64_t, std::string>& prepared_log_entrys);
+    int ingest_snapshot_sst(const std::string& dir);
+    int check_learner_snapshot();
+    int check_follower_snapshot(const std::string& peer);
 
 private:
     RocksWrapper*           _rocksdb;
@@ -184,6 +206,8 @@ private:
     size_t                  _snapshot_meta_size = 0;
     pb::RegionInfo          _new_region_info;
     int64_t                 _region_id = 0;
+    // 1) table_manager发出的init_region请求的version = 1
+    // 2) split_region的初始version = 0, 完成后version = 1
     int64_t                 _version = 0;
     int64_t                 _table_id = 0;
 

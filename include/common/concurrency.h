@@ -24,5 +24,6 @@ private:
         , raft_write_concurrency(-FLAGS_raft_write_concurrency)
         , service_write_concurrency(-FLAGS_service_write_concurrency)
     {}
+};
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

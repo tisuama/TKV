@@ -40,7 +40,7 @@ public:
     int write_batch(rocksdb::WriteBatch* updates, int64_t region_id);
     
     // SST FILE
-    int ingest_sst_file(const std::string& meta_sst_file, int64_t region_id); 
+    int ingest_meta_sst(const std::string& meta_sst_file, int64_t region_id); 
 
     // Clear Region info
     int clear_meta_info(int64_t drop_region_id);
