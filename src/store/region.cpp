@@ -2,10 +2,12 @@
 #include "common/mut_table_key.h"
 #include "raft/rocksdb_file_system_adaptor.h"
 #include "common/concurrency.h"
+#include "store/store.h"
+#include "store/rpc_sender.h"
 
 #include <butil/file_util.h>
 #include <butil/files/file_path.h>
-
+#include <butil/strings/string_split.h>
 
 namespace TKV {
 DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
@@ -226,7 +228,7 @@ void Region::reset_snapshot_status() {
 int Region::on_snapshot_load(braft::SnapshotReader* reader) {
     this->reset_timecost();
     TimeCost time_cost;
-    DB_WARNING("region_id: %ld start to load snapshot, path: %s", _region_id, reader->get_path());
+    DB_WARNING("region_id: %ld start to load snapshot, path: %s", _region_id, reader->get_path().c_str());
     ON_SCOPED_EXIT([this]() {
         _meta_writer->clear_doing_snapshot(_region_id);
         DB_WARNING("region_id: %ld end  to laod snapshot", _region_id);
@@ -262,7 +264,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
                 Concurrency::get_instance()->snapshot_load_concurrency.decrease_broadcast();
                 if (_need_decrease) {
                     _need_decrease = false;
-                    Concurrency::get_instance()->received_add_peer_concurrency.decrease_broadcast();
+                    Concurrency::get_instance()->receive_add_peer_concurrency.decrease_broadcast();
                 }
             }    
         });
@@ -295,7 +297,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
                 }
             } else {
                 DB_WARNING("region_id: %ld no need clear data, data_index: %ld, old_data_index: %ld", 
-                        _region_id, data_index, old_data_index);
+                        _region_id, _data_index, old_data_index);
             }
         } else { // region_info.version() == 0，没有数据
             if (is_learner()) {
@@ -325,7 +327,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
     _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
     _num_table_lines = _meta_writer->read_num_table_lines(_region_id);
     pb::RegionInfo region_info;
-    ret = _meta_writer->read_reigon_info(_region_id, region_info);
+    int ret = _meta_writer->read_region_info(_region_id, region_info);
     if (ret < 0) {
         DB_FATAL("read region info fail on snapshot load, region_id: %ld", _region_id);
         return -1;
@@ -335,12 +337,25 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
         return -1;
     }
     if (_num_table_lines < 0) {
-        DB_WARNING("region_id: %ld num_table_lines: %ld", _region_id, _num_table_lines);
+        DB_WARNING("region_id: %ld num_table_lines: %ld", _region_id, _num_table_lines.load());
         _meta_writer->update_num_table_lines(_region_id, 0);
         _num_table_lines = 0;
     }
     region_info.set_can_add_peer(true);
-    // TODO: continue on snapshot load
+    this->set_region_with_update_range(region_info);
+    if (!this->compare_and_set_legal()) {
+        DB_FATAL("region_id: %ld is not illegal, should be removed", _region_id);
+        return -1;
+    }
+    _new_region_infos.clear();
+    _snapshot_num_table_lines = _num_table_lines.load();
+    _snapshot_index = _applied_index;
+    _snapshot_time_cost.reset();
+    this->copy_region(&_resource->region_info);
+    _restart = false;
+    // Learner read for read
+    _learner_ready_for_read = true;
+    return 0;
 }
 
 void Region::on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
@@ -360,14 +375,14 @@ int Region::ingest_snapshot_sst(const std::string& dir) {
         return -1;
     }
     int cnt = 0;
-    while (dir_reader->Next()) {
-        std::string sub_path = dir_reader->name();
+    while (dir_reader.Next()) {
+        std::string sub_path = dir_reader.name();
         std::vector<std::string> split_vec;
         butil::SplitString(sub_path, '/', &split_vec);
         std::string data_path = split_vec.back();
         // stars_with
         if (data_path.find(SNAPSHOT_DATA_FILE) == 0) {
-            std::string link_path = dir + "/link." + out_path;
+            std::string link_path = dir + "/link." + data_path;
             ::link(sub_path.c_str(), link_path.c_str());
             DB_WARNING("region_id: %ld ingest source path: %s", _region_id, link_path.c_str());
             if (is_addpeer() && !_restart) {
@@ -414,6 +429,21 @@ int Region::check_follower_snapshot(const std::string& peer) {
         return -1;
     }
     return 0;
+}
+
+void Region::set_region_with_update_range(const pb::RegionInfo& region_info) {
+    BAIDU_SCOPED_LOCK(_region_lock);
+    _region_info.CopyFrom(region_info);
+    _version = _region_info.version();
+    std::shared_ptr<RegionResource> new_resource(new RegionResource(region_info));
+    {
+        BAIDU_SCOPED_LOCK(_resource_lock);
+        _resource = new_resource;
+    }
+    // TODO: compaction的时候删除多余的数据
+    DB_WARNING("region_id: %ld, start_key: %s, end_key: %s", _region_id, 
+            rocksdb::Slice(region_info.start_key()).ToString().c_str(),
+            rocksdb::Slice(region_info.end_key()).ToString().c_str());
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

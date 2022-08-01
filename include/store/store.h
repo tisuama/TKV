@@ -124,6 +124,9 @@ public:
     int drop_region_from_store(int64_t drop_region_id, bool need_delay_drop);
 
 private:
+    void check_region_legal_complete(int64_t region_id);
+
+private:
     Store()
         : _split_num(0)
         , _disk_total("disk_total", 0)

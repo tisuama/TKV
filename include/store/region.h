@@ -82,7 +82,7 @@ public:
     }
     
     void copy_region(pb::RegionInfo* region_info) {
-        std::lock_guard<std::mutex> lock(_region_lock);
+        BAIDU_SCOPED_LOCK(_region_lock);
         region_info->CopyFrom(_region_info);
     }
     
@@ -95,7 +95,7 @@ public:
     }
     
     bool is_merged() {
-        std::lock_guard<std::mutex> lock(_region_lock);
+        BAIDU_SCOPED_LOCK(_region_lock);
         if (!_region_info.start_key().empty()) {
             return _region_info.start_key() == _region_info.end_key();
         }
@@ -171,6 +171,13 @@ public:
         return _snapshot_index;
     }
 
+    bool compare_and_set_legal() {
+        BAIDU_SCOPED_LOCK(_legal_mutex);
+        if (_legal_region) {
+            return true;
+        }
+        return false;
+    }
 
     // public
     void compact_data_in_queue();
@@ -188,6 +195,7 @@ private:
     int ingest_snapshot_sst(const std::string& dir);
     int check_learner_snapshot();
     int check_follower_snapshot(const std::string& peer);
+    void set_region_with_update_range(const pb::RegionInfo& region_info);
 
 private:
     RocksWrapper*           _rocksdb;
@@ -198,7 +206,7 @@ private:
 
     // region meta info
     pb::RegionInfo          _region_info;
-    std::mutex              _region_lock;
+    bthread::Mutex          _region_lock;
 
     // split region info
     std::vector<pb::RegionInfo> _new_region_infos;
@@ -219,7 +227,7 @@ private:
     BthreadCond             _real_writing_cond;
     
     // Legal 
-    std::mutex              _legal_mutex;
+    bthread::Mutex          _legal_mutex;
     bool                    _legal_region = true;
     
     // Restart
@@ -233,6 +241,7 @@ private:
     std::atomic<bool>       _is_leader;
     
     int64_t                 _braft_apply_index = 0;
+    // on_apply的时候更新，可以用来判断快照
     int64_t                 _applied_index = 0;
     // _applied_index
     int64_t                 _data_index = 0;
@@ -260,6 +269,7 @@ private:
     TimeCost                _learner_time;
     
     MetaWriter*             _meta_writer = nullptr;
+    bthread::Mutex                  _resource_lock;
     std::shared_ptr<RegionResource> _resource;
     RegionControl           _region_control;
     scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor = nullptr;

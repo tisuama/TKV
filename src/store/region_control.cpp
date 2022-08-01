@@ -3,7 +3,13 @@
 #include "store/store.h"
 #include "store/closure.h"
 
+#include <rocksdb/options.h>
+
 namespace TKV {
+DEFINE_bool(allow_blocking_flush, true, "allow_blocking_flush");
+DECLARE_string(snapshot_uri);
+DECLARE_string(stable_uri);
+
 void RegionControl::sync_do_snapshot() {
     DB_WARNING("region_id: %ld sync do snapshot start", _region_id);
     std::string address = Store::get_instance()->address();
@@ -87,10 +93,10 @@ int RegionControl::remove_snapshot_path(int64_t drop_region_id) {
     std::string stable_path_str(FLAGS_stable_uri, FLAGS_stable_uri.find("//") + 2);
     stable_path_str += "region_" + std::to_string(drop_region_id);
     // Delete whether directory or file
-    butil:::FilePath snapshot_path(snapshot_path_str);
-    butil::DeleteFile(snapshot_path); 
+    butil::FilePath snapshot_path(snapshot_path_str);
+    butil::DeleteFile(snapshot_path, true); 
     butil::FilePath stable_path(stable_path_str);
-    butil::DeleteFile(stable_path);
+    butil::DeleteFile(stable_path, true);
     DB_WARNING("drop snapshot path directory, region_id: %ld", drop_region_id);
     return 0;
 }
@@ -115,7 +121,7 @@ int RegionControl::ingest_data_sst(const std::string& data_sst_file, int64_t reg
                 data_sst_file.c_str(), s.ToString().c_str());
         if (!FLAGS_allow_blocking_flush) {
             // check whether ingest failed because not flush
-            rocksdb::FLushOptions flush_options;
+            rocksdb::FlushOptions flush_options;
             s = rocksdb->flush(flush_options, data_cf);
             if (!s.ok()) {
                 DB_WARNING("region_id: %ld flush data to rocksdb failed, err: %s",

@@ -2,6 +2,7 @@
 #include "store/meta_writer.h"
 #include "common/mut_table_key.h"
 #include "store/region_control.h"
+#include "common/concurrency.h"
 #include <sys/statfs.h>
 
 namespace TKV {
@@ -75,7 +76,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         if (r.version() == 0) {
             DB_WARNING("region_id: %ld version: %ld is 0, dropped. region_info: %s",
                     region_id, r.version(), r.ShortDebugString().data());
-            RegionControl::clear_all_infos_for_region(region_id);
+            RegionControl::clear_all_info_for_region(region_id);
             continue;
         }
         braft::GroupId groupid(std::string("region_") + std::to_string(region_id)); 
@@ -162,20 +163,20 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     bool is_addpeer = request->region_info().can_add_peer();
 
     // rocksdb stall -> cannot add peer
-    // received_add_peer_concurrency后，直到on_snapshot_load后才释放。
+    // receive_add_peer_concurrency后，直到on_snapshot_load后才释放。
     ON_SCOPED_EXIT([is_addpeer](){
         if (is_addpeer) {
-            Concurrency::get_instance()->received_add_peer_concurrency.decrease_broadcase();
+            Concurrency::get_instance()->receive_add_peer_concurrency.decrease_broadcast();
         } 
     });
     if (is_addpeer) {
         // Wait region::on_snapshot_load here
-        int ret = Concurrency::get_instance()->received_add_peer_concurrency.increase_time_wait(1000 * 1000 * 10);
+        int ret = Concurrency::get_instance()->receive_add_peer_concurrency.increase_timed_wait(1000 * 1000 * 10);
         if (ret != 0) {
-            DB_WARNING("received_add_peer_concurrency timeout, count: %d, log_id: %lu, remote_side: %s",
-                    Concurrency::get_instance()->received_add_peer_concurrency.count(), log_id, remote_side);
+            DB_WARNING("receive_add_peer_concurrency timeout, count: %d, log_id: %lu, remote_side: %s",
+                    Concurrency::get_instance()->receive_add_peer_concurrency.count(), log_id, remote_side);
             response->set_errcode(pb::CANNOT_ADD_PEER);
-            response->set_errmsg("received_add_peer_concurrency timeout");
+            response->set_errmsg("receive_add_peer_concurrency timeout");
             return ;
         }
     }
@@ -224,7 +225,7 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     int ret = region->init(true, request->snapshot_times());
     if (ret < 0) {
         // 删除该region所有的相关信息
-        RegionControl::clear_all_infos_for_region(region_id);
+        RegionControl::clear_all_info_for_region(region_id);
         this->erase_region(region_id);
         DB_FATAL("region_id: %ld init fail when add region, log_id: %lu",
                 region_id, log_id);
@@ -317,7 +318,7 @@ int Store::drop_region_from_store(int64_t drop_region_id, bool need_delay_drop) 
     return 0;
 }
 
-void Region::get_applied_index(::google::protobuf::RpcController* controller,
+void Store::get_applied_index(::google::protobuf::RpcController* controller,
              const ::TKV::pb::GetAppliedIndex* request,
              ::TKV::pb::StoreRes* response,
              ::google::protobuf::Closure* done) {
@@ -331,13 +332,17 @@ void Region::get_applied_index(::google::protobuf::RpcController* controller,
         response->set_errmsg("region not exist");
         return ;
     }
-    response->set_reigon_status(region->region_status());
+    response->set_region_status(region->region_status());
     response->set_applied_index(region->get_log_index());
     response->mutable_region_raft_stat()->set_applied_index(region->get_log_index());
     response->mutable_region_raft_stat()->set_snapshot_meta_size(region->snapshot_meta_size());
     response->mutable_region_raft_stat()->set_snapshot_data_size(region->snapshot_data_size());
     response->mutable_region_raft_stat()->set_snapshot_index(region->snapshot_index());
     response->set_leader(butil::endpoint2str(region->get_leader()).c_str());
+}
+
+void Store::check_region_legal_complete(int64_t region_id) {
+    // TODO: next
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

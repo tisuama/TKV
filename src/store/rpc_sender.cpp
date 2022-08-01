@@ -30,7 +30,7 @@ int RpcSender::send_query_method(const pb::StoreReq& req,
     return ret;
 }
 
-void RpcSender::get_peer_snaphsot_size(const std::string& peer, int64_t region_id,
+void RpcSender::get_peer_snapshot_size(const std::string& peer, int64_t region_id,
         uint64_t* data_size, uint64_t* meta_size, int64_t* snapshot_index) {
     pb::GetAppliedIndex request;
     request.set_region_id(region_id);

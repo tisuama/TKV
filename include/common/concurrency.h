@@ -3,6 +3,10 @@
 #include "common/common.h"
 
 namespace TKV {
+DECLARE_int32(snapshot_load_num);
+DECLARE_int32(raft_write_concurrency);
+DECLARE_int32(service_write_concurrency);
+
 class Concurrency {
 public:
     static Concurrency* get_instance() {
