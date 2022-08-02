@@ -447,6 +447,51 @@ private:
     DISALLOW_COPY_AND_ASSIGN(ThreadSafeMap);
 };
 
+// 通常使用butil::DoublyBufferedData
+// 只在几个自己控制gc和写很少，需要很高性能时候使用这个
+template <typename T, int64_t SLEEP = 1000>
+class DoubleBuffer {
+public:
+    DoubleBuffer() {
+        bthread::execution_queue_start(&_queue_id, nullptr, run_function, (void*)this);
+    }
+    T* read() {
+        return _data + _index;
+    }
+    T* read_background() {
+        return _data + !_index;
+    }
+    void swap() {
+        _index = ! _index;
+    }
+    void modify(const std::function<void(T&)>& fn) {
+        bthread::execution_queue_execute(_queue_id, fn);
+    }
+private:
+    ExecutionQueue _queue;
+    T _data[2];
+    int _index = 0;
+    static int run_function(void* meta, bthread::TaskIterator<std::function<void(T&)>>& iter) {
+        if (iter.is_queue_stopped()) {
+            return 0;
+        }
+        DoubleBuffer* db = (DoubleBuffer*)meta;
+        std::vector<std::function<void(T&)>> vec;
+        vec.reserve(3);
+        for (; iter; ++iter) {
+            (*iter)(*db->read_background());
+            vec.emplace_back(*iter);
+        }
+        db->swap();
+        bthread_usleep(SLEEP);
+        for (auto& c : vec) {
+            c(*db->read_background());
+        }
+        return 0;
+    }
+    bthread::ExecutionQueueId<std::function<void(T&)>> _queue_id = {0};
+};
+
 inline std::string transfer_to_lower(std::string str) {
     std::transform(str.begin(), str.end(), str.begin(), 
             [](unsigned char c) -> unsigned char { return std::tolower(c); });
