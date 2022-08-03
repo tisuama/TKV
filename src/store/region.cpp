@@ -10,9 +10,11 @@
 #include <butil/strings/string_split.h>
 
 namespace TKV {
-DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
 DECLARE_int32(election_timeout_ms);
 DECLARE_int32(snapshot_interval_s);
+
+DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
+DEFINE_int64(split_duration_us, 3600 * 1000 * 1000LL, "split duration, default: 3600s");
 
 DEFINE_string(raftlog_uri, "raft_log: //my_raft_log?id=", "raft_log uri");
 DEFINE_string(stable_uri, "raft_meta://my_raft_meta?id=", "raft stable path");
@@ -163,7 +165,6 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     
     bool is_restart = _restart;
     if (_is_learner) {
-        // TODO: Not impl in braft
         DB_WARNING("start init learner, region_id: %ld", _region_id);
     } else {
         DB_WARNING("start init node, region_id: %ld", _region_id);
@@ -435,7 +436,8 @@ void Region::set_region_with_update_range(const pb::RegionInfo& region_info) {
     BAIDU_SCOPED_LOCK(_region_lock);
     _region_info.CopyFrom(region_info);
     _version = _region_info.version();
-    std::shared_ptr<RegionResource> new_resource(new RegionResource(region_info));
+    std::shared_ptr<RegionResource> new_resource(new RegionResource);
+    new_resource->region_info = region_info;
     {
         BAIDU_SCOPED_LOCK(_resource_lock);
         _resource = new_resource;
@@ -444,6 +446,33 @@ void Region::set_region_with_update_range(const pb::RegionInfo& region_info) {
     DB_WARNING("region_id: %ld, start_key: %s, end_key: %s", _region_id, 
             rocksdb::Slice(region_info.start_key()).ToString().c_str(),
             rocksdb::Slice(region_info.end_key()).ToString().c_str());
+}
+
+bool Region::check_region_legal_complete() {
+    do {
+        // store init_region时调用此函数循环检查, 如果_legal_region = false，store调用drop_region删除
+        bthread_usleep(10 * 1000 * 1000LL);
+        // 3600s没有收到请求，且version也没有更新的话，则分裂失败
+        if (_removed) {
+            DB_WARNING("region_id: %ld has been removed", _region_id);
+            return true;
+        }
+        if (this->get_timecost() > FLAGS_split_duration_us) {
+            if (this->compare_and_set_illegal()) {
+                DB_WARNING("region_id: %ld split or add peer fail, set illegal", _region_id);
+                return false;
+            } else {
+                DB_WARNING("region_id: %ld split or add peer success", _region_id);
+                return true;
+            }
+        } else if (this->get_version() > 0) {
+            DB_WARNING("region_id: %ld split or add peer success", _region_id);
+            return true;
+        } else {
+            DB_WARNING("region_id: %ld split or add peer not complete, need wait, time cost: %ld",
+                    _region_id, this->get_timecost());
+        }
+    } while (1);
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

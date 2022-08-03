@@ -309,12 +309,27 @@ void Store::update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, in
         return ;
     }
     // indexs not implement
-    (void*)reverser_index_map;
+    (void)reverser_index_map;
 }
 
 int Store::drop_region_from_store(int64_t drop_region_id, bool need_delay_drop) {
-    // TODO: need to impl drop_region_from_store
     DB_WARNING("region need remove, region_id: %ld, need_delay_drop: %d", drop_region_id, need_delay_drop);
+    SmartRegion region = get_region(drop_region_id);
+    if (!region) {
+        DB_WARNING("region_id: %ld not exist, maybe removed", drop_region_id);
+        return -1;
+    }
+    if (!region->removed()) {
+        region->shutdown();
+        region->join();
+        region->set_removed(true);
+        DB_WARNING("region_id: %ld closed for removed", drop_region_id);
+    }
+    if (!need_delay_drop) {
+        region->set_removed(true);
+        RegionControl::clear_all_info_for_region(drop_region_id);
+        this->erase_region(drop_region_id); 
+    }
     return 0;
 }
 
@@ -341,8 +356,22 @@ void Store::get_applied_index(::google::protobuf::RpcController* controller,
     response->set_leader(butil::endpoint2str(region->get_leader()).c_str());
 }
 
+/* 检查region是否分裂或者add peer成功 */
+/* region->version() == 0时检查 */
 void Store::check_region_legal_complete(int64_t region_id) {
-    // TODO: next
+    DB_WARNING("region_id: %ld start to check whether split or add peer complete", region_id);
+    auto region = get_region(region_id);
+    if (!region) {
+        DB_WARNING("region_id: %ld not exist", region_id);
+        return ;
+    }
+    // check
+    if (region->check_region_legal_complete()) {
+        DB_WARNING("region_id: %ld split or add peer success", region_id);
+    } else {
+        DB_WARNING("region_id: %ld split or add peer failed", region_id);
+        this->drop_region_from_store(region_id, false);
+    }
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

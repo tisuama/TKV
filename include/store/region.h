@@ -16,6 +16,7 @@
 #include "store/meta_writer.h"
 #include "store/region_control.h"
 #include "raft/rocksdb_file_system_adaptor.h"
+#include "common/concurrency.h"
 
 namespace TKV {
 struct RegionResource {
@@ -102,6 +103,10 @@ public:
         return false;
     }
 
+    void set_removed(bool removed) {
+        _removed = removed;
+    }
+    
     bool removed() const {
         return _removed;
     }
@@ -178,11 +183,43 @@ public:
         }
         return false;
     }
+    
+    bool compare_and_set_illegal() {
+        BAIDU_SCOPED_LOCK(_legal_mutex);
+        BAIDU_SCOPED_LOCK(_region_lock);
+        if (_region_info.version() <= 0) {
+            _legal_region = false;
+            return true;
+        }
+        return false;
+    }
+
+    void join() {
+        DB_WARNING("region_id: %ld raft node join completely", _region_id);
+        _real_writing_cond.wait();
+        _disable_write_cond.wait(); 
+    }
+
+    void shutdown() {
+        if (this->get_version() == 0) {
+            wait_async_apply_log_queue_empty();
+        }
+        if (_need_decrease) {
+            _need_decrease = false;
+            Concurrency::get_instance()->receive_add_peer_concurrency.decrease_broadcast();
+        }
+        bool expect_status = false;
+        if (_shutdown.compare_exchange_strong(expect_status, true)) {
+            _init_success = false;
+            DB_WARNING("region_id: %ld raft node is shutdown", _region_id);
+        }
+    }
 
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
     void reset_snapshot_status();
+    bool check_region_legal_complete();
 
     // override virtual functions from braft::StateMachine
     virtual void on_apply(braft::Iterator& iter) override; 

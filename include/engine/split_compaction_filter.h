@@ -42,7 +42,7 @@ public:
         if (filter == nullptr || filter->end_key.empty()) {
             return false;
         }
-        // TTL: binglog存在时间进行Filter
+        // TODO: TTL binglog存在时间进行Filter
         return false;
     }
     
