@@ -21,8 +21,9 @@ DEFINE_string(stable_uri, "raft_meta://my_raft_meta?id=", "raft stable path");
 DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");
 
 void Region::compact_data_in_queue() {
+    // 删除数据太多，开始compact
     _num_delete_lines = 0;
-    // TODO: region_control compact_data_in_queue
+    RegionControl::compact_data_in_queue(_region_id);
 }
 
 void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need_peer_balance) {

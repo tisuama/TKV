@@ -119,6 +119,14 @@ public:
     std::string address() const {
         return _address;
     }
+    
+    ExecutionQueue& compact_queue() {
+        return _compact_queue;
+    }
+    
+    bool is_shutdown() const {
+        return _shutdown;
+    }
 
     void update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, int64_t>* reverser_index_map);
     int drop_region_from_store(int64_t drop_region_id, bool need_delay_drop);

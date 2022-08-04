@@ -197,6 +197,7 @@ bool SstWriterAdaptor::finish_sst() {
             DB_FATAL("delete sst file path: %s failed, region_id: %ld", path.c_str(), _region_id);
         }
     }
+    return true;
 }
 
 PosixFileAdaptor::~PosixFileAdaptor() {

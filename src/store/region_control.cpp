@@ -7,6 +7,8 @@
 
 namespace TKV {
 DEFINE_bool(allow_blocking_flush, true, "allow_blocking_flush");
+DEFINE_int32(compact_interval_s, 1, "compact_interval(s)");
+DEFINE_bool(allow_compact_range, true, "allow_comapct_range");
 DECLARE_string(snapshot_uri);
 DECLARE_string(stable_uri);
 
@@ -84,6 +86,8 @@ int RegionControl::remove_log_entry(int64_t drop_region_id) {
     DB_WARNING("remove raft log entry, region_id: %ld, cost: %ld", drop_region_id, time_cost.get_time());
 
     // TODO: remove log entry
+    
+    return 0;
 } 
 
 int RegionControl::remove_snapshot_path(int64_t drop_region_id) {
@@ -148,6 +152,51 @@ int RegionControl::clear_all_info_for_region(int64_t drop_region_id) {
     remove_snapshot_path(drop_region_id);
     remove_log_entry(drop_region_id);
     return 0;
+}
+
+void RegionControl::compact_data_in_queue(int64_t region_id) {
+    // static 变量不用捕获
+    static ThreadSafeMap<int64_t, bool> in_compact_regions;
+    if (in_compact_regions.count(region_id) == 1) {
+        DB_WARNING("region_id: %ld has been put in queue before", region_id);
+        return ;
+    }
+    in_compact_regions[region_id] = true;
+    Store::get_instance()->compact_queue().run([region_id] {
+        if (in_compact_regions.count(region_id) == 1) {
+            if (!Store::get_instance()->is_shutdown() && FLAGS_allow_compact_range) {
+                RegionControl::compact_data(region_id);
+                in_compact_regions.erase(region_id);
+                bthread_usleep(FLAGS_compact_interval_s * 1000 * 1000LL);
+            }
+        }    
+    });
+}
+
+void RegionControl::compact_data(int64_t region_id) {
+    MutableKey start_key;
+    MutableKey end_key;
+    start_key.append_i64(region_id);
+    
+    end_key.append_i64(region_id);
+    end_key.append_u64(UINT64_MAX);
+
+    auto rocksdb = RocksWrapper::get_instance();
+    auto data_cf = rocksdb->get_data_handle();
+    if (!data_cf) {
+        DB_WARNING("region_id: %ld no data cf", region_id);
+        return ;
+    }
+    TimeCost time_cost;
+    rocksdb::Slice start(start_key.data());
+    rocksdb::Slice end(end_key.data());
+    rocksdb::CompactRangeOptions compact_options;
+    auto s = rocksdb->compact_range(compact_options, data_cf, &start, &end);
+    if (!s.ok()) {
+        DB_WARNING("region_id: %ld compact range error, msg: %s",
+                region_id, s.ToString().c_str());
+    }
+    DB_WARNING("region_id: %ld compact range success", region_id);
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

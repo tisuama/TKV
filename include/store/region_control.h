@@ -33,8 +33,13 @@ public:
     static int ingest_meta_sst(const std::string& meta_sst_file, int64_t region_id);
     static int ingest_data_sst(const std::string& data_sst_file, int64_t region_id, bool move_files);
 
+    static void compact_data_in_queue(int64_t region_id);
+    static void compact_data(int64_t region_id);
+
     // called by region
     void sync_do_snapshot();
+    
+    
 
 private:
     Region* _region = nullptr;
