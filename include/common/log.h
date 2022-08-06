@@ -24,11 +24,11 @@
 #endif
 
 namespace logging {
-	DECLARE_int32(v); // Used when use VLOG type
-	// "Any log at or above this level will be "
-	// "displayed. Anything below this level will be silently ignored. "
-	// "0=INFO 1=NOTICE 2=WARNING 3=ERROR 4=FATAL"
-	DECLARE_int32(minloglevel); // Default 0
+DECLARE_int32(v); // Used when use VLOG type
+// "Any log at or above this level will be "
+// "displayed. Anything below this level will be silently ignored. "
+// "0=INFO 1=NOTICE 2=WARNING 3=ERROR 4=FATAL"
+DECLARE_int32(minloglevel); // Default 0
 }
 
 namespace TKV {
@@ -38,52 +38,52 @@ DECLARE_bool(enable_self_trace);
 
 using namespace logging;
 const int MAX_LOG_LEN = 2048;
-inline void glog_info_writelog(const char* fmt, ...) {
+inline void glog_info_writelog(const char* file, int line, const char* fmt, ...) {
     char buf[MAX_LOG_LEN];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
-    LOG(INFO) << buf;
+    LOG_AT_STREAM(INFO, file, line) << buf;
 }
 const int MAX_LOG_LEN_LONG = 20480;
-inline void glog_info_writelog_long(const char* fmt, ...) {
+inline void glog_info_writelog_long(const char* file, int line, const char* fmt, ...) {
     char buf[MAX_LOG_LEN_LONG];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
-    LOG(INFO) << buf;
+    LOG_AT_STREAM(INFO, file, line) << buf;
 }
 #define DB_NOTICE_LONG(_fmt_, args...) \
     do {\
-        ::TKV::glog_info_writelog_long("[%s:%d][%s][%llu]" _fmt_, \
-                strrchr(__FILE__, '/') + 1, __LINE__, __FUNCTION__, bthread_self(), ##args);\
+        ::TKV::glog_info_writelog_long(__FILE__, __LINE__, "[%s][%llu]" _fmt_, \
+                __FUNCTION__, bthread_self(), ##args);\
     } while (0);
 
-inline void glog_warning_writelog(const char* fmt, ...) {
+inline void glog_warning_writelog(const char* file, int line, const char* fmt, ...) {
     char buf[MAX_LOG_LEN];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
-    LOG(WARNING) << buf;
+    LOG_AT_STREAM(WARNING, file, line) << buf;
 }
-inline void glog_error_writelog(const char* fmt, ...) {
+inline void glog_error_writelog(const char* file, int line, const char* fmt, ...) {
     char buf[MAX_LOG_LEN];
     va_list args;
     va_start(args, fmt);
     vsnprintf(buf, sizeof(buf), fmt, args);
     va_end(args);
-    LOG(ERROR) << buf;
+    LOG_AT_STREAM(ERROR, file, line) << buf;
 }
 
 #ifndef NDEBUG
 #define DB_DEBUG(_fmt_, args...) \
     do {\
         if (!TKV::FLAGS_enable_debug) break; \
-        ::TKV::glog_info_writelog("[%s:%d][%s][%lu]" _fmt_, \
-                strrchr(__FILE__, '/') + 1, __LINE__, __FUNCTION__, bthread_self(), ##args);\
+        ::TKV::glog_info_writelog(__FILE__, __LINE__, "[%s][%lu]" _fmt_, \
+                __FUNCTION__, bthread_self(), ##args);\
     } while (0);
 #else
 #define DB_DEBUG(_fmt_, args...) 
@@ -92,26 +92,26 @@ inline void glog_error_writelog(const char* fmt, ...) {
 #define DB_TRACE(_fmt_, args...) \
     do {\
         if (!TKV::FLAGS_enable_self_trace) break; \
-        ::TKV::glog_info_writelog("[%s:%d][%s][%lu]" _fmt_, \
-                strrchr(__FILE__, '/') + 1, __LINE__, __FUNCTION__, bthread_self(), ##args);\
+        ::TKV::glog_info_writelog(__FILE__, __LINE__, "[%s][%lu]" _fmt_, \
+                __FUNCTION__, bthread_self(), ##args);\
     } while (0);
 
 #define DB_NOTICE(_fmt_, args...) \
     do {\
-        ::TKV::glog_info_writelog("[%s:%d][%s][%lu]" _fmt_, \
-                strrchr(__FILE__, '/') + 1, __LINE__, __FUNCTION__, bthread_self(), ##args);\
+        ::TKV::glog_info_writelog(__FILE__, __LINE__, "[%s][%lu]" _fmt_, \
+                __FUNCTION__, bthread_self(), ##args);\
     } while (0);
 
 #define DB_WARNING(_fmt_, args...) \
     do {\
-        ::TKV::glog_warning_writelog("[%s:%d][%s][%lu]" _fmt_, \
-                strrchr(__FILE__, '/') + 1, __LINE__, __FUNCTION__, bthread_self(), ##args);\
+        ::TKV::glog_warning_writelog(__FILE__, __LINE__, "[%s][%lu]" _fmt_, \
+                __FUNCTION__, bthread_self(), ##args);\
     } while (0);
 
 #define DB_FATAL(_fmt_, args...) \
     do {\
-        ::TKV::glog_error_writelog("[%s:%d][%s][%lu]" _fmt_, \
-                strrchr(__FILE__, '/') + 1, __LINE__, __FUNCTION__, bthread_self(), ##args);\
+        ::TKV::glog_error_writelog(__FILE__, __LINE__, "[%s][%lu]" _fmt_, \
+                __FUNCTION__, bthread_self(), ##args);\
     } while (0);
 
 inline int init_log(const char* bin_name) {

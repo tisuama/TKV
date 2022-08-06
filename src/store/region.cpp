@@ -192,7 +192,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     }
     this->copy_region(&_resource->region_info);
     // TODO: compact时候删除多余数据
-    DB_WARNING("=== region_id: %ld init success, region_info: %s", _region_id, 
+    DB_WARNING("region_id: %ld init success, region_info: %s", _region_id, 
             _resource->region_info.ShortDebugString().c_str());
     _init_success = true;
     
