@@ -40,9 +40,7 @@ int Conf::parse() {
                 }
                 continue;
             }
-            DB_DEBUG("is_meta: %d, split: %s", _is_meta, split_vec[1].data());
             if (_is_meta && split_vec[1].compare("meta") == 0) {
-                DB_DEBUG("meta, %s %s", split_vec[1].data(), split_vec[2].data());
                 int id = std::stoi(split_vec[2].data());
                 if (id == _id) {
                     return internal_parse(infile);

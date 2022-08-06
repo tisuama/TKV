@@ -4,7 +4,7 @@
 #include <gflags/gflags.h>
 #include <brpc/server.h>
 #include <braft/raft.h>
-#include "common/util.h"
+#include <butil/strings/string_split.h>
 #include "common/common.h"
 #include "meta/meta_server.h"
 #include "common/conf.h"
@@ -32,7 +32,7 @@ int main(int argc, char** argv) {
         DB_DEBUG("TKVMeta parse conf failed");
         return -1;
     }
-    DB_DEBUG("TKV parse conf success");
+    DB_DEBUG("TKV parse conf success, meta_server_bns: %s", TKV::FLAGS_meta_server_bns.c_str());
     brpc::Server server;
     butil::EndPoint addr;
     addr.ip = butil::IP_ANY;
@@ -44,7 +44,8 @@ int main(int argc, char** argv) {
     DB_WARNING("Add raft to brpc server sucess");
     std::vector<std::string> raft_peers;
     std::vector<braft::PeerId> peers;
-    TKV::split_string(raft_peers, TKV::FLAGS_meta_server_bns, ',');
+    butil::SplitString(TKV::FLAGS_meta_server_bns, ',', &raft_peers);
+    DB_DEBUG("TKV split size: %ld", raft_peers.size());
     for (auto& r : raft_peers) {
         DB_WARNING("raft peer: %s", r.data());
         braft::PeerId peer(r);
