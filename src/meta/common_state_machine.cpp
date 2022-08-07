@@ -6,7 +6,7 @@ DECLARE_int32(meta_replica_number);
 DECLARE_int32(snapshot_interval_s);
 DECLARE_int32(election_timeout_ms);
 
-DEFINE_string(log_uri, "local://./raft_data/raft_log", "raft log uri");
+DEFINE_string(raftlog_uri, "myraftlog://./raft_data/raft_log", "raft log uri");
 DEFINE_string(stable_uri, "local://./raft_data/stable", "raft stable uri");
 DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");
 DEFINE_int64(check_migrate_interval_us, 60 * 1000 * 1000LL, "check meta server migrate interval(60)");
@@ -45,7 +45,7 @@ int CommonStateMachine::init(const std::vector<braft::PeerId>& peers) {
     // Can get replica num from peers
     options.initial_conf = braft::Configuration(peers);
     options.snapshot_interval_s = FLAGS_snapshot_interval_s;
-    options.log_uri = FLAGS_log_uri;
+    options.log_uri = FLAGS_raftlog_uri;
     options.raft_meta_uri = FLAGS_stable_uri;
     options.snapshot_uri = FLAGS_snapshot_uri;
     int ret = _node.init(options);
@@ -91,7 +91,6 @@ void CommonStateMachine::process(::google::protobuf::RpcController* controller,
 }
 
 void CommonStateMachine::start_check_migrate() {
-    
     // 
 }
 

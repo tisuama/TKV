@@ -16,8 +16,11 @@ DECLARE_int32(snapshot_interval_s);
 DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
 DEFINE_int64(split_duration_us, 3600 * 1000 * 1000LL, "split duration, default: 3600s");
 
+// raft log数据
 DEFINE_string(raftlog_uri, "raft_log: //my_raft_log?id=", "raft_log uri");
+// raft meta持久化数据
 DEFINE_string(stable_uri, "raft_meta://my_raft_meta?id=", "raft stable path");
+// snapshot_last_log_id为后缀的文件
 DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");
 
 void Region::compact_data_in_queue() {

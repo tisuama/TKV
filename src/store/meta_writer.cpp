@@ -5,6 +5,7 @@
 
 namespace TKV {
 const rocksdb::WriteOptions MetaWriter::write_options;
+// META_INFO_HANDLE
 const std::string MetaWriter::META_IDENTIFY(1, 0x01);
 // key: META_IDENTIFY + region_id + identify
 const std::string MetaWriter::APPLIED_INDEX_IDENTIFY(1, 0x01);
