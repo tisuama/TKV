@@ -75,6 +75,11 @@ file(GLOB STORE_INTERACT
 	)
 add_library(store_interact_lib OBJECT ${STORE_INTERACT})
 
+file(GLOB RAFT_SRC
+	src/raft/*.cpp
+	)
+add_library(raft_src_lib OBJECT ${RAFT_SRC})
+
 file(GLOB META_SERVER
 	src/meta/meta_server.cpp
 	src/meta/common_state_machine.cpp
@@ -103,7 +108,6 @@ file(GLOB STORE_SRC
 	src/store/rpc_sender.cpp
 	src/store/closure.cpp
 	src/store/meta_writer.cpp
-	src/raft/rocksdb_file_system_adaptor.cpp
 	)
 add_library(store_src_lib OBJECT ${STORE_SRC} ${META_INTERACT} ${STORE_INTERACT})
 
@@ -145,6 +149,7 @@ add_executable(TKVMeta
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
+	$<TARGET_OBJECTS:raft_src_lib>
 	)
 target_link_libraries(TKVMeta ${DEP_LIB})
 
@@ -154,6 +159,7 @@ add_executable(TKVStore
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
 	$<TARGET_OBJECTS:store_src_lib>
+	$<TARGET_OBJECTS:raft_src_lib>
 	)
 target_link_libraries(TKVStore ${DEP_LIB})
 
