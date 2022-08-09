@@ -6,9 +6,9 @@ DECLARE_int32(meta_replica_number);
 DECLARE_int32(snapshot_interval_s);
 DECLARE_int32(election_timeout_ms);
 
-DEFINE_string(raftlog_uri, "myraftlog://./raft_data/raft_log", "raft log uri");
-DEFINE_string(stable_uri, "local://./raft_data/stable", "raft stable uri");
-DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");
+DECLARE_string(raftlog_uri);
+DECLARE_string(stable_uri);
+DECLARE_string(snapshot_uri);
 DEFINE_int64(check_migrate_interval_us, 60 * 1000 * 1000LL, "check meta server migrate interval(60)");
 
 void MetaServerClosure::Run() {

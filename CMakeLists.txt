@@ -86,7 +86,6 @@ file(GLOB META_SERVER
 	src/meta/meta_state_machine.cpp
 	src/meta/cluster_manager.cpp
 	src/meta/meta_rocksdb.cpp
-	src/meta/meta_server_interact.cpp
 	src/meta/privilege_manager.cpp
 	src/meta/schema_manager.cpp
 	src/meta/namespace_manager.cpp
@@ -94,7 +93,7 @@ file(GLOB META_SERVER
 	src/meta/table_manager.cpp
 	src/meta/region_manager.cpp
 	)
-add_library(meta_server_lib OBJECT ${META_SERVER} ${META_INTERACT} ${STORE_INTERACT})
+add_library(meta_server_lib OBJECT ${META_SERVER})
 
 file(GLOB ENGINE_SRC
 	src/engine/*.cpp
@@ -109,7 +108,7 @@ file(GLOB STORE_SRC
 	src/store/closure.cpp
 	src/store/meta_writer.cpp
 	)
-add_library(store_src_lib OBJECT ${STORE_SRC} ${META_INTERACT} ${STORE_INTERACT})
+add_library(store_src_lib OBJECT ${STORE_SRC})
 
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto/
@@ -149,7 +148,10 @@ add_executable(TKVMeta
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
-	$<TARGET_OBJECTS:raft_src_lib>
+	$<TARGET_OBJECTS:store_src_lib>
+	$<TARGET_OBJECTS:raft_src_lib>	
+	$<TARGET_OBJECTS:meta_interact_lib>
+	$<TARGET_OBJECTS:store_interact_lib>
 	)
 target_link_libraries(TKVMeta ${DEP_LIB})
 
@@ -160,6 +162,8 @@ add_executable(TKVStore
 	$<TARGET_OBJECTS:engine_src_lib>
 	$<TARGET_OBJECTS:store_src_lib>
 	$<TARGET_OBJECTS:raft_src_lib>
+	$<TARGET_OBJECTS:meta_interact_lib>
+	$<TARGET_OBJECTS:store_interact_lib>
 	)
 target_link_libraries(TKVStore ${DEP_LIB})
 
@@ -170,6 +174,8 @@ add_executable(test_meta_server
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
+	$<TARGET_OBJECTS:store_interact_lib>
+	$<TARGET_OBJECTS:meta_interact_lib>
 	)
 target_link_libraries(test_meta_server ${DEP_LIB})
 
@@ -179,6 +185,7 @@ add_executable(test_table_key
 	$<TARGET_OBJECTS:proto_src_lib>
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
+	$<TARGET_OBJECTS:store_interact_lib>
 	)
 target_link_libraries(test_table_key ${DEP_LIB})
 

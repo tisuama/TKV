@@ -2,7 +2,8 @@
 #include "common/log.h"
 
 namespace TKV {
-DEFINE_string(db_path, "./raft_db", "rocksdb path");
+DECLARE_string(db_path);
+
 int MetaRocksdb::init() {
     _rocksdb = RocksWrapper::get_instance();
     if (!_rocksdb) {

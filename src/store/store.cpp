@@ -10,9 +10,9 @@ DECLARE_string(default_physical_room);
 DECLARE_int32(store_port);
 DECLARE_string(resource_tag);
 DECLARE_int32(balance_periodicity);
+DECLARE_string(db_path);
 
 DEFINE_int64(store_heart_beat_interval_us, 30 * 1000 * 1000, "store heartbeat interval, default: 30s"); 
-DEFINE_string(db_path, "./rocks_db", "rocksdb db path of store data");
 
 int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     butil::EndPoint addr;

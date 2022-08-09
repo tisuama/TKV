@@ -22,6 +22,16 @@ DEFINE_int32(store_id, 0, "store id in conf file");
 DEFINE_string(store_ip, "127.0.0.1", "store ip");
 DEFINE_int32(store_port, 8110, "store port");
 
+// Raft
+// raft log数据
+DEFINE_string(raftlog_uri, "raft_log: //my_raft_log?id=", "raft_log uri");
+// raft meta持久化数据
+DEFINE_string(stable_uri, "raft_meta://my_raft_meta?id=", "raft stable path");
+// snapshot_last_log_id为后缀的文件
+DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");
+// rocksdb path
+DEFINE_string(db_path, "./rocks_db", "rocksdb db path of store data");
+
 // Concurrency
 DEFINE_int32(snapshot_load_num, 4, "snapshot_load_num, default: 4");
 DEFINE_int32(raft_write_concurrency, 40, "raft_write_concurrency, default: 40");
