@@ -72,19 +72,49 @@ public:
 	int append_entries(const std::vector<braft::LogEntry*>& entries, 
 			braft::IOMetric* metric) override;
 
-	int truncate_prefix(const int64_t first_index_kept) override;
+	int truncate_prefix(const int64_t first_log_index) override;
 	
-	int truncate_suffix(const int64_t last_index_kept) override;
+	int truncate_suffix(const int64_t last_log_index) override;
 
 	int rest(const int64_t next_log_index) override;
 
 	LogStorage* new_instance(const std::string& uri) const override;
 
 private:
-	int _encode_log_meta_key(void* key_buf, size_t n);
-	int _encode_log_data_key(void* key_buf, size_t n, int64_t index);
+	int _encode_log_meta_key(void* key_buf, size_t n) {
+        if (n < LOG_META_KEY_SIZE) {
+            DB_WARNING("region_id: %ld key buf is not enough", _region_id);
+            return -1;
+        }
+        uint64_t region_field = KeyEncoder::to_endian_u64(KeyEncoder::encode_i64(_region_id));
+        memcpy(key_buf, (char*)&region_field, sizeof(int64_t));
+        memcpy((char*)key_buf + sizeof(uint64_t), &LOG_META_IDENRIFY, 1);
+        return 0;
+    }
+
+	int _encode_log_data_key(void* key_buf, size_t n, int64_t index) {
+        if (n < LOG_DATA_KEY_SIZE) {
+            DB_WARNING("region_id: %ld key buf is not enough", _region_id);
+            return -1;
+        }
+
+        uint64_t region_field = KeyEncoder::to_endian_u64(KeyEncoder::encode_i64(_region_id));
+        memcpy(key_buf, (char*)&region_field, sizeof(int64_t));
+        memcpy((char*)key_buf + sizeof(uint64_t), &LOG_DATA_IDENTIFY, 1);
+        uint64_t index_tmp = KeyEncoder::to_endian_u64(KeyEncoder::encode_i64(index));
+        memcpy((char*)key_buf + sizeof(uint64_t) + 1, (char*)&index_tmp, sizeof(int64_t));
+        return 0; 
+    }
+
 	int _decode_log_data_key(const rocksdb::Slice& data_key, 
-			int64_t region_id, int64_t& index);
+			int64_t region_id, int64_t& index) {
+        if (data_key.size() != LOG_DATA_KEY_SIZE) {
+            DB_WARNING("region_id: %ld log data is corrupted", _region_id);
+            return -1;
+        }
+        uint64_t region_field = *(uint64_t*)data_key.data();
+        region_id = KeyEncoder::decode_i64(KeyEncoder::to_endian_u64(region_id));
+    }
 
     std::atomic<int64_t> _first_log_index;
     std::atomic<int64_t> _last_log_index;

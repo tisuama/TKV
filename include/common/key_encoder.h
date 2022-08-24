@@ -21,7 +21,7 @@ public:
         if (is_big) {
             return in;
         }
-        return ((in & 0x00ff) << 8 | ((in & 0xff00) >> 8));
+        return ((in & 0x00FF) << 8 | ((in & 0xFF00) >> 8));
     }
     
     static uint32_t to_endian_u32(uint32_t in) {
