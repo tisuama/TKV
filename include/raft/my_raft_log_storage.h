@@ -28,9 +28,9 @@ class MyRaftLogStorage: public braft::LogStorage {
 	std::vector<std::pair<rocksdb::SliceParts, rocksdb::SliceParts>> SlicePartsVec;
 public:
 	// data format
-	// region_id + 0x1 -> _first_log_index
-	// region_id + 0x2 + logindex -> LogHead + data
-	// data: DATA + configurationPBMeta
+	// LOG_META: region_id + 0x1 -> _first_log_index 持久化first_log_index
+	// LOG_DATA: region_id + 0x2 + index -> LogHead + data
+	// LOG_DATA: data: DATA / configurationPBMeta    持久化Log或者Config
 	static const size_t LOG_META_KEY_SIZE = sizeof(int64_t) + 1;
     static const size_t LOG_DATA_KEY_SIZE = sizeof(int64_t) + 1 + sizeof(int64_t);	
 	static const uint8_t LOG_META_IDENRIFY = 0x1;
@@ -45,7 +45,7 @@ public:
 	}
 	MyRarftLogStorage(int64_t region_id, RocksWrapper* db,
 			rocksdb::ColumnFamilyHandle* raft_log_handle)
-		: _first_log_index(0)
+		: _first_log_index(1)
 		, _last_log_index(0)
 		, _region_id(region_id)
 		, _db(db)
@@ -64,7 +64,7 @@ public:
 		return _last_log_index.load(std::memory_order_relaxed);
 	}
 
-	braft::LogEntry* get_entiry(const int64_t index) override;
+	braft::LogEntry* get_entry(const int64_t index) override;
 
 	int64_t get_term(const int64_t index) override;
 
@@ -114,8 +114,14 @@ private:
         }
         uint64_t region_field = *(uint64_t*)data_key.data();
         region_id = KeyEncoder::decode_i64(KeyEncoder::to_endian_u64(region_id));
+        uint64_t index_tmp = *(uint64_t*)(data_key.data() + sizeof(int64_t) + 1);
+        index = KeyEncoder::decode_i64(KeyEncoder::to_endian_u64(index_tmp));
+        return 0;
     }
 
+    int _parse_meta(braft::LogEntry* entry, const rocksdb::Slice& value);
+
+private:
     std::atomic<int64_t> _first_log_index;
     std::atomic<int64_t> _last_log_index;
     int64_t _region_id;

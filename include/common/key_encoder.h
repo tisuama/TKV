@@ -85,32 +85,37 @@ public:
     }
     
     // 可比较大小的encode
+    //mem-comparable transform for int64
     static uint8_t encode_i8(int8_t in) {
-        return (static_cast<uint8_t>(in) ^ SIGN_MASK_08);
+        return (static_cast<uint8_t>(in)) ^ SIGN_MASK_08;
     }
+
     static int8_t decode_i8(uint8_t in) {
-        return (static_cast<int8_t>((in) ^ SIGN_MASK_08));
+        return (static_cast<int8_t>(in ^ SIGN_MASK_08));
     }
 
     static uint16_t encode_i16(int16_t in) {
-        return (static_cast<uint16_t>(in) ^ SIGN_MASK_16);
+        return (static_cast<uint16_t>(in)) ^ SIGN_MASK_16;
     }
+
     static int16_t decode_i16(uint16_t in) {
-        return (static_cast<int16_t>((in) ^ SIGN_MASK_16));
+        return (static_cast<int16_t>(in ^ SIGN_MASK_16));
     }
 
     static uint32_t encode_i32(int32_t in) {
-        return (static_cast<uint32_t>(in) ^ SIGN_MASK_32);
+        return (static_cast<uint32_t>(in)) ^ SIGN_MASK_32;
     }
+
     static int32_t decode_i32(uint32_t in) {
-        return (static_cast<int32_t>((in) ^ SIGN_MASK_32));
+        return (static_cast<int32_t>(in ^ SIGN_MASK_32));
     }
 
     static uint64_t encode_i64(int64_t in) {
-        return (static_cast<uint64_t>(in) ^ SIGN_MASK_64);
+        return (static_cast<uint64_t>(in)) ^ SIGN_MASK_64;
     }
+
     static int64_t decode_i64(uint64_t in) {
-        return (static_cast<int64_t>((in) ^ SIGN_MASK_64));
+        return (static_cast<int64_t>(in ^ SIGN_MASK_64));
     }
     
     // Translate float type
