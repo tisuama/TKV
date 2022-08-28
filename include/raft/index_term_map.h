@@ -5,7 +5,13 @@
 namespace TKV {
 class IndexTermMap {
 public:
-    IndexTermMap() {}
+    IndexTermMap() {
+        bthread_mutex_init(&_mutex, NULL);
+    }
+    
+    ~IndexTermMap() {
+        bthread_mutex_destroy(&_mutex);
+    }
 
     struct cmp {
         bool operator()(int64_t index, const braft::LogId& log_id) const {
@@ -66,9 +72,10 @@ public:
         for (auto it = _q.begin(); it != _q.end(); it++) {
             if (it->index > first_log_index) {
                 num_pop = it - _q.begin();
+                break;
             }
         }
-        _q.erase(_q.begin(), _q.end() + num_pop);
+        _q.erase(_q.begin(), _q.begin() + num_pop - 1);
     }
 
     void truncate_suffix(int64_t last_log_index) {

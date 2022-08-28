@@ -1,4 +1,5 @@
 #include "raft/my_raft_log_storage.h"
+#include <xxhash.h>
 #include <braft/local_storage.pb.h>
 
 namespace TKV {
@@ -21,7 +22,7 @@ int MyRaftLogStorage::init(braft::ConfigurationManager* config_manager) {
         DB_FATAL("region_id: %ld raft init without rocksdb handle", _region_id);
         return -1;
     }
-    int64_t first_log_index = -1;
+    int64_t first_log_index = 1;
     int64_t last_log_index = 0;
     std::string first_log_index_str;
     auto s = _db->get(rocksdb::ReadOptions(), _raft_log_handle, 
@@ -147,7 +148,7 @@ braft::LogEntry* MyRaftLogStorage::get_entry(const int64_t index) {
     std::string value;
     auto s = _db->get(rocksdb::ReadOptions(), _raft_log_handle, rocksdb::Slice(buf, LOG_DATA_KEY_SIZE), &value);
     if (!s.ok()) {
-        DB_WARNING("region_id: %d get_index: %ld fail", _region_id, index);
+        DB_WARNING("region_id: %d get_index: %ld fail, err_msg: %s", _region_id, index, s.ToString().c_str());
         return nullptr;
     }
     if (value.size() < LOG_HEAD_SIZE) {
@@ -244,6 +245,11 @@ int MyRaftLogStorage::append_entries(const std::vector<braft::LogEntry*>& entrie
     rocksdb::WriteBatch batch;
     for (auto it = kv_raftlog_vec.begin(); it != kv_raftlog_vec.end(); it++) {
         batch.Put(_raft_log_handle, it->first, it->second);
+    }
+    auto s = _db->write(options, &batch);
+    if (!s.ok()) {
+        DB_FATAL("region_id: %ld write to rocksdb fail, err_msg: %s", _region_id, s.ToString().c_str());
+        return -1;
     }
 
     // udpate term map
@@ -357,8 +363,8 @@ braft::LogStorage* MyRaftLogStorage::new_instance(const std::string& uri) const 
         DB_FATAL("parse uri fail, uri: %s", uri.c_str());
         return nullptr;
     }
-    int64_t region_id = stol(uri);
-    auto raftlog_handle = _db->get_raft_log_handle();
+    int64_t region_id = stol(region_id_str);
+    auto raftlog_handle = rocksdb->get_raft_log_handle();
     if (raftlog_handle == nullptr) {
         DB_FATAL("region_id: %ld get raft log handle fail", _region_id);
         return nullptr;
@@ -368,7 +374,7 @@ braft::LogStorage* MyRaftLogStorage::new_instance(const std::string& uri) const 
         DB_FATAL("region_id: %ld new storage fail", _region_id);
     }
     // RaftLogCompactionFilter::get_instance()->update_first_index_map(region_id, 0);
-    return 0;
+    return instance;
 }
 
 int MyRaftLogStorage::_parse_meta(braft::LogEntry* entry, const rocksdb::Slice& value) {
@@ -434,6 +440,7 @@ int MyRaftLogStorage::_build_key_value(SlicePartsVec & kv_raftlog_vec, const bra
         case braft::ENTRY_TYPE_NO_OP:
             raftlog_value.parts = _construct_slice_array(head_buf, nullptr, nullptr, arena);
             raftlog_value.num_parts = 1;
+            break;
         default:
             DB_FATAL("unknow type: %d, region_id: %ld", entry->type, _region_id);
             return -1;
@@ -483,8 +490,8 @@ rocksdb::Slice* MyRaftLogStorage::_construct_slice_array(void* head_buf, const s
         }
         const size_t byte_size = meta.ByteSize();
         void* meta_buf = arena.allocate(byte_size);
-        if (meta_buf) {
-            DB_FATAL("Fail to allocate mem, region_id: %ld", _region_id);
+        if (!meta_buf) {
+            DB_FATAL("Fail to allocate mem, region_id: %ld, byte_size: %ld", _region_id, byte_size);
             return nullptr;
         }
         if (!meta.SerializeToArray(meta_buf, byte_size)) {

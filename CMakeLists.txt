@@ -137,6 +137,7 @@ SET(DEP_LIB
 	dl
 	ssl
 	crypto
+	xxhash
 )
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++11 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
@@ -188,6 +189,18 @@ add_executable(test_table_key
 	$<TARGET_OBJECTS:store_interact_lib>
 	)
 target_link_libraries(test_table_key ${DEP_LIB})
+
+add_executable(test_log_storage
+	test/test_log_storage.cpp
+	$<TARGET_OBJECTS:common_src_lib>
+	$<TARGET_OBJECTS:proto_src_lib>
+	$<TARGET_OBJECTS:engine_src_lib>
+	$<TARGET_OBJECTS:store_src_lib>
+	$<TARGET_OBJECTS:raft_src_lib>
+	$<TARGET_OBJECTS:store_interact_lib>
+	$<TARGET_OBJECTS:meta_interact_lib>
+	)
+target_link_libraries(test_log_storage ${DEP_LIB})
 
 add_executable(rocks_bench
 	tool/rocks_bench.cpp
