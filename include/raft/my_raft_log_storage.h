@@ -7,6 +7,11 @@
 #include <braft/configuration_manager.h>
 #include <butil/raw_pack.h>
 #include <rocksdb/slice.h>
+#include <butil/arena.h>
+
+#include "engine/rocks_wrapper.h"
+#include "raft/index_term_map.h"
+#include "common/key_encoder.h"
 
 namespace TKV {
 struct LogHead {
@@ -25,7 +30,7 @@ struct LogHead {
 };
 
 class MyRaftLogStorage: public braft::LogStorage {
-	std::vector<std::pair<rocksdb::SliceParts, rocksdb::SliceParts>> SlicePartsVec;
+	typedef std::vector<std::pair<rocksdb::SliceParts, rocksdb::SliceParts>> SlicePartsVec;
 public:
 	// data format
 	// LOG_META: region_id + 0x1 -> _first_log_index 持久化first_log_index
@@ -37,22 +42,19 @@ public:
 	static const uint8_t LOG_DATA_IDENTIFY = 0x2;
 	static const size_t LOG_HEAD_SIZE = sizeof(int64_t) + sizeof(int);
 
-	~MyRaftLogStoreage() {
-		bthread_mutex_destory(&_mutex);
-	}
-	MyRaftLogStorage(): _db(nullptr),_raft_log_handle(nullptr) {
-		bthread_muterx_init(&_mutex);
-	}
-	MyRarftLogStorage(int64_t region_id, RocksWrapper* db,
+	~MyRaftLogStorage() {}
+
+	MyRaftLogStorage(): _db(nullptr),_raft_log_handle(nullptr) 
+    {}
+
+	MyRaftLogStorage(int64_t region_id, RocksWrapper* db,
 			rocksdb::ColumnFamilyHandle* raft_log_handle)
 		: _first_log_index(1)
 		, _last_log_index(0)
 		, _region_id(region_id)
 		, _db(db)
 		, _raft_log_handle(raft_log_handle)
-	{
-		bthread_mutex_inti(&_mutex);
-	}
+    {}
 
 	int init(braft::ConfigurationManager* config_manager) override;
 
@@ -76,9 +78,9 @@ public:
 	
 	int truncate_suffix(const int64_t last_log_index) override;
 
-	int rest(const int64_t next_log_index) override;
+	int reset(const int64_t next_log_index) override;
 
-	LogStorage* new_instance(const std::string& uri) const override;
+    braft::LogStorage* new_instance(const std::string& uri) const override;
 
 private:
 	int _encode_log_meta_key(void* key_buf, size_t n) {
@@ -107,19 +109,24 @@ private:
     }
 
 	int _decode_log_data_key(const rocksdb::Slice& data_key, 
-			int64_t region_id, int64_t& index) {
+			int64_t& region_id, int64_t& index) {
         if (data_key.size() != LOG_DATA_KEY_SIZE) {
             DB_WARNING("region_id: %ld log data is corrupted", _region_id);
             return -1;
         }
         uint64_t region_field = *(uint64_t*)data_key.data();
-        region_id = KeyEncoder::decode_i64(KeyEncoder::to_endian_u64(region_id));
+        region_id = KeyEncoder::decode_i64(KeyEncoder::to_endian_u64(region_field));
         uint64_t index_tmp = *(uint64_t*)(data_key.data() + sizeof(int64_t) + 1);
         index = KeyEncoder::decode_i64(KeyEncoder::to_endian_u64(index_tmp));
         return 0;
     }
 
     int _parse_meta(braft::LogEntry* entry, const rocksdb::Slice& value);
+    int _build_key_value(SlicePartsVec& kv_raftlog_vec, const braft::LogEntry* entry, butil::Arena& arena);
+    rocksdb::Slice* _construct_slice_array(void* head_buf, const butil::IOBuf& buf, butil::Arena& arena);
+    rocksdb::Slice* _construct_slice_array(void* head_buf, const std::vector<braft::PeerId>* peers, 
+            const std::vector<braft::PeerId>* old_peers, butil::Arena& arena);
+
 
 private:
     std::atomic<int64_t> _first_log_index;
@@ -131,7 +138,6 @@ private:
     bool is_binlog_region {false};
 
     IndexTermMap _term_map;
-    bthread_mutex_t _mutex;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
