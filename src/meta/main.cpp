@@ -8,6 +8,7 @@
 #include "common/common.h"
 #include "meta/meta_server.h"
 #include "common/conf.h"
+#include "raft/my_raft_log.h"
 
 namespace TKV {
 DECLARE_int32(meta_port);
@@ -26,6 +27,7 @@ int main(int argc, char** argv) {
         return -1;
     } 
     DB_DEBUG("TKV init log success");
+    TKV::register_myraft_extension(); 
     // Conf Parse GFLAGS options
     TKV::Conf meta_conf(TKV::FLAGS_conf_path, true, TKV::FLAGS_meta_id); 
     if (meta_conf.parse()) {

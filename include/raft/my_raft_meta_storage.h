@@ -18,6 +18,8 @@ public:
     static const size_t RAFT_META_KEY_SIZE = sizeof(int64_t) + 1;
     static const uint8_t RAFT_META_IDENTIFY = 0x03;
 
+    MyRaftMetaStorage() {}
+
     int set_term(const int64_t term);
     int64_t get_term() const;
     int set_votedfor(const braft::PeerId& peer_id);

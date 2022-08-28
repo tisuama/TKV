@@ -4,13 +4,13 @@
 
 namespace TKV {
 
-static int parse_my_raft_log_uri(const std::string& uri, std::string& region_id) {
+static int parse_my_raft_log_uri(const std::string& uri, std::string& region_id_str) {
     size_t pos = uri.find("id=");
     if (pos == 0 || pos == std::string::npos) {
         return -1;
     }
-    region_id = uri.substr(pos + 3);
-    DB_WARNING("parse result, uri: %s, region_id: %s", uri.c_str(), region_id.c_str());
+    region_id_str = uri.substr(pos + 3);
+    DB_WARNING("parse result, uri: %s, region_id: %s", uri.c_str(), region_id_str.c_str());
     return 0;
 }
 

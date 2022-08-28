@@ -5,6 +5,7 @@
 
 #include "common/common.h"
 #include "store/store.h"
+#include "raft/my_raft_log.h"
 
 namespace TKV {
 DECLARE_int32(store_port);
@@ -12,7 +13,7 @@ DECLARE_int32(store_port);
 
 brpc::Server server;
 int main(int argc, char** argv) {
-    google::SetCommandLineOption("flagfile", "/etc/TKV/store_flags.conf");
+    // google::SetCommandLineOption("flagfile", "/etc/TKV/sto.conf");
     google::ParseCommandLineFlags(&argc, &argv, true);
     // init log first
     if (TKV::init_log("store") != 0) {
@@ -21,7 +22,7 @@ int main(int argc, char** argv) {
     }
     DB_WARNING("TKV init log success");
     // init something
-    //
+    TKV::register_myraft_extension();
     // add service
     butil::EndPoint addr;
     addr.ip = butil::IP_ANY;

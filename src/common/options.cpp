@@ -24,11 +24,11 @@ DEFINE_int32(store_port, 8110, "store port");
 
 // Raft
 // raft log数据
-DEFINE_string(raftlog_uri, "raft_log: //my_raft_log?id=", "raft_log uri");
+DEFINE_string(raftlog_uri, "raft_log://myraftlog?id=", "raft_log uri");
 // raft meta持久化数据
-DEFINE_string(stable_uri, "raft_meta://my_raft_meta?id=", "raft stable path");
+DEFINE_string(stable_uri, "raft_meta://myraftmeta?id=", "raft stable path");
 // snapshot_last_log_id为后缀的文件
-DEFINE_string(snapshot_uri, "local://./raft_data/snapshot", "raft snapshot uri");
+DEFINE_string(snapshot_uri, "local://raft_data/snapshot", "raft snapshot uri");
 // rocksdb path
 DEFINE_string(db_path, "./rocks_db", "rocksdb db path of store data");
 
