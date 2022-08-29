@@ -21,20 +21,20 @@ int main(int argc, char** argv) {
     // read config parse
     // google::SetCommandLineOption("flagfile", "/etc/TKV/meta_flags.conf");
     google::ParseCommandLineFlags(&argc, &argv, true); 
-    // init log first
-    if (TKV::init_log("meta") !=  0) {
-        fprintf(stderr, "init meta log failed.");
-        return -1;
-    } 
-    DB_DEBUG("TKV init log success");
-    TKV::register_myraft_extension(); 
     // Conf Parse GFLAGS options
     TKV::Conf meta_conf(TKV::FLAGS_conf_path, true, TKV::FLAGS_meta_id); 
     if (meta_conf.parse()) {
         DB_DEBUG("TKVMeta parse conf failed");
         return -1;
     }
-    DB_DEBUG("TKV parse conf success, meta_server_bns: %s", TKV::FLAGS_meta_server_bns.c_str());
+    // init log first
+    std::string meta_log = "meta" + std::to_string(TKV::FLAGS_meta_id);
+    if (TKV::init_log(meta_log.c_str()) !=  0) {
+        fprintf(stderr, "init meta log failed.");
+        return -1;
+    } 
+    DB_DEBUG("TKV init log success");
+    TKV::register_myraft_extension(); 
     brpc::Server server;
     butil::EndPoint addr;
     addr.ip = butil::IP_ANY;

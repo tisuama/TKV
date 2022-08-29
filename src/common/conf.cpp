@@ -9,7 +9,7 @@ namespace TKV {
 using butil::StringPiece;
 
 int Conf::parse() {
-    DB_DEBUG("parse conf path: %s", _conf_path.c_str());
+    // DB_DEBUG("parse conf path: %s", _conf_path.c_str());
     std::ifstream infile(_conf_path);    
     if (!infile.is_open()) {
         return -1;
@@ -76,8 +76,8 @@ int Conf::internal_parse(std::ifstream& infile) {
             infile.close();
             return -1;
         }
-        DB_DEBUG("parse conf %s = %s", 
-                split_vec[0].as_string().data(), split_vec[1].as_string().data());     
+        // DB_DEBUG("parse conf %s = %s", 
+        //         split_vec[0].as_string().data(), split_vec[1].as_string().data());     
         google::SetCommandLineOption(split_vec[0].as_string().data(), 
                 split_vec[1].as_string().data());
     }

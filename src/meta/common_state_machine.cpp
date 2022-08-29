@@ -43,11 +43,12 @@ int CommonStateMachine::init(const std::vector<braft::PeerId>& peers) {
     options.election_timeout_ms = FLAGS_election_timeout_ms;
     options.fsm = this;
     // Can get replica num from peers
+    std::string region_str = "id=" + std::to_string(0);
     options.initial_conf = braft::Configuration(peers);
     options.snapshot_interval_s = FLAGS_snapshot_interval_s;
-    options.log_uri = FLAGS_raftlog_uri;
-    options.raft_meta_uri = FLAGS_stable_uri;
-    options.snapshot_uri = FLAGS_snapshot_uri;
+    options.log_uri = FLAGS_raftlog_uri + region_str;
+    options.raft_meta_uri = FLAGS_stable_uri + region_str;
+    options.snapshot_uri = FLAGS_snapshot_uri + region_str;
     int ret = _node.init(options);
     if (ret < 0) {
         DB_FATAL("raft node init fail");

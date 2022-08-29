@@ -155,13 +155,14 @@ int Region::init(bool new_region, int32_t snapshot_times) {
         }
         peers.push_back(braft::PeerId(end_point));
     }
+    std::string region_str = "id=" + std::to_string(_region_id);
     options.election_timeout_ms = FLAGS_election_timeout_ms;
     options.fsm = this;
     options.initial_conf = braft::Configuration(peers);
     options.snapshot_interval_s = 0; // 自己设置？
-    options.log_uri = FLAGS_raftlog_uri + std::to_string(_region_id);
-    options.raft_meta_uri = FLAGS_stable_uri + std::to_string(_region_id);
-    options.snapshot_uri = FLAGS_snapshot_uri + "/region_" + std::to_string(_region_id);
+    options.log_uri = FLAGS_raftlog_uri + region_str;
+    options.raft_meta_uri = FLAGS_stable_uri + region_str;
+    options.snapshot_uri = FLAGS_snapshot_uri + region_str;
     options.snapshot_file_system_adaptor = &_snapshot_adaptor;
     
     bool is_restart = _restart;

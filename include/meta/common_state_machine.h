@@ -2,6 +2,7 @@
 #include <braft/raft.h>
 #include "common/common.h"
 #include "proto/meta.pb.h"
+#include "raft/rocksdb_file_system_adaptor.h"
 
 namespace TKV {
 class CommonStateMachine;
@@ -28,7 +29,9 @@ public:
         , _is_leader(false)
         , _dummy_region_id(dummy_region_id)
         , _file_path(file_path)
-        , _check_migrate(&BTHREAD_ATTR_SMALL) {}  
+        , _check_migrate(&BTHREAD_ATTR_SMALL) 
+        , _snapshot_adaptor(new RocksdbFileSystemAdaptor(0))
+    {}  
 
     virtual ~CommonStateMachine() {}
     virtual int init(const std::vector<braft::PeerId>& peers);
@@ -97,6 +100,7 @@ private:
     Bthread _check_migrate;
     bool    _check_state  {false};
     bool    _have_data    {false};
+    scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor {nullptr};
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

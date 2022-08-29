@@ -26,7 +26,7 @@ int MetaServerInteract::init_internal(const std::string& meta_bns) {
     } else {
         meta_server_addr = std::string("list://") + meta_bns;
     }
-    if (_bns_channel.Init(meta_server_addr.c_str(), &channel_opt)) {
+    if (_bns_channel.Init(meta_server_addr.c_str(), "rr", &channel_opt)) {
         DB_FATAL("meta server bns pool init failed, bns name: %s", meta_server_addr.c_str());
         return -1;
     }

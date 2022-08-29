@@ -176,6 +176,8 @@ add_executable(test_meta_server
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
 	$<TARGET_OBJECTS:store_interact_lib>
+	$<TARGET_OBJECTS:store_src_lib>
+	$<TARGET_OBJECTS:raft_src_lib>
 	$<TARGET_OBJECTS:meta_interact_lib>
 	)
 target_link_libraries(test_meta_server ${DEP_LIB})
@@ -187,6 +189,9 @@ add_executable(test_table_key
 	$<TARGET_OBJECTS:meta_server_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
 	$<TARGET_OBJECTS:store_interact_lib>
+	$<TARGET_OBJECTS:store_src_lib>
+	$<TARGET_OBJECTS:raft_src_lib>
+	$<TARGET_OBJECTS:meta_interact_lib>
 	)
 target_link_libraries(test_table_key ${DEP_LIB})
 
