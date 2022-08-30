@@ -1,4 +1,5 @@
 #include "raft/my_raft_log_storage.h"
+#include "raft/my_raft_meta_storage.h"
 #include "engine/rocks_wrapper.h"
 #include <gtest/gtest.h>
 #include "proto/store.pb.h"
@@ -63,6 +64,7 @@ TEST(test_log_storage, case_call) {
     }
     {
         // add batch data
+        std::cout << "===== put multi data =====" << std::endl;
         for (size_t i = 3; i <= 10000; i++) {
             braft::LogEntry* entry = new braft::LogEntry;
             entry->type = braft::ENTRY_TYPE_DATA;
@@ -142,13 +144,55 @@ TEST(test_log_storage, case_call) {
     }
     {
         // add reset
+        /*
         ret = raft_log->reset(10000);
         CHECK(!ret);
         std::cout << "log_entry 10006 term: " << raft_log->get_term(10006) << std::endl;
         std::cout << "log_entry 10003 term: " << raft_log->get_term(10003) << std::endl;
         std::cout << "first_log_index: " << raft_log->first_log_index() << std::endl;
         std::cout << "last_log_index: " << raft_log->last_log_index() << std::endl;
+        */
     }
+    std::cout << "==== raft meta ==== " << std::endl;
+    static MyRaftMetaStorage my_raft_meta_storage;
+    braft::VersionedGroupId group;
+    auto meta_s = my_raft_meta_storage.new_instance(uri);
+    auto meta_log = static_cast<MyRaftMetaStorage*>(meta_s);
+    meta_log->init();
+    braft::PeerId peer("127.0.0.1:8010");
+    meta_log->set_term_and_votedfor(2, peer, group);
+    std::cout << "meta log term: " << meta_log->get_term() << std::endl;
+    braft::PeerId tmp_peer;
+    meta_log->get_votedfor(tmp_peer);
+    std::cout << "meta log votedfor: " << tmp_peer.to_string() << std::endl;
+    
+     
+
+    db->close();
+
+    // reopen
+    std::cout << "====== reopen test ======= " << std::endl;
+    auto db1 = RocksWrapper::get_instance();
+    ret = db1->init(db_path);
+    std::cout << "rocksdb reopen result: " << ret << std::endl;
+    CHECK(!ret);
+    raft_log = my_raft_log_storage.new_instance(uri);
+    raft_log->init(conf_manager);
+    CHECK(raft_log);
+    std::cout << "log_entry 10006 term: " << raft_log->get_term(10006) << std::endl;
+    std::cout << "log_entry 10003 term: " << raft_log->get_term(10003) << std::endl;
+    std::cout << "first_log_index: " << raft_log->first_log_index() << std::endl;
+    std::cout << "last_log_index: " << raft_log->last_log_index() << std::endl;
+
+
+    meta_s = my_raft_meta_storage.new_instance(uri);
+    auto meta_log_1 = static_cast<MyRaftMetaStorage*>(meta_s);
+    meta_log_1->init();
+    std::cout << "meta log term: " << meta_log->get_term() << std::endl;
+    meta_log->get_votedfor(tmp_peer);
+    std::cout << "meta log votedfor: " << tmp_peer.to_string() << std::endl;
+
+    db1->close();
 }
 
 } // namespcae TKV

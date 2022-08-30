@@ -326,8 +326,8 @@ int MyRaftLogStorage::truncate_suffix(const int64_t last_log_index) {
     char* data_buff = buff.get();
     
     // Write to rocksdb
-    _encode_log_data_key(data_buff, LOG_DATA_KEY_SIZE, last_log_index);
-    _encode_log_data_key(data_buff + LOG_DATA_KEY_SIZE, LOG_DATA_KEY_SIZE, pre_last_log_index);
+    _encode_log_data_key(data_buff, LOG_DATA_KEY_SIZE, last_log_index + 1);
+    _encode_log_data_key(data_buff + LOG_DATA_KEY_SIZE, LOG_DATA_KEY_SIZE, pre_last_log_index + 1);
     rocksdb::WriteOptions write_option;
     auto s = _db->remove_range(write_option, _raft_log_handle, 
                 rocksdb::Slice(data_buff, LOG_DATA_KEY_SIZE),

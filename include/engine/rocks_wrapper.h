@@ -119,7 +119,10 @@ public:
         _db->ReleaseSnapshot(snapshot);
     }
     void close() {
-        delete _db;
+        if (_is_init) {
+            delete _db;
+        }
+        _is_init = false;
     }
     void set_flush_file_number(const std::string& cf_name, uint64_t file_num) {
         if (cf_name == DATA_CF) {
