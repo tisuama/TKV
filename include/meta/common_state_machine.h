@@ -98,7 +98,7 @@ private:
     virtual int send_set_peer_request(bool remove_peer, const std::string& change_peer);
 
     Bthread _check_migrate;
-    bool    _check_state  {false};
+    bool    _check_start {false};
     bool    _have_data    {false};
     scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor {nullptr};
 };

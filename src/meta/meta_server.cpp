@@ -101,6 +101,7 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     addr.port = FLAGS_meta_port;
     braft::PeerId peer_id(addr, 0);
     _meta_state_machine = new (std::nothrow)MetaStateMachine(peer_id);
+    DB_WARNING("meta server new MetaStateMachine, peer_id: %s", peer_id.to_string().c_str());
     if (_meta_state_machine == NULL) {
         DB_FATAL("new meta state machine failed");
         return -1;

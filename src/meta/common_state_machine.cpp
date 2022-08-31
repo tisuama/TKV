@@ -114,19 +114,25 @@ int CommonStateMachine::on_snapshot_load(braft::SnapshotReader* reader) {
 }
 
 void CommonStateMachine::on_leader_start() {
-    // 
+    _is_leader.store(true);
 }
 
 void CommonStateMachine::on_leader_start(int64_t term) {
-    // 
+    DB_WARNING("region_id: %ld on leader start, term: %ld", _dummy_region_id, term);
+    on_leader_start();
 }
 
 void CommonStateMachine::on_leader_stop() {
-    // 
+    _is_leader.store(true);
+    if (_check_start) {
+        // TODO: 判断meta_server是否需要迁移
+    }
+    DB_WARNING("region_id: %ld leader stop succes", _dummy_region_id);
 }
 
 void CommonStateMachine::on_leader_stop(const butil::Status& status) {
-    //
+    DB_WARNING("region_id: %ld leader stop, err_msg: %s", _dummy_region_id, status.error_str().c_str());
+    on_leader_stop();
 }
 
 void CommonStateMachine::on_error(const braft::Error& e) {

@@ -106,12 +106,34 @@ void MetaStateMachine::store_heartbeat(::google::protobuf::RpcController* contro
 
 
 void MetaStateMachine::on_leader_start() {
-    //
+    DB_WARNING("on leader start at new term");
+    _leader_start_timestamp = butil::gettimeofday_us();
+    if (!_health_check_start) {
+        std::function<void()> f = [this]() {
+            health_check_function();
+        };
+        _bth.run(f);
+        _health_check_start = true;
+    } else {
+        DB_FATAL("start health check thread has altredy started");
+    }
+    CommonStateMachine::on_leader_start();
+    _is_leader.store(true);
 }
 
 void MetaStateMachine::on_leader_stop() {
-    //
+    _is_leader.store(false);
+    if (_health_check_start) {
+        _bth.join();
+        _health_check_start = false;
+        DB_WARNING("health check thread stop");
+    }
+    DB_WARNING("on leader stop");
+    CommonStateMachine::on_leader_stop();
 }
 
+void MetaStateMachine::health_check_function() {
+    DB_WARNING("start health check function");
+} 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

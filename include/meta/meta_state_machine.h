@@ -31,6 +31,7 @@ public:
     int64_t applied_index() const {return _applied_index; }
     
     bool whether_can_decide();
+    void health_check_function(); 
 
     // service impl
     void store_heartbeat(::google::protobuf::RpcController* controller,
@@ -42,7 +43,7 @@ private:
                        rocksdb::Iterator* iter, 
                        braft::SnapshotWriter* writer);    
 
-    int64_t _leader_start_stamp;
+    int64_t _leader_start_timestamp;
     Bthread _bth;
     bool    _health_check_start;
 
