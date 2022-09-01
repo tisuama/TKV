@@ -58,6 +58,7 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
         } 
         _applied_index = iter.index();
         if (done) {
+            // cntl的回调
             braft::run_closure_in_bthread(done_guard.release());
         }
     }
@@ -65,11 +66,11 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
 
 void MetaStateMachine::on_snapshot_save(braft::SnapshotWriter* writer,
                               braft::Closure* done) {
-    // 
 }
 
+
 int MetaStateMachine::on_snapshot_load(braft::SnapshotReader* reader) {
-    // 
+    DB_WARNING("meta start machine start on snapshot load");
     return 0;
 }
 

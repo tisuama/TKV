@@ -43,6 +43,7 @@ TEST(test_mata_server, careate_namespace) {
 int main(int argc, char** argv) {
     google::ParseCommandLineFlags(&argc, &argv, true); 
 	::testing::InitGoogleTest(&argc, argv);
+    ::testing::GTEST_FLAG(filter) = "test_mata_server.careate_namespace";
 	srand((unsigned)time(NULL));
 	return RUN_ALL_TESTS();
 }
