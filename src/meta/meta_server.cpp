@@ -25,6 +25,8 @@ const std::string MetaServer::NAMESPACE_SCHEMA_IDENTIFY(1, 0x02);
 const std::string MetaServer::DATABASE_SCHEMA_IDENTIFY(1, 0x03);
 const std::string MetaServer::TABLE_SCHEMA_IDENTIFY(1, 0x04);
 
+const std::string MetaServer::MAX_IDENTIFY(1, 0xFF);
+
 void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
      const ::TKV::pb::StoreHBRequest* request,
      ::TKV::pb::StoreHBResponse* response,

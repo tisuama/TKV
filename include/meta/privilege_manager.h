@@ -26,6 +26,8 @@ public:
     // called by meta_state_machine when on_apply
     void create_user(const pb::MetaManagerRequest& request, braft::Closure* done);
     void add_privilege(const pb::MetaManagerRequest& request, braft::Closure* done);
+    
+    int load_snapshot();
 
     void set_meta_state_machine(MetaStateMachine* s) {
         _meta_state_machine = s;

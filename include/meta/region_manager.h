@@ -26,6 +26,7 @@ typedef std::shared_ptr<RegionStateInfo> SmartRegionStateInfo;
 class RegionManager {
 public:
     ~RegionManager() {
+        bthread_mutex_destroy(&_region_mutex);
         bthread_mutex_destroy(&_ins_region_mutex);
         bthread_mutex_destroy(&_ins_learner_mutex);
         bthread_mutex_destroy(&_cond_mutex);
@@ -37,10 +38,12 @@ public:
     }
     
     int64_t get_max_region_id() const {
+        BAIDU_SCOPED_LOCk(_region_mutex);
         return _max_region_id;
     }
 
     void set_max_region_id(int64_t max_region_id) {
+        BAIDU_SCOPED_LOCk(_region_mutex);
         _max_region_id = max_region_id;
     }
     
@@ -55,11 +58,13 @@ private:
     RegionManager(): _max_region_id(0) {
         _doing_recovery = false;
         _last_opt_times = butil::gettimeofday_us();
+        bthread_mutex_init(&_region_mutex, NULL);
         bthread_mutex_init(&_ins_region_mutex, NULL);
         bthread_mutex_init(&_ins_learner_mutex, NULL);
         bthread_mutex_init(&_cond_mutex, NULL);
         bthread_mutex_init(&_doing_mutex, NULL);
     }
+    bthread_mutex_t                         _region_mutex;
     int64_t                                 _max_region_id;
     int64_t                                 _last_opt_times;
     std::atomic<bool>                       _doing_recovery;

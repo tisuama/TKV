@@ -96,6 +96,7 @@ public:
             const std::string& logical_room,
             std::string& select_instance);
 
+    int load_snapshot();
 
 private:
     ClusterManager() {

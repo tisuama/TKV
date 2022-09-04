@@ -93,7 +93,13 @@ public:
     }
     
     void set_max_table_id(int64_t max_table_id) {
+        BAIDU_SCOPED_LOCK(_table_mutex);
         _max_table_id = max_table_id;
+    }
+
+    int64_t get_max_table_id() const {
+        BAIDU_SCOPED_LOCK(_table_mutex);
+        return _max_table_id;
     }
     
     void set_table_info(const TableMem& table_mem) {

@@ -35,6 +35,11 @@ public:
         BAIDU_SCOPED_LOCK(_db_mutex);
         _max_db_id = db_id;
     }
+
+    int64_t get_max_database_id() const {
+        BAIDU_SCOPED_LOCK(_db_mutex);
+        return _max_db_id;
+    }
     
     const std::string get_resource_tag(const int64_t db_id) {
         BAIDU_SCOPED_LOCK(_db_mutex);

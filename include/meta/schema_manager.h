@@ -38,6 +38,7 @@ public:
            pb::MetaManagerResponse* response,
            uint64_t log_id); 
 
+    int load_snapshot();
         
 private:
 	SchemaManager() {};

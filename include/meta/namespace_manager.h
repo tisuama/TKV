@@ -38,7 +38,7 @@ public:
         _max_nid = max_nid;
     }
     
-    int64_t get_max_namspace_id() {
+    int64_t get_max_namspace_id() const {
         BAIDU_SCOPED_LOCK(_nmutex);
         return _max_nid;
     }
