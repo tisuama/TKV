@@ -9,19 +9,23 @@ namespace TKV {
 
 class MetaServer: public pb::MetaService {
 public:
-    // first
+    
     static const std::string CLUSTER_IDENTIFY;
-    static const std::string INSTANCE_CLUSTER_IDENTIFY;
     static const std::string SCHEMA_IDENTIFY;
     static const std::string PRIVILEGE_IDENTIFY;
-    
-    // second
-    static const std::string NAMESPACE_SCHEMA_IDENTIFY;
+    static const std::string MAX_IDENTIFY;
+
     static const std::string MAX_ID_SCHEMA_IDENTIFY;
+    static const std::string NAMESPACE_SCHEMA_IDENTIFY;
     static const std::string DATABASE_SCHEMA_IDENTIFY;
     static const std::string TABLE_SCHEMA_IDENTIFY;
 
-    static const std::string MAX_IDENTIFY;
+    static const std::string LOGICAL_CLUSTER_IDENTIFY;
+    static const std::string PHYSICAL_CLUSTER_IDENTIFY;
+    static const std::string INSTANCE_CLUSTER_IDENTIFY;
+    static const std::string INSTANCE_PARAM_CLUSTER_IDENTIFY;
+
+    static const std::string LOGICAL_KEY;
     
     virtual ~MetaServer() {}
     

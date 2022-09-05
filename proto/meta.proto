@@ -212,7 +212,7 @@ message ParamDesc {
 };
 
 message InstanceParam {
-    optional string resource_tag_or_addr = 1;
+    optional string resource_tag_or_address = 1;
     repeated ParamDesc params = 2;
 };
 

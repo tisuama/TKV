@@ -59,7 +59,7 @@ public:
     ~ClusterManager() {
         bthread_mutex_destroy(&_phy_mutex);
         bthread_mutex_destroy(&_ins_mutex);
-        bthread_mutex_destroy(&_ins_parm_mutex);
+        bthread_mutex_destroy(&_ins_param_mutex);
     }
     // called before apply for process
     void process_cluster_info(google::protobuf::RpcController* controller,
@@ -97,12 +97,20 @@ public:
             std::string& select_instance);
 
     int load_snapshot();
+    int load_instance_snapshot(const std::string& instance_prefix, 
+            const std::string& key, const std::string& value);
+    int load_instance_param_snapshot(const std::string& instance_param_prefix, 
+            const std::string& key, const std::string& value);
+    int load_physical_snapshot(const std::string& physical_prefix,
+            const std::string& key, const std::string& value);
+    int load_logical_snapshot(const std::string& logical_prefix,
+            const std::string& key, const std::string& value);
 
 private:
     ClusterManager() {
         bthread_mutex_init(&_phy_mutex, NULL);
         bthread_mutex_init(&_ins_mutex, NULL);
-        bthread_mutex_init(&_ins_parm_mutex, NULL);
+        bthread_mutex_init(&_ins_param_mutex, NULL);
         {
             BAIDU_SCOPED_LOCK(_phy_mutex);
             _phy_log_map[FLAGS_default_physical_room] = 
@@ -140,8 +148,8 @@ private:
     std::unordered_map<std::string, std::string>          _container_id_to_ip;
     std::unordered_set<std::string>                       _slow_instance;
     
-    bthread_mutex_t                                       _ins_parm_mutex;
-    std::unordered_map<std::string, pb::InstanceParam>    _ins_parm_map;
+    bthread_mutex_t                                       _ins_param_mutex;
+    std::unordered_map<std::string, pb::InstanceParam>    _ins_param_map;
     int                                                   _migreate_concurrency {2};
 
     MetaStateMachine*                                     _meta_state_machine {nullptr};

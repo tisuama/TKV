@@ -1,10 +1,13 @@
+#include "common/common.h"
 #include "meta/meta_state_machine.h"
 #include "meta/cluster_manager.h"
 #include "meta/privilege_manager.h"
 #include "meta/namespace_manager.h"
 #include "meta/database_manager.h"
 #include "meta/table_manager.h"
+#include "meta/region_manager.h"
 #include <braft/util.h>
+#include <errno.h>
 
 namespace TKV {
 const std::string META_INFO_SST =  "meta_info.sst";
@@ -70,7 +73,7 @@ void MetaStateMachine::on_snapshot_save(braft::SnapshotWriter* writer,
     DB_WARNING("snapshot save info, max_namespace_id: %ld, max_database_id: %ld, "
             "max_table_id: %ld, max_region_id: %ld", 
             NamespaceManager::get_instance()->get_max_namespace_id(),
-            DatabaseManager::get_instance()->get_database_id(),
+            DatabaseManager::get_instance()->get_max_database_id(),
             TableManager::get_instance()->get_max_table_id(),
             RegionManager::get_instance()->get_max_region_id());
     // 创建snapshot
@@ -78,6 +81,8 @@ void MetaStateMachine::on_snapshot_save(braft::SnapshotWriter* writer,
     // 相同prefix的数据 = false
     read_options.prefix_same_as_start = false;
     read_options.total_order_seek = true;
+    auto iter = RocksWrapper::get_instance()->new_iterator(read_options, 
+            RocksWrapper::get_instance()->get_meta_info_handle());
     iter->SeekToFirst();
     Bthread bth;
     std::function<void()> save_snapshot_fun = [this, done, iter, writer]() {
@@ -103,10 +108,10 @@ void MetaStateMachine::save_snapshot(braft::Closure* done,
     if (!s.ok()) {
         DB_WARNING("Error when opening file: %s, err_msg: %s", 
                 sst_file_path.c_str(), s.ToString().c_str());
-        done->status().set_error(EINAL, "File to open sst file");
+        done->status().set_error(EINVAL, "File to open sst file");
         return ;
     }
-    for (: iter->Valid(); iter->Next()) {
+    for (; iter->Valid(); iter->Next()) {
         auto res = sst_writer.put(iter->key(), iter->value());
         if (!res.ok()) {
             DB_WARNING("Error while adding key: %s, err_msg: %s",
@@ -120,11 +125,11 @@ void MetaStateMachine::save_snapshot(braft::Closure* done,
     if (!s.ok()) {
         DB_WARNING("Error while finish sst file: %s, err_msg: %s", 
                 sst_file_path.c_str(), s.ToString().c_str());
-        doen->status().set_error(EINVAL, "Fail to finish sst file");
+        done->status().set_error(EINVAL, "Fail to finish sst file");
         return ;
     }
     if ((writer->add_file(META_INFO_SST)) != 0) {
-        done->status()->set_error(EINVAL, "File to add file");
+        done->status().set_error(EINVAL, "File to add file");
         DB_WARNING("Error while add file");
         return ;
     }
@@ -153,7 +158,7 @@ int MetaStateMachine::on_snapshot_load(braft::SnapshotReader* reader) {
         DB_WARNING("snapshot file: %s", file.c_str());
         if (file == META_INFO_SST) {
             std::string snapshot_path = reader->get_path();
-            _applied_index = parse_snapshot_from_path(snapshot_path, false);
+            _applied_index = parse_snapshot_index_from_path(snapshot_path, false);
             DB_WARNING("meta snapshot_path: %s, applied_index: %ld", snapshot_path.c_str(), _applied_index);
             snapshot_path.append(META_INFO_SST);
 

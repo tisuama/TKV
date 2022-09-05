@@ -97,7 +97,7 @@ public:
         _max_table_id = max_table_id;
     }
 
-    int64_t get_max_table_id() const {
+    int64_t get_max_table_id() {
         BAIDU_SCOPED_LOCK(_table_mutex);
         return _max_table_id;
     }

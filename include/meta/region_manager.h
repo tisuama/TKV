@@ -37,13 +37,13 @@ public:
         return &instance;
     }
     
-    int64_t get_max_region_id() const {
-        BAIDU_SCOPED_LOCk(_region_mutex);
+    int64_t get_max_region_id() {
+        BAIDU_SCOPED_LOCK(_region_mutex);
         return _max_region_id;
     }
 
     void set_max_region_id(int64_t max_region_id) {
-        BAIDU_SCOPED_LOCk(_region_mutex);
+        BAIDU_SCOPED_LOCK(_region_mutex);
         _max_region_id = max_region_id;
     }
     

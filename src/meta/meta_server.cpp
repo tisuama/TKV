@@ -16,16 +16,21 @@ DECLARE_string(meta_ip);
 DECLARE_string(default_physical_room);
 
 const std::string MetaServer::CLUSTER_IDENTIFY(1, 0x1);
-const std::string MetaServer::INSTANCE_CLUSTER_IDENTIFY(1, 0x3);
 const std::string MetaServer::SCHEMA_IDENTIFY(1, 0x02);
 const std::string MetaServer::PRIVILEGE_IDENTIFY(1, 0x03);
+const std::string MetaServer::MAX_IDENTIFY(1, 0xFF);
 
 const std::string MetaServer::MAX_ID_SCHEMA_IDENTIFY(1, 0x01);
 const std::string MetaServer::NAMESPACE_SCHEMA_IDENTIFY(1, 0x02);
 const std::string MetaServer::DATABASE_SCHEMA_IDENTIFY(1, 0x03);
 const std::string MetaServer::TABLE_SCHEMA_IDENTIFY(1, 0x04);
 
-const std::string MetaServer::MAX_IDENTIFY(1, 0xFF);
+const std::string MetaServer::LOGICAL_CLUSTER_IDENTIFY(1, 0x1);
+const std::string MetaServer::PHYSICAL_CLUSTER_IDENTIFY(1, 0x2);
+const std::string MetaServer::INSTANCE_CLUSTER_IDENTIFY(1, 0x3);
+const std::string MetaServer::INSTANCE_PARAM_CLUSTER_IDENTIFY(1, 0x4);
+
+const std::string MetaServer::LOGICAL_KEY = "logical_room";
 
 void MetaServer::store_heartbeat(::google::protobuf::RpcController* controller,
      const ::TKV::pb::StoreHBRequest* request,
