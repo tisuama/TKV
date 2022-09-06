@@ -150,7 +150,7 @@ int ClusterManager::load_snapshot() {
         BAIDU_SCOPED_LOCK(_ins_mutex);
         _phy_ins_map[FLAGS_default_logical_room] = std::set<std::string>();
     }
-    // 创建snapshot
+
     rocksdb::ReadOptions read_options;
     read_options.prefix_same_as_start = true;
     read_options.total_order_seek = false;
@@ -200,7 +200,7 @@ int ClusterManager::load_instance_snapshot(const std::string& instance_prefix,
         DB_FATAL("parse from pb fail when load instance snapshot, key: %s", key.c_str());
         return -1;
     }
-    DB_WARNING("cluster instance info: %s", ins_info_pb.ShortDebugString().c_str());
+    DB_WARNING("cluster load snapshot, instance info: %s", ins_info_pb.ShortDebugString().c_str());
     
     std::string physical_room = ins_info_pb.physical_room();
     if (physical_room.size() == 0) {
@@ -231,7 +231,7 @@ int ClusterManager::load_instance_param_snapshot(const std::string& instance_par
         DB_FATAL("parse from pb fail when load instance param snapshot, key: %s", key.c_str());
         return -1;
     }
-    DB_WARNING("instance param pb: %s", ins_param_pb.ShortDebugString().c_str());
+    DB_WARNING("cluster load snapshot, instance param pb: %s", ins_param_pb.ShortDebugString().c_str());
     if (resource_tag_or_address != ins_param_pb.resource_tag_or_address()) {
         DB_FATAL("diff reource tag: %s vs %s", resource_tag_or_address.c_str(), 
                 ins_param_pb.resource_tag_or_address().c_str());
@@ -248,7 +248,7 @@ int ClusterManager::load_physical_snapshot(const std::string& physical_prefix,
         DB_FATAL("parse from pb fail when load physical snapshot", key.c_str());
         return -1;
     }
-    DB_WARNING("physical logical info: %s", phy_log_pb.ShortDebugString().c_str());
+    DB_WARNING("cluster load snapshot, physical logical info: %s", phy_log_pb.ShortDebugString().c_str());
     BAIDU_SCOPED_LOCK(_phy_mutex);
     std::string logical_room = phy_log_pb.logical_room();
     std::set<std::string> physical_rooms;
@@ -264,11 +264,11 @@ int ClusterManager::load_physical_snapshot(const std::string& physical_prefix,
 int ClusterManager::load_logical_snapshot(const std::string& logical_prefix,
         const std::string& key, const std::string& value) {
     pb::LogicalRoom logical_info_pb;
-    if (logical_info_pb.ParseFromString(value)) {
+    if (!logical_info_pb.ParseFromString(value)) {
         DB_FATAL("parse from pb fail when load logical snapshot, key: %s", key.c_str());
         return -1;
     }
-    DB_WARNING("logical info: %s", logical_info_pb.ShortDebugString().c_str());
+    DB_WARNING("cluster load snapshot, logical info: %s", logical_info_pb.ShortDebugString().c_str());
     BAIDU_SCOPED_LOCK(_phy_mutex);
     for (auto logical_room : logical_info_pb.logical_rooms()) {
         _log_phy_map[logical_room] = std::set<std::string>();

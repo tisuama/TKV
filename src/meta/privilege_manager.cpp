@@ -83,5 +83,30 @@ void PrivilegeManager::create_user(const pb::MetaManagerRequest& request, braft:
 void PrivilegeManager::add_privilege(const pb::MetaManagerRequest& request, braft::Closure* done) {
 }
 
+int PrivilegeManager::load_snapshot() {
+    _user_privilege.clear();
+    std::string privilege_prefix = MetaServer::PRIVILEGE_IDENTIFY;
+    rocksdb::ReadOptions read_options;
+    read_options.prefix_same_as_start = true;
+    read_options.total_order_seek = false;
+    auto db = RocksWrapper::get_instance();
+    std::unique_ptr<rocksdb::Iterator> iter(
+            db->new_iterator(read_options, db->get_meta_info_handle()));
+    iter->Seek(privilege_prefix);
+    for (; iter->Valid(); iter->Next()) {
+        std::string user_name(iter->key().ToString(), privilege_prefix.size());
+        pb::UserPrivilege user_privilege_pb;
+        if (!user_privilege_pb.ParseFromString(iter->value().ToString())) {
+            DB_FATAL("parse from pb fail when load snapshot, key: %s",
+                    iter->key().data());
+            return -1;
+        }
+        DB_WARNING("privilege load snapshot, user_privilege: %s", user_privilege_pb.ShortDebugString().c_str()); 
+        BAIDU_SCOPED_LOCK(_user_mutex);
+        _user_privilege[user_name] = user_privilege_pb;
+    }
+    return 0;
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

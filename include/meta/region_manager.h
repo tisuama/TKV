@@ -54,6 +54,17 @@ public:
         return max_region_id_key;
     }
 
+    void clear() {
+        _region_info_map.clear();
+        _region_state_map.clear();
+        _region_peer_state_map.clear();
+        _ins_region_map.clear();
+        _ins_learner_map.clear();
+        _ins_leader_count.clear();
+        _ins_pk_leader_count.clear();
+        _remove_region_peer_on_pk_prefix.clear();
+    }
+
 private:
     RegionManager(): _max_region_id(0) {
         _doing_recovery = false;

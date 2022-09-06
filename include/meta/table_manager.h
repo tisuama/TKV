@@ -118,6 +118,11 @@ public:
         // no global index
     }
 
+    void clear() {
+        _table_id_map.clear();
+        _table_info_map.clear();
+    }
+
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
     int write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,

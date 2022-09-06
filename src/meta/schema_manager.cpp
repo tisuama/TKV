@@ -2,6 +2,7 @@
 #include "meta/namespace_manager.h"
 #include "meta/database_manager.h"
 #include "meta/table_manager.h"
+#include "meta/region_manager.h"
 #include "proto/meta.pb.h"
 #include "meta/cluster_manager.h"
 
@@ -240,6 +241,17 @@ int SchemaManager::whether_dists_legal(pb::MetaManagerRequest* request,
                 "replica num not match", request->op_type(), log_id);
         return -1;
     }
+    return 0;
+}
+
+int SchemaManager::load_snapshot() {
+    NamespaceManager::get_instance()->clear();
+    DatabaseManager::get_instance()->clear();
+    TableManager::get_instance()->clear();
+    RegionManager::get_instance()->clear();
+
+    // read data from rocksdb
+
     return 0;
 }
 } // namespace TKV

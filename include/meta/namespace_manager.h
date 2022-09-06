@@ -56,6 +56,12 @@ public:
         _db_ids[nid].insert(db_id);
     }
 
+    void clear() {
+        _nid_map.clear();
+        _ninfo_map.clear();
+        _db_ids.clear();
+    }
+
     // Raft串行接口访问
     void create_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);
     void drop_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);

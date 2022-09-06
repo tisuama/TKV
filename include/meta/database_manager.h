@@ -54,6 +54,12 @@ public:
         _table_ids[db_id].insert(table_id);
     }
 
+    void clear() {
+        _db_id_map.clear();
+        _db_info_map.clear();
+        _table_ids.clear();
+    }
+
     // Raft串行访问
     void create_database(const pb::MetaManagerRequest& request, braft::Closure* done);
 
