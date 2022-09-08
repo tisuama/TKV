@@ -62,5 +62,10 @@ void DatabaseManager::create_database(const pb::MetaManagerRequest& request, bra
     IF_DONE_SET_RESPONSE(done, pb::SUCCESS, "success");
     DB_NOTICE("create database success, request: %s", request.ShortDebugString().c_str());
 }
+
+int DatabaseManager::load_database_snapshot(const std::string& value) {
+    // TODO 
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

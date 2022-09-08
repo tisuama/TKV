@@ -60,6 +60,8 @@ public:
         _table_ids.clear();
     }
 
+    int load_database_snapshot(const std::string& value);
+
     // Raft串行访问
     void create_database(const pb::MetaManagerRequest& request, braft::Closure* done);
 

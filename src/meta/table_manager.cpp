@@ -235,5 +235,9 @@ void TableManager::send_create_table_request(const std::string& namespace_name,
     }
 } 
 
+int TableManager::load_table_snapshot(const std::string& value) {
+    
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

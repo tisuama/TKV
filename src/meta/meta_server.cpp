@@ -24,6 +24,7 @@ const std::string MetaServer::MAX_ID_SCHEMA_IDENTIFY(1, 0x01);
 const std::string MetaServer::NAMESPACE_SCHEMA_IDENTIFY(1, 0x02);
 const std::string MetaServer::DATABASE_SCHEMA_IDENTIFY(1, 0x03);
 const std::string MetaServer::TABLE_SCHEMA_IDENTIFY(1, 0x04);
+const std::string MetaServer::REGION_SCHEMA_IDENTIFY(1, 0x05);
 
 const std::string MetaServer::LOGICAL_CLUSTER_IDENTIFY(1, 0x1);
 const std::string MetaServer::PHYSICAL_CLUSTER_IDENTIFY(1, 0x2);
@@ -125,7 +126,6 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     SchemaManager::get_instance()->set_meta_state_machine(_meta_state_machine);
     PrivilegeManager::get_instance()->set_meta_state_machine(_meta_state_machine);
     ClusterManager::get_instance()->set_meta_state_machine(_meta_state_machine);
-    
     
     return 0;
 }

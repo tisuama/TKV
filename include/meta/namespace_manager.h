@@ -62,11 +62,12 @@ public:
         _db_ids.clear();
     }
 
+    int load_namespace_snapshot(const std::string& value);
+
     // Raft串行接口访问
     void create_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);
     void drop_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);
     void modify_namespace(const pb::MetaManagerRequest& request, braft::Closure* done);
-    void load_namespace_snapshot(const std::string& value);
     
 private:
     NamespaceManager(): _max_nid(0) {

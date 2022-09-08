@@ -251,7 +251,50 @@ int SchemaManager::load_snapshot() {
     RegionManager::get_instance()->clear();
 
     // read data from rocksdb
+    rocksdb::ReadOptions read_options;
+    read_options.prefix_same_as_start = true;
+    read_options.total_order_seek = false;
+    auto db = RocksWrapper::get_instance();
+    std::unique_ptr<rocksdb::Iterator> iter(
+            RocksWrapper::get_instance()->new_iterator(read_options, db->get_meta_info_handle()));
+    iter->Seek(MetaServer::SCHEMA_IDENTIFY);
+    std::string max_id_prefix = MetaServer::SCHEMA_IDENTIFY;
+    // max_region_id / max_namespace_id / max_table_id / max_database_id
+    max_id_prefix += MetaServer::MAX_ID_SCHEMA_IDENTIFY;
 
+    std::string namespace_prefix = MetaServer::SCHEMA_IDENTIFY;
+    namespace_prefix += MetaServer::NAMESPACE_SCHEMA_IDENTIFY;
+
+    std::string database_prefix = MetaServer::SCHEMA_IDENTIFY;
+    database_prefix += MetaServer::DATABASE_SCHEMA_IDENTIFY;
+
+    std::string table_prefix = MetaServer::SCHEMA_IDENTIFY;
+    table_prefix += MetaServer::TABLE_SCHEMA_IDENTIFY;
+
+    std::string region_prefix = MetaServer::SCHEMA_IDENTIFY;
+    region_prefix += MetaServer::REGION_SCHEMA_IDENTIFY;
+
+    for (; iter->Valid(); iter->Next()) {
+        int ret = 0;
+        if (iter->key().starts_with(region_prefix)) {
+            ret = RegionManager::get_instance()->load_region_snapshot(iter->value().ToString());
+        } else if (iter->key().starts_with(table_prefix)) {
+            ret = TableManager::get_instance()->load_table_snapshot(iter->value().ToString());
+        } else if (iter->key().starts_with(database_prefix)) {
+            ret = DatabaseManager::get_instance()->load_database_snapshot(iter->value().ToString());
+        } else if (iter->key().starts_with(namespace_prefix)) {
+            ret = NamespaceManager::get_instance()->load_namespace_snapshot(iter->value().ToString());
+        } else if (iter->key().starts_with(max_id_prefix)) {
+            ret = load_max_id_snapshot(max_id_prefix, iter->key().ToString(), iter->value().ToString());
+        } else {
+            DB_FATAL("unsupport schema info when load snapshot, key: %s", iter->key().data());
+        }
+        if (ret) {
+            DB_FATAL("LOAD snapshot fail, key: %s, value: %s", iter->key().data(), iter->value().data());
+            return -1;
+        }
+    }
+    TableManager::get_instance()->check_startkey_regionid_map();
     return 0;
 }
 } // namespace TKV

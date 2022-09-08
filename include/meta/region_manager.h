@@ -65,6 +65,10 @@ public:
         _remove_region_peer_on_pk_prefix.clear();
     }
 
+    
+    int load_region_snapshot(const std::string& value);
+
+
 private:
     RegionManager(): _max_region_id(0) {
         _doing_recovery = false;

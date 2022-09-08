@@ -123,6 +123,7 @@ public:
         _table_info_map.clear();
     }
 
+    int load_table_snapshot(const std::string& value);
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
     int write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
