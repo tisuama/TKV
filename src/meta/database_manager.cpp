@@ -64,7 +64,18 @@ void DatabaseManager::create_database(const pb::MetaManagerRequest& request, bra
 }
 
 int DatabaseManager::load_database_snapshot(const std::string& value) {
-    // TODO 
+    pb::DatabaseInfo db_pb;
+    if (!db_pb.ParseFromString(value)) {
+        DB_FATAL("parse from pb fail when load database snapshot, value: %s", value.c_str());
+        return -1;
+    }
+    DB_WARNING("load database info: %s", db_pb.ShortDebugString().c_str());
+    set_database_info(db_pb);
+
+    // 更新内存中namesapce info
+    NamespaceManager::get_instance()->add_database_id(
+            db_pb.namespace_id(),
+            db_pb.database_id());
     return 0;
 }
 } // namespace TKV

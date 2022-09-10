@@ -17,6 +17,7 @@
 namespace TKV {
 // Function define in common.cpp, extern here
 extern int64_t parse_snapshot_index_from_path(const std::string& snapshot_path, bool use_dirname); 
+extern std::string to_hex_str(const std::string& str);
 
 #define RETURN_IF_NOT_INIT(init, response, log_id) \
     do {\

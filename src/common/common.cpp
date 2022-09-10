@@ -2,6 +2,7 @@
 
 #include <butil/files/file_path.h>
 #include <butil/strings/string_split.h>
+#include <rocksdb/slice.h>
 
 namespace TKV {
 int64_t parse_snapshot_index_from_path(const std::string& snapshot_path, bool use_dirname) {
@@ -23,5 +24,9 @@ int64_t parse_snapshot_index_from_path(const std::string& snapshot_path, bool us
 		snapshot_index = atoll(snapshot_index_vec[1].c_str());
 	}
 	return snapshot_index;
+}
+
+std::string to_hex_str(const std::string& str) {
+	return rocksdb::Slice(str).ToString(true /* hex = true */);
 }
 } // namespace TKV

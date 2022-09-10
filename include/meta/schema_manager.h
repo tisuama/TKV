@@ -34,14 +34,18 @@ public:
                             const pb::MetaManagerRequest* request, 
                             pb::MetaManagerResponse* response, 
                             google::protobuf::Closure* done);
-    int pre_process_for_create_table(const pb::MetaManagerRequest* request, 
-           pb::MetaManagerResponse* response,
-           uint64_t log_id); 
-
     int load_snapshot();
         
 private:
 	SchemaManager() {};
+    
+    int pre_process_for_create_table(const pb::MetaManagerRequest* request, 
+           pb::MetaManagerResponse* response,
+           uint64_t log_id); 
+    int load_max_id_snapshot(const std::string& max_id_prefix,
+            const std::string& key,
+            const std::string& value);
+
 
 	MetaStateMachine* _meta_state_machine {nullptr};
 };

@@ -9,13 +9,14 @@
 #include "proto/meta.pb.h"
 
 namespace TKV {
+
 enum MergeStatus {
     MERGE_IDLE = 0,
     MERGE_SRC = 1,// 用于Merge源 
     MERGE_DST = 2 // 用于Merge目标
 };
 
-struct RegionDesc {
+struct RegionStatus {
     int64_t region_id;
     MergeStatus merge_status;
 };
@@ -27,11 +28,12 @@ struct TableMem {
     // Not support field and index now
     std::unordered_map<std::string, int32_t> field_id_map; 
     std::unordered_map<std::string, int64_t> index_id_map; 
-    // start_key -> region_id
-    std::map<int64_t, std::map<std::string, RegionDesc>> skey_to_region_map;
+
+    // partition_id: start_key -> region_status
+    std::map<int64_t, std::map<std::string, RegionStatus>> skey_to_region_map;
 
     // 发生split或者merge时，用以下三个map暂存心跳上报的region信息，保证整体更新。
-    // start_key -> region： 存放new region, new region为分裂出来的region
+    // partition_id: start_key -> region： 存放new region, new region为分裂出来的region
     std::map<int64_t, std::map<std::string, SmartRegionInfo>> skey_to_new_region_map;
     // region_id -> none region： 存放空region
     std::map<int64_t, SmartRegionInfo> id_to_none_map;
@@ -118,12 +120,26 @@ public:
         // no global index
     }
 
+    void add_region_id(int64_t table_id, int64_t partition_id, int64_t region_id) {
+        BAIDU_SCOPED_LOCK(_table_mutex);
+        if (_table_info_map.find(table_id) == _table_info_map.end()) {
+            DB_WARNING("table_id: %ld info not exist", table_id);
+            return ;
+        }
+        DB_WARNING("table_id: %ld partition_id: %ld add region_id: %ld", 
+                table_id, partition_id, region_id);
+        _table_info_map[table_id].partition_regions[partition_id].insert(region_id);
+    }
+
     void clear() {
         _table_id_map.clear();
         _table_info_map.clear();
     }
 
     int load_table_snapshot(const std::string& value);
+    int add_startkey_region_map(const pb::RegionInfo& region_pb);
+    int check_startkey_region_map();
+
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
     int write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,

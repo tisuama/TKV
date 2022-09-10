@@ -294,8 +294,38 @@ int SchemaManager::load_snapshot() {
             return -1;
         }
     }
-    TableManager::get_instance()->check_startkey_regionid_map();
+    TableManager::get_instance()->check_startkey_region_map();
     return 0;
 }
+
+int SchemaManager::load_max_id_snapshot(const std::string& max_id_prefix,
+        const std::string& key,
+        const std::string& value) {
+    std::string max_key(key, max_id_prefix.size());
+    int64_t* max_id = (int64_t*)(value.c_str());
+    if (max_key == SchemaManager::MAX_NAMESPACE_ID_KEY) {
+        NamespaceManager::get_instance()->set_max_namespace_id(*max_id);
+        DB_WARNING("load snapshot, max_namespace_id: %ld", *max_id);
+        return 0;
+    }
+    if (max_key == SchemaManager::MAX_DATABASE_ID_KEY) {
+        DatabaseManager::get_instance()->set_max_database_id(*max_id);
+        DB_WARNING("load snapshot, max_database_id: %ld", *max_id);
+        return 0;
+    }
+    if (max_key == SchemaManager::MAX_TABLE_ID_KEY) {
+        TableManager::get_instance()->set_max_table_id(*max_id);
+        DB_WARNING("load snapshot, max_table_id: %ld", *max_id);
+        return 0;
+    }
+    if (max_key == SchemaManager::MAX_REGION_ID_KEY) {
+        RegionManager::get_instance()->set_max_region_id(*max_id);
+        DB_WARNING("load snapshot, max_region_id: %ld", *max_id);
+        return 0;
+    }
+    return 0;
+}
+
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

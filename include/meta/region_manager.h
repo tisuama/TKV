@@ -18,6 +18,7 @@ struct RegionPeerState {
 };
 
 struct RegionLearnerState {
+    // peer -> state
     std::map<std::string, pb::PeerStateInfo> learner_state_map;
     TimeCost                                 tc;
 };
@@ -54,19 +55,18 @@ public:
         return max_region_id_key;
     }
 
-    void clear() {
-        _region_info_map.clear();
-        _region_state_map.clear();
-        _region_peer_state_map.clear();
-        _ins_region_map.clear();
-        _ins_learner_map.clear();
-        _ins_leader_count.clear();
-        _ins_pk_leader_count.clear();
-        _remove_region_peer_on_pk_prefix.clear();
+    void set_region_state(int64_t region_id, const RegionStateInfo& region_state) {
+        _region_state_map.set(region_id, region_state);
+    }  
+
+    SmartRegionInfo get_region_info(int64_t region_id) {
+        return _region_info_map.get(region_id);
     }
 
+    void clear();
     
     int load_region_snapshot(const std::string& value);
+    void set_region_info(const pb::RegionInfo& region_pb);
 
 
 private:
@@ -91,14 +91,17 @@ private:
     std::unordered_map<std::string, std::unordered_map<int64_t, std::set<int64_t>>> _ins_region_map;
     std::unordered_map<std::string, std::unordered_map<int64_t, std::set<int64_t>>> _ins_learner_map;
     
+    // region_id -> regionstate
     ThreadSafeMap<int64_t, RegionStateInfo> _region_state_map;
     ThreadSafeMap<int64_t, RegionPeerState> _region_peer_state_map;
-    ThreadSafeMap<int64_t, RegionLearnerState> _region_leader_state_map;
+    ThreadSafeMap<int64_t, RegionLearnerState> _region_learner_peer_state_map;
     
     bthread_mutex_t _cond_mutex;
     std::unordered_map<std::string, std::unordered_map<int64_t, int64_t>> _ins_leader_count; 
+
     // instance_table_id -> pk_prefix -> leader region count
-    std::unordered_map<std::string, std::unordered_map<std::string, int64_t>> _ins_pk_leader_count;
+    // std::unordered_map<std::string, std::unordered_map<std::string, int64_t>> _ins_pk_leader_count;
+    
     // region_id -> logical room
     // 处理store心跳发现大户不均，标记需要迁移的region_id及候选store需要在logical_room
     // check_peer_count发现region_id在map里，直接按照大户的维度删除peer数量最多的candidate，

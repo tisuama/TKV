@@ -146,8 +146,8 @@ message PartitionInfo {
     repeated string partition_names = 3;
 };
 
-// No fileds now
-// No index now
+// No Fileds
+// No Index
 message SchemaInfo {
     optional int64 table_id = 1;
     required string table_name = 2;

@@ -53,13 +53,14 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
     if (!table_info.has_replica_num()) {
         table_info.set_replica_num(FLAGS_replica_num);
     }
-    // TODO: 分配field_id，index_id
-    // TODO: partition_num > 1
+
+    // TODO: 分配field_id，index_id等信息
+    // TODO: partition分区表, 设置各field信息
+     
     for (auto& r : *table_info.mutable_learner_resource_tags()) {
         table_mem.learner_resource_tag.emplace_back(r);
     }
     table_mem.schema_pb = table_info;
-    
 
     // 发起交互
     bool has_auto_increament = false;
@@ -236,7 +237,120 @@ void TableManager::send_create_table_request(const std::string& namespace_name,
 } 
 
 int TableManager::load_table_snapshot(const std::string& value) {
-    
+    pb::SchemaInfo table_pb;
+    if (!table_pb.ParseFromString(value)) {
+        DB_FATAL("parse from pb fail when load table snapshot, key: %s", value.c_str());
+        return -1;
+    }
+    DB_WARNING("load table info: %s, size: %lu", table_pb.ShortDebugString().c_str(), value.c_str());
+
+    TableMem table_mem;
+    table_mem.schema_pb = table_pb;
+    table_mem.whether_level_table = false;
+    table_mem.main_table_id = table_pb.table_id();
+    table_mem.global_index_id = table_pb.table_id();
+
+    for (auto& r : table_pb.learner_resource_tags()) {
+        table_mem.learner_resource_tag.emplace_back(r);
+    }
+    // 暂时不支持partition
+    CHECK(!table_pb.has_partition_info());
+    // No Field/Index    
+
+    if (table_pb.deleted()) {
+        _table_tombstone_map[table_pb.table_id()] = table_mem;
+    } else {
+        set_table_info(table_mem);
+        DatabaseManager::get_instance()->add_table_id(table_pb.database_id(), table_pb.table_id());
+    }
+
+    return 0;
+}
+
+// 更新start_key->region的状态
+int TableManager::add_startkey_region_map(const pb::RegionInfo& region_pb) {
+    int64_t table_id = region_pb.table_id();
+    int64_t region_id = region_pb.region_id();
+    int64_t partition_id = region_pb.partition_id();
+
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    // 此时Table的相关信息应该已经存在了
+    if (_table_info_map.find(table_id) == _table_info_map.end()) {
+        DB_WARNING("table_id: %ld info not exist", table_id);
+        return -1;
+    }
+    // 空region
+    if (region_pb.start_key() == region_pb.end_key() &&
+            !region_pb.start_key().empty()) {
+        DB_WARNING("table_id: %ld, region_id: %ld, start_key: %s is empty", 
+                table_id, region_id, to_hex_str(region_pb.start_key()).c_str());
+        return 0;
+    }
+
+    RegionStatus region;
+    region.region_id = region_id;
+    region.merge_status = MERGE_IDLE; 
+    auto& skey_to_region_map = _table_info_map[table_id].skey_to_region_map;
+    if (skey_to_region_map[partition_id].find(region_pb.start_key()) ==
+            skey_to_region_map[partition_id].end()) {
+        skey_to_region_map[partition_id][region_pb.start_key()] = region;
+    } else {
+        int64_t src_region_id = skey_to_region_map[partition_id][region_pb.start_key()].region_id;
+        RegionManager* region_manager = RegionManager::get_instance();
+        auto src_region = region_manager->get_region_info(src_region_id);
+        DB_FATAL("table_id: %ld two regions has same start_key (%ld, %s, %s) vs (%ld, %s, %s)",
+                table_id, src_region->region_id(), to_hex_str(src_region->start_key()).c_str(),
+                to_hex_str(src_region->end_key()).c_str(), region_id, to_hex_str(region_pb.start_key()).c_str(), 
+                to_hex_str(region_pb.end_key()).c_str());
+        return -1;
+    }
+    return 0;
+}
+
+int TableManager::check_startkey_region_map() {
+    TimeCost time_cost;
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    for(auto table_info: _table_info_map) {
+        int64_t table_id = table_info.first;
+        for (const auto& partition_region_map: table_info.second.skey_to_region_map) {
+            SmartRegionInfo pre_region;
+            bool is_first_region = true;
+            auto& skey_to_region_map = partition_region_map.second;            
+            for (auto iter = skey_to_region_map.begin(); iter != skey_to_region_map.end(); iter++) {
+                if (is_first_region) {
+                    auto first_region = RegionManager::get_instance()->get_region_info(iter->second.region_id);
+                    if (first_region == nullptr) {
+                        DB_FATAL("table_id: %ld can't find region_id: %ld, start_key: %s in region info map", 
+                                table_id, iter->second.region_id, to_hex_str(iter->first).c_str());
+                        continue;
+                    }
+                    DB_WARNING("table_id: %ld first region_id: %ld, version: %ld, key(%s, %s)",
+                            table_id, first_region->region_id(), first_region->version(),
+                            to_hex_str(first_region->start_key()).c_str(),
+                            to_hex_str(first_region->end_key()).c_str());
+                    pre_region = first_region;
+                    is_first_region = false;
+                    continue;
+                }
+                auto cur_region = RegionManager::get_instance()->get_region_info(iter->second.region_id);
+                if (cur_region == nullptr) {
+                    DB_FATAL("table_id: %ld can't find region_id: %ld, start_key: %s in region info map",
+                            table_id, iter->second.region_id, to_hex_str(iter->first).c_str());
+                    continue;
+                }
+                if (pre_region->end_key() != cur_region->start_key()) {
+                    DB_FATAL("table_id: %ld, key no sequence, prev (region_id: %ld, version: %ld, start_key: %s, end_key: %s) "
+                            " vs cur (region_id: %ld, version: %ld, start_key: %s, end_key: %s", table_id,
+                            pre_region->region_id(), pre_region->version(), to_hex_str(pre_region->start_key()).c_str(), 
+                            to_hex_str(pre_region->end_key()).c_str(), cur_region->region_id(), cur_region->version(),
+                            to_hex_str(cur_region->start_key()).c_str(), to_hex_str(cur_region->end_key()).c_str());
+                    continue;
+                }
+                pre_region = cur_region;
+            }
+        }
+        DB_WARNING("table_id: %ld check start key finish", table_id);
+    }
     return 0;
 }
 } // namespace TKV

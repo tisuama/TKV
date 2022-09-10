@@ -52,6 +52,14 @@ void NamespaceManager::modify_namespace(const pb::MetaManagerRequest& request, b
 }
 
 int NamespaceManager::load_namespace_snapshot(const std::string& value) {
+    pb::NamespaceInfo namespace_pb;
+    if (namespace_pb.ParseFromString(value)) {
+        DB_FATAL("parse from pb fail when load namespace snapshot, value: %s", value.c_str());
+        return -1;
+    }
+    DB_WARNING("load namespace info: %s", namespace_pb.ShortDebugString().c_str());
+    set_namespace_info(namespace_pb);
+    return 0;
 }
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
