@@ -80,6 +80,11 @@ file(GLOB RAFT_SRC
 	)
 add_library(raft_src_lib OBJECT ${RAFT_SRC})
 
+file(GLOB RAFT_META_SRC
+	src/meta/raft_helper.cpp
+	)
+add_library(raft_meta_src_lib OBJECT ${RAFT_META_SRC})
+
 file(GLOB META_SERVER
 	src/meta/meta_server.cpp
 	src/meta/common_state_machine.cpp
@@ -99,6 +104,11 @@ file(GLOB ENGINE_SRC
 	src/engine/*.cpp
 	)
 add_library(engine_src_lib OBJECT ${ENGINE_SRC})
+
+file(GLOB RAFT_STORE_SRC
+	src/store/raft_helper.cpp
+	)
+add_library(raft_store_src_lib OBJECT ${RAFT_STORE_SRC})
 
 file(GLOB STORE_SRC
 	src/store/store.cpp
@@ -153,6 +163,7 @@ add_executable(TKVMeta
 	$<TARGET_OBJECTS:raft_src_lib>	
 	$<TARGET_OBJECTS:meta_interact_lib>
 	$<TARGET_OBJECTS:store_interact_lib>
+	$<TARGET_OBJECTS:raft_meta_src_lib>
 	)
 target_link_libraries(TKVMeta ${DEP_LIB})
 
@@ -165,6 +176,7 @@ add_executable(TKVStore
 	$<TARGET_OBJECTS:raft_src_lib>
 	$<TARGET_OBJECTS:meta_interact_lib>
 	$<TARGET_OBJECTS:store_interact_lib>
+	$<TARGET_OBJECTS:raft_store_src_lib>
 	)
 target_link_libraries(TKVStore ${DEP_LIB})
 
@@ -179,6 +191,7 @@ add_executable(test_meta_server
 	$<TARGET_OBJECTS:store_src_lib>
 	$<TARGET_OBJECTS:raft_src_lib>
 	$<TARGET_OBJECTS:meta_interact_lib>
+	$<TARGET_OBJECTS:raft_meta_src_lib>
 	)
 target_link_libraries(test_meta_server ${DEP_LIB})
 
@@ -192,6 +205,7 @@ add_executable(test_table_key
 	$<TARGET_OBJECTS:store_src_lib>
 	$<TARGET_OBJECTS:raft_src_lib>
 	$<TARGET_OBJECTS:meta_interact_lib>
+	$<TARGET_OBJECTS:raft_meta_src_lib>
 	)
 target_link_libraries(test_table_key ${DEP_LIB})
 
@@ -204,6 +218,7 @@ add_executable(test_log_storage
 	$<TARGET_OBJECTS:raft_src_lib>
 	$<TARGET_OBJECTS:store_interact_lib>
 	$<TARGET_OBJECTS:meta_interact_lib>
+	$<TARGET_OBJECTS:raft_meta_src_lib>
 	)
 target_link_libraries(test_log_storage ${DEP_LIB})
 

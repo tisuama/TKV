@@ -359,5 +359,25 @@ int MetaWriter::clear_doing_snapshot(int64_t region_id) {
     }
     return 0;
 }
+
+int MetaWriter::update_region_info(const pb::RegionInfo& region_info) {
+    int64_t region_id = region_info.region_id();
+    std::string region_info_str;
+    if (!region_info.SerializeToString(&region_info_str)) {
+        DB_FATAL("region_id: %ld serialze to string fail", region_id);
+        return -1;
+    }
+    auto s = _rocksdb->put(MetaWriter::write_options, _meta_cf, 
+            rocksdb::Slice(region_info_key(region_id)), 
+            rocksdb::Slice(region_info_str));
+    if (!s.ok()) {
+        DB_FATAL("region_id: %ld put to rocksdb fail, err_msg: %s",
+                region_id, s.ToString().c_str());
+        return -1;
+    }
+    DB_WARNING("region_id: %ld write region_info: %s success to rocksdb", 
+            region_id, region_info.ShortDebugString().c_str());
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

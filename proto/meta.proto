@@ -1,6 +1,7 @@
 syntax="proto2";
 import "common.proto";
 import "optype.proto";
+import "raft.proto";
 package TKV.pb;
 option cc_generic_services = true;
 
@@ -373,5 +374,6 @@ message MetaManagerResponse {
 service MetaService {
     rpc store_heartbeat(StoreHBRequest) returns (StoreHBResponse);
     rpc meta_manager(MetaManagerRequest) returns (MetaManagerResponse);
+    rpc raft_control(RaftControlRequest) returns (RaftControlResponse);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

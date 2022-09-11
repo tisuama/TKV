@@ -23,6 +23,13 @@ public:
     pb::RegionStatus get_status() const {
         return _status.load();
     }
+
+    void reset_region_status() {
+        pb::RegionStatus expect_status = pb::DOING;
+        if (!_status.compare_exchange_strong(expect_status, pb::IDLE)) {
+            DB_WARNING("region_id: %ld region status is not DOING, do nothing", _region_id);
+        }
+    }
     
     // static function
     static int remove_data(int64_t drop_region_id);
@@ -38,8 +45,6 @@ public:
 
     // called by region
     void sync_do_snapshot();
-    
-    
 
 private:
     Region* _region = nullptr;

@@ -1,0 +1,35 @@
+syntax="proto2";
+import "common.proto";
+package TKV.pb;
+
+
+enum RaftControlOp {
+	// Leader
+	SetPeer = 1;
+	TransferLeader = 2;
+
+	// Leader & Follower 
+	Snapshot = 3; 
+	GetLeader = 4;
+	ShutDown = 5; 
+	Vote = 6;
+	ResetVoteTime = 7;
+};
+
+
+message RaftControlRequest {
+	required RaftControlOp op_type = 1;
+	optional int64 region_id = 2;
+	optional string new_leader = 3;
+	repeated string old_peers = 4;
+	repeated string new_peers = 5;
+	optional int64 election_time = 6;
+	optional bool force = 7;
+};
+
+message RaftControlResponse {
+	required int64 region_id = 1;
+	required ErrorCode errcode = 2;
+	optional string leader = 3;
+	optional string errmsg = 4;
+};

@@ -88,7 +88,7 @@ public:
             mp.erase(region_id);
             return 1;
         };
-        _region_mapping.Modify(call, region_id);//region_i
+        _region_mapping.Modify(call, region_id);//region_id
     }
 
     // traverse region
@@ -126,6 +126,24 @@ public:
     
     bool is_shutdown() const {
         return _shutdown;
+    }
+
+    void set_can_add_peer_for_region(int64_t region_id) {
+        SmartRegion region = get_region(region_id);
+        if (region == nullptr) {
+            DB_FATAL("region_id: %ld not exist", region_id);
+            return ;
+        }
+        region->set_can_add_peer();
+    }
+
+    void reset_region_status(int64_t region_id) {
+        SmartRegion region = get_region(region_id);
+        if (region == nullptr) {
+            DB_FATAL("region_id: %ld not exist", region_id);
+            return ;
+        }
+        region->reset_region_status();
     }
 
     void update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, int64_t>* reverser_index_map);

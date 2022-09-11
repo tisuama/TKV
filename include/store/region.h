@@ -214,6 +214,24 @@ public:
             DB_WARNING("region_id: %ld raft node is shutdown", _region_id);
         }
     }
+    
+    void set_can_add_peer() {
+        if (!_region_info.can_add_peer()) {
+            pb::RegionInfo region_pb;
+            copy_region(&region_pb);
+            region_pb.set_can_add_peer(true);
+            if (_meta_writer->update_region_info(region_pb) != 0) {
+                DB_FATAL("region_id: %ld set can add peer fail", _region_id);
+            } else {
+                DB_WARNING("region_id: %ld set can add peer success", _region_id);
+            }
+            _region_info.set_can_add_peer(true);
+        }
+    }
+    
+    void reset_region_status() {
+        _region_control.reset_region_status(); 
+    }
 
     // public
     void compact_data_in_queue();

@@ -2,6 +2,7 @@
 #include "store/rpc_sender.h"
 #include "store/store.h"
 #include "store/closure.h"
+#include "raft/raft_helper.h"
 
 #include <rocksdb/options.h>
 
@@ -11,6 +12,55 @@ DEFINE_int32(compact_interval_s, 1, "compact_interval(s)");
 DEFINE_bool(allow_compact_range, true, "allow_comapct_range");
 DECLARE_string(snapshot_uri);
 DECLARE_string(stable_uri);
+
+class RaftControlDone: public braft::Closure {
+public:
+    RaftControlDone(google::protobuf::RpcController* controller,
+            const pb::RaftControlRequest* request,
+            pb::RaftControlResponse* response,
+            google::protobuf::Closure* done,
+            braft::Node* node,
+            std::shared_ptr<UpdateRegionStatus> auto_reset) 
+        : _controller(controller)
+        , _request(request)
+        , _response(response)
+        , _done(done)
+        , _node(node)
+        , _auto_reset(auto_reset) 
+    {}
+
+    virtual ~RaftControlDone() {}
+
+    virtual void Run() {
+        brpc::Controller* cntl = static_cast<brpc::Controller*>(_controller);
+        uint64_t log_id = 0;
+        if (cntl->has_log_id()) {
+            log_id = cntl->log_id();
+        }
+        if (status().ok()) {
+            DB_NOTICE("region_id: %ld raft control rpc success, type: %d, remote_side: %s, log_id: %ld",
+                    _request->region_id(), _request->op_type(), 
+                    butil::endpoint2str(cntl->remote_side()).c_str(), log_id);
+            _response->set_errcode(pb::SUCCESS);
+        } else {
+            DB_WARNING("region_id: %ld raft control rpc failed, type: %d, remote_side: %s, log_id: %ld",
+                    _request->region_id(), _request->op_type(),
+                    butil::endpoint2str(cntl->remote_side()).c_str(), log_id);
+            _response->set_errcode(pb::INTERNAL_ERROR);
+            _response->set_errmsg(status().error_cstr());
+            _response->set_leader(butil::endpoint2str(_node->leader_id().addr).c_str());
+        }
+        _done->Run();
+        delete this;
+    }
+private:
+    google::protobuf::RpcController* _controller;
+    const pb::RaftControlRequest* _request;
+    pb::RaftControlResponse*      _response;
+    google::protobuf::Closure*    _done;
+    braft::Node*                  _node;
+    std::shared_ptr<UpdateRegionStatus> _auto_reset;
+};
 
 void RegionControl::sync_do_snapshot() {
     DB_WARNING("region_id: %ld sync do snapshot start", _region_id);
@@ -197,6 +247,42 @@ void RegionControl::compact_data(int64_t region_id) {
                 region_id, s.ToString().c_str());
     }
     DB_WARNING("region_id: %ld compact range success", region_id);
+}
+
+
+void common_raft_control(google::protobuf::RpcController* controller,
+    const pb::RaftControlRequest* request,
+    pb::RaftControlResponse* response,
+    google::protobuf::Closure* done,
+    braft::Node* node) {
+
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    int64_t region_id = request->region_id();
+    response->set_region_id(region_id);     
+    auto reset_fn = [region_id](UpdateRegionStatus* update_region) {
+        update_region->reset_region_status(region_id);
+    }; 
+
+    std::shared_ptr<UpdateRegionStatus> auto_reset(UpdateRegionStatus::get_instance(), reset_fn);
+
+    switch (request->op_type()) {
+    case pb::Snapshot: {
+        RaftControlDone* raft_done = new RaftControlDone(cntl, request, response, done_guard.release(), node, auto_reset);
+        node->snapshot(raft_done);
+        break;
+    }
+    default:
+        DB_FATAL("Fail, node: %s upsupport request type: %s, log_id: %lu",
+                node->node_id().group_id.c_str(),
+                request->ShortDebugString().c_str(),
+                log_id);
+        return ;
+    }
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
