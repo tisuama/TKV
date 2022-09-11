@@ -30,7 +30,7 @@ void MetaServerClosure::Run() {
     }
     if (response != nullptr) {
         DB_NOTICE("response: %s raft_time_cost: %ld, total_time_cost: %ld, remote_side: %ld", 
-                response->ShortDebugString().c_str(), raft_time_cost, total_time_cost);
+                response->ShortDebugString().c_str(), raft_time_cost, total_time_cost, remote_side.c_str());
     }  
     if (done) {
         done->Run();
@@ -100,16 +100,8 @@ void CommonStateMachine::check_migrate() {
     //
 }
 
-void CommonStateMachine::on_apply(braft::Iterator& iter) {
-    // 
-} 
-
-void CommonStateMachine::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) {
-    // 
-}
-
 int CommonStateMachine::on_snapshot_load(braft::SnapshotReader* reader) {
-    // 
+    DB_WARNING("common state machine start on snapshot load");
     return 0;
 }
 

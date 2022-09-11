@@ -68,12 +68,13 @@ void SchemaManager::process_schema_info(google::protobuf::RpcController* control
     }
     if (!_meta_state_machine->is_leader()) {
         ERROR_SET_RESPONSE(response, pb::NOT_LEADER, "not leader", request->op_type(), log_id);
+        response->set_leader(butil::endpoint2str(_meta_state_machine->get_leader()).c_str());
         return ;
     }
     ON_SCOPED_EXIT(([cntl, log_id, response]() {
         if (response!= nullptr && response->errcode() != pb::SUCCESS) {
             const auto& remote_side = butil::endpoint2str(cntl->remote_side());
-            DB_WARNING("response error, remote_side: %s, log_id: %ld", remote_side, log_id);
+            DB_WARNING("response error, remote_side: %s, log_id: %ld", remote_side.c_str(), log_id);
         }
     }));
     
@@ -149,7 +150,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
     }
     // 校验split_key有序, split_key.index_name必须在index_name中
     // split_index split_keys(0) split_keys(1)
-    int total_region_cnt = 0;
+    int region_cnt = 1; // 主键索引默认先默认设置1个region
     for (auto& skey: request->table_info().split_keys()) {
         for (auto i = 1; i < skey.split_keys_size(); i++) {
             if (skey.split_keys(i) <= skey.split_keys(i - 1)) {
@@ -158,7 +159,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
                 return -1;
             }
         }
-        total_region_cnt += skey.split_keys_size() + 1;
+        region_cnt += skey.split_keys_size() + 1;
     }
     
     // Set schema main_logical_room
@@ -174,8 +175,8 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
     } 
 
     // Set schema resource tag
-    // partition_num * total_region_cnt 
-    total_region_cnt += partition_num * total_region_cnt;
+    // partition_num * region_cnt 
+    int64_t total_region_cnt = partition_num * region_cnt;
     std::string tag = request->table_info().resource_tag();
     if (!table_info.has_resource_tag()) {
         std::string nname = table_info.namespace_name();
@@ -201,6 +202,8 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         }
         // instance address
         mutable_request->mutable_table_info()->add_init_store(instance);
+        DB_WARNING("Add init %d-th store, main_logical_room: %s, tag: %s", 
+                instance.c_str(), main_logical_room.c_str(), tag.c_str()); 
     }
     return 0;
 } 
@@ -210,7 +213,7 @@ int SchemaManager::whether_dists_legal(pb::MetaManagerRequest* request,
         std::string& candidate_logical_room,
         uint64_t log_id) {
     if (request->table_info().dists_size() == 0) {
-        return -1;
+        return 0;
     }
     // 检查逻辑机房是否存在
     uint64_t total_count = 0;
@@ -225,7 +228,7 @@ int SchemaManager::whether_dists_legal(pb::MetaManagerRequest* request,
                 request->op_type(), log_id);
         return -1;
     }
-    if (request->table_info().main_logical_room().size() != 0) {
+    if (request->table_info().main_logical_room().size() == 0) {
         int max_count = 0;
         // 副本数量最多的是主机房
         for (auto& d : request->table_info().dists()) {

@@ -122,7 +122,7 @@ enum RW {
 
 message PrivilegeDatabase {
     required string database = 1;
-    required int64 database_id = 2;
+    optional int64 database_id = 2;
     optional RW rw = 3;
     optional bool force = 4;
 };
@@ -171,6 +171,7 @@ message SchemaInfo {
     optional int32 region_num = 20;
     optional string comment = 21; 
     optional PartitionInfo partition_info = 22;
+    // 若为层次表，固定为1
     optional int64 partition_num = 23;
     optional string resource_tag = 24;
     optional Engine  engine = 25;
@@ -188,7 +189,7 @@ message StoreHBRequest {
     repeated SchemaHB schema_info = 2;
     repeated LeaderHB leader_regions = 3;
     repeated PeerHB peer_info = 4;
-    optional bool need_leader_balance = 5;
+    optional bool need_leader_balance ;
     optional bool need_peer_balance = 6;
     repeated LearnerHB learner_regions = 7;
 };

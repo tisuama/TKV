@@ -184,7 +184,7 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
         bth.run(create_table_fn);
     }
     IF_DONE_SET_RESPONSE(done, pb::SUCCESS, "success"); 
-    DB_WARNING("Create table, db_name: %s, table_id: %ld, table_name: %s, max_table_id: %ld"
+    DB_WARNING("Create table, db_name: %s, table_id: %ld max_table_id: %ld"
             " alloc [start_region_id, end_region_id]: [%ld, %ld]",
             db_name.c_str(), table_id, max_table_id, start_region_id, max_region_id);
     return 0;

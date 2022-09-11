@@ -78,6 +78,7 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
         _ins_phy_map[address] = physical_room;
         _phy_ins_map[physical_room].insert(address);
         _res_ins_map[ins_mem.resource_tag].insert(address);
+        _res_rolling_ins[ins_mem.resource_tag].push_back(address);
         _ins_info[address] = ins_mem;
         // 暂时不考虑网段信息
     } 
@@ -219,6 +220,7 @@ int ClusterManager::load_instance_snapshot(const std::string& instance_prefix,
         _ins_phy_map[address] = ins_info_pb.physical_room();
         _phy_ins_map[ins_info_pb.physical_room()].insert(address);
         _res_ins_map[_ins_info[address].resource_tag].insert(address);
+        _res_rolling_ins[_ins_info[address].resource_tag].push_back(address);
     }
     return 0;
 }

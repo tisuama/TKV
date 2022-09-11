@@ -141,7 +141,7 @@ private:
     std::unordered_map<std::string, std::set<std::string>> _res_ins_map;
     // key: tag value: tag下上一个rolling的instance
     std::unordered_map<std::string, size_t>                    _res_rolling_pos;
-    std::unordered_map<std::string, std::vector<std::string>> _res_rolling_ins;
+    std::unordered_map<std::string, std::vector<std::string>>  _res_rolling_ins;
 
     // 实例信息
     std::unordered_map<std::string, Instance>             _ins_info;

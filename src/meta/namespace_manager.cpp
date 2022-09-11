@@ -53,7 +53,7 @@ void NamespaceManager::modify_namespace(const pb::MetaManagerRequest& request, b
 
 int NamespaceManager::load_namespace_snapshot(const std::string& value) {
     pb::NamespaceInfo namespace_pb;
-    if (namespace_pb.ParseFromString(value)) {
+    if (!namespace_pb.ParseFromString(value)) {
         DB_FATAL("parse from pb fail when load namespace snapshot, value: %s", value.c_str());
         return -1;
     }

@@ -38,7 +38,7 @@ DEFINE_int32(raft_write_concurrency, 40, "raft_write_concurrency, default: 40");
 DEFINE_int32(service_write_concurrency, 40, "service_write_concurrency");
 DEFINE_int32(balance_periodicity, 60, "times of store heart beat");
 DEFINE_int64(store_heart_beat_interval, 30 * 1000 * 1000, "store heart beat interval, default: 30s");
-DEFINE_int32(snapshot_interval_s, 600, "raft snapshot interval, default: 600s");
+DEFINE_int32(snapshot_interval_s, 180, "raft snapshot interval, default: 600s");
 DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms), default: 1s");
 
 } // namespace TKV

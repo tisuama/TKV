@@ -160,7 +160,7 @@ int MetaStateMachine::on_snapshot_load(braft::SnapshotReader* reader) {
             std::string snapshot_path = reader->get_path();
             _applied_index = parse_snapshot_index_from_path(snapshot_path, false);
             DB_WARNING("meta snapshot_path: %s, applied_index: %ld", snapshot_path.c_str(), _applied_index);
-            snapshot_path.append(META_INFO_SST);
+            snapshot_path.append("/" + META_INFO_SST);
 
             // ingest 
             rocksdb::IngestExternalFileOptions ingest_options;
