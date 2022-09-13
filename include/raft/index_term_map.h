@@ -68,12 +68,15 @@ public:
             DB_WARNING("term map has no log_id, first_log_index: %ld", first_log_index);
             return ;
         }
-        size_t num_pop = 0;
+        int num_pop = -1;
         for (auto it = _q.begin(); it != _q.end(); it++) {
-            if (it->index > first_log_index) {
+            if (it->index >= first_log_index) {
                 num_pop = it - _q.begin();
                 break;
             }
+        }
+        if (num_pop == -1) {
+            num_pop = _q.size();
         }
         _q.erase(_q.begin(), _q.begin() + num_pop - 1);
     }

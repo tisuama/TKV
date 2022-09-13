@@ -189,7 +189,7 @@ message StoreHBRequest {
     repeated SchemaHB schema_info = 2;
     repeated LeaderHB leader_regions = 3;
     repeated PeerHB peer_info = 4;
-    optional bool need_leader_balance ;
+    optional bool need_leader_balance = 5;
     optional bool need_peer_balance = 6;
     repeated LearnerHB learner_regions = 7;
 };
@@ -251,6 +251,21 @@ message DatabaseInfo {
     optional string     resource_tag = 8;
 };
 
+message ResourceTagInfo {
+    required string     resource_tag = 1;
+    optional bool       peer_load_balance = 2;
+    optional bool       migrate = 3;
+    optional bool       network_segment_balance = 4;
+};
+
+message RegionStateInfo {
+    optional int64      table_id = 1;
+    optional int64      region_id = 2;
+    optional bool       is_health = 3;
+    optional string     table_name = 4;
+    repeated PeerStateInfo peer_status_infos = 5; 
+};
+
 message UserPrivilege {
     required string     username = 1;
     optional string     password = 2;
@@ -273,6 +288,12 @@ message LogicalRoom {
 message PhysicalRoom {
     required string logical_room = 1;
     repeated string physical_rooms = 2;
+};
+
+message PhysicalInstance {
+    required string physical_room = 1;
+    required string logical_room = 2;
+    repeated string instances = 3;
 };
 
 message MovePhysicalRequest {
@@ -372,9 +393,48 @@ message MetaManagerResponse {
     optional RegionRecoverResponse recover_response = 9;
 };
 
+message QueryRequest {
+    required QueryOpType    op_type = 1;
+    optional string         logical_room = 2;
+    optional string         physical_room = 3;
+    optional string         instance_address = 4;
+    optional string         user_name = 5;
+    optional string         namespace_name = 6;
+    optional string         database = 7;
+    optional string         table_name = 8;
+    repeated int64          region_ids = 9;
+    optional string         old_leader = 10;
+    optional string         new_leader = 11;
+    optional string         old_peers = 12;
+    optional string         new_peers = 13;
+    optional string         resource_tag = 14;
+    optional int64          table_id = 15;
+    optional string         string_region_id = 16;
+};
+
+message QueryResponse {
+    required ErrorCode            errcode             = 1;
+    optional string             errmsg              = 2;
+    optional string             leader              = 3;
+    repeated PhysicalRoom       physical_rooms      = 4;
+    repeated PhysicalInstance   physical_instances  = 5;
+    repeated InstanceInfo       instance_infos      = 6;
+    repeated UserPrivilege      user_privilege      = 7;
+    repeated NamespaceInfo      namespace_infos     = 8;
+    repeated DatabaseInfo       database_infos      = 9;
+    repeated SchemaInfo         schema_infos        = 10;
+    repeated RegionInfo         region_infos        = 11; 
+    repeated int64              peer_ids            = 12;
+    repeated int64              region_ids          = 13;
+    repeated RegionStateInfo    region_status_infos = 14;
+    repeated InstanceParam      instance_params     = 15;
+    repeated ResourceTagInfo    resource_tag_infos  = 16;    
+};
+
 service MetaService {
     rpc store_heartbeat(StoreHBRequest) returns (StoreHBResponse);
     rpc meta_manager(MetaManagerRequest) returns (MetaManagerResponse);
     rpc raft_control(RaftControlRequest) returns (RaftControlResponse);
+    rpc query(QueryRequest) returns (QueryResponse);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -5,7 +5,6 @@
 #include "proto/store.pb.h"
 
 namespace TKV {
-    
 
 TEST(test_log_storage, case_call) {
     ::system("rm -rf test_log");  
@@ -195,10 +194,23 @@ TEST(test_log_storage, case_call) {
     db1->close();
 }
 
+TEST(test_log_storage, test_index_map) {
+    IndexTermMap index_map;
+    for (int i = 0; i < 100; i++) {
+        braft::LogId log(i, i);
+        index_map.append(log);
+    }
+    std::cout << index_map.get_term(1) << std::endl;
+    index_map.truncate_prefix(100);
+    index_map.truncate_prefix(100);
+    std::cout << index_map.get_term(100) << std::endl;
+}
+
 } // namespcae TKV
 
 int main(int argc, char** argv) {
 	::testing::InitGoogleTest(&argc, argv);
+    ::testing::GTEST_FLAG(filter) = "test_log_storage.test_index_map";
 	srand((unsigned)time(NULL));
 	return RUN_ALL_TESTS();
 }

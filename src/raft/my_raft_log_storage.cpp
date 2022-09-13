@@ -307,7 +307,7 @@ int MyRaftLogStorage::truncate_prefix(const int64_t first_log_index) {
                 _region_id, first_log_index, s.ToString().c_str());
         return -1;
     } else {
-        DB_FATAL("region_id: %ld remove rangefirst_log_index: %ld success",
+        DB_FATAL("region_id: %ld remove range first_log_index: %ld success",
                 _region_id, first_log_index);
     }
     return 0;

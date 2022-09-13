@@ -137,6 +137,7 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
                 *(region_request.mutable_schema_info()) = schema_info;
                 region_request.set_snapshot_times(2);
                 init_regions->push_back(region_request);
+                DB_WARNING("create init region request info: %s", region_request.ShortDebugString().c_str());
             }
         }
     }
@@ -199,6 +200,8 @@ void TableManager::send_create_table_request(const std::string& namespace_name,
     BthreadCond concurrency_cond(-10);
     std::string full_table_name = namespace_name + "." + database_name + "." + table_name;
     bool success = false;
+    DB_WARNING("send create table to store, full_table_name: %s, request size: %d", 
+            full_table_name.c_str(), init_regions->size());
     for (auto& init_region_request: *init_regions) {
         auto send_init_region_fn = [&init_region_request, &success, &concurrency_cond, 
              log_id, full_table_name] () {
@@ -211,8 +214,8 @@ void TableManager::send_create_table_request(const std::string& namespace_name,
             auto ret = store_interact.send_request(log_id, "init_region", init_region_request, res);
             if (ret < 0) {
                 // Send error 
-                DB_FATAL("Create table fail, address: %s, region_id: %ld",
-                        r.leader().c_str(), region_id);
+                DB_FATAL("Create table fail, address: %s, region_id: %ld, full_table_name: %s, init region request info: %s",
+                        r.leader().c_str(), region_id, full_table_name.c_str(), init_region_request.ShortDebugString().c_str());
                 success = false;
                 return ;
             }
