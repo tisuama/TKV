@@ -43,7 +43,7 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
     table_info.set_table_id(++max_table_id);
     table_mem.main_table_id = max_table_id;
     table_mem.global_index_id = max_table_id;
-    // whether_level_table = false 
+    // 非层次表
     if (!table_info.has_partition_num()) {
         table_info.set_partition_num(1);
     }
@@ -52,6 +52,9 @@ void TableManager::create_table(const pb::MetaManagerRequest& request, const int
     }
     if (!table_info.has_replica_num()) {
         table_info.set_replica_num(FLAGS_replica_num);
+    }
+    if (!table_info.has_engine()) {
+        table_info.set_engine(pb::Engine::ROCKSDB);
     }
 
     // TODO: 分配field_id，index_id等信息
@@ -105,8 +108,10 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
     int64_t main_table_id = schema_info.table_id();
     schema_info.clear_init_store();
     schema_info.clear_split_keys();
-    // 全局索引和主键索引需要建region
-    // 处理含有split_key的index
+    DB_WARNING("write schema_info: %s", table_mem.schema_pb.ShortDebugString().c_str());
+    // 全局索引和主键索引需要新建region
+    //  - 处理有split_key的索引
+    //  - 处理没有split_key的索引
     for (int i = 0; i < table_mem.schema_pb.partition_num(); i++) {
         if (table_mem.schema_pb.engine() != pb::ROCKSDB ||
             table_mem.schema_pb.engine() != pb::ROCKSDB_CSTORE) {
@@ -126,8 +131,9 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
                 region_info->set_partition_id(i);
                 region_info->add_peers(table_mem.schema_pb.init_store(instance_count));
                 region_info->set_leader(table_mem.schema_pb.init_store(instance_count));
+                // 在快照过后才能add_peer
+                region_info->set_can_add_peer(false);
                 region_info->set_partition_num(table_mem.schema_pb.partition_num());
-                // region_info->set_is_binglog_region(table_mem.is_binglog);
                 if (j) {
                     region_info->set_start_key(split_key.split_keys(j - 1));
                 }

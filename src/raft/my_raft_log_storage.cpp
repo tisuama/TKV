@@ -1,4 +1,5 @@
 #include "raft/my_raft_log_storage.h"
+#include "raft/raft_helper.h"
 #include <xxhash.h>
 #include <braft/local_storage.pb.h>
 
@@ -310,6 +311,8 @@ int MyRaftLogStorage::truncate_prefix(const int64_t first_log_index) {
         DB_FATAL("region_id: %ld remove range first_log_index: %ld success",
                 _region_id, first_log_index);
     }
+    // 快照会调用truncate_prefix，此时可以can_add_peer
+    CanAddPeerSetter::get_instance()->set_can_add_peer(_region_id);
     return 0;
 }
 

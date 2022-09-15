@@ -92,7 +92,6 @@ TEST(test_mata_server, create_table) {
     std::cout << "send request: " << r << std::endl;
 }
 
-/*
 TEST(test_mata_server, create_user) {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
@@ -111,7 +110,6 @@ TEST(test_mata_server, create_user) {
     // r = meta->send_request("meta_manager", request, response);
     std::cout << "send request: " << r << std::endl;
 }
-*/
 
 int main(int argc, char** argv) {
     google::ParseCommandLineFlags(&argc, &argv, true); 
