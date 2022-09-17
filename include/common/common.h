@@ -18,6 +18,7 @@ namespace TKV {
 // Function define in common.cpp, extern here
 extern int64_t parse_snapshot_index_from_path(const std::string& snapshot_path, bool use_dirname); 
 extern std::string to_hex_str(const std::string& str);
+extern std::string transfer_to_lower(std::string str);
 
 #define RETURN_IF_NOT_INIT(init, response, log_id) \
     do {\
@@ -493,10 +494,52 @@ private:
     bthread::ExecutionQueueId<std::function<void(T&)>> _queue_id = {0};
 };
 
-inline std::string transfer_to_lower(std::string str) {
-    std::transform(str.begin(), str.end(), str.begin(), 
-            [](unsigned char c) -> unsigned char { return std::tolower(c); });
-    return str;
+class ConcurrencyBthread {
+public:
+    explicit ConcurrencyBthread(int concurrency) :
+        _concurrency(concurrency) {
+    }
+    ConcurrencyBthread(int concurrency, const bthread_attr_t* attr) :
+        _concurrency(concurrency),
+        _attr(attr) {
+    }
+    void run(const std::function<void()>& call) {
+        _cond.increase_wait(_concurrency);
+        Bthread bth(_attr);
+        bth.run([this, call]() {
+            call();
+            _cond.decrease_signal();
+        });
+    }
+    void join() {
+        _cond.wait();
+    }
+
+    int count() const {
+        return _cond.count();
+    }
+
+private:
+    int _concurrency = 10;
+    BthreadCond _cond;
+    const bthread_attr_t* _attr = NULL;
+};
+
+template<typename T>
+void bthread_usleep_fast_shutdown(int64_t interval_us, T& shutdown) {
+    if (interval_us < 10000) {
+        bthread_usleep(interval_us);
+        return ;
+    }
+    int64_t sleep_time_count = interval_us / 10000; // 10ms为单位
+    int time = 0;
+    while (time < sleep_time_count) {
+        if (shutdown) {
+            return ;
+        }
+        bthread_usleep(10000);
+        ++time;
+    }
 }
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

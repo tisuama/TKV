@@ -458,7 +458,7 @@ int MyRaftLogStorage::_build_key_value(SlicePartsVec & kv_raftlog_vec, const bra
 
 rocksdb::Slice* MyRaftLogStorage::_construct_slice_array(void* head_buf, const butil::IOBuf& buf, butil::Arena& arena) {
     const size_t block_num = buf.backing_block_num();
-    rocksdb::Slice* slices = (rocksdb::Slice*)arena.allocate(sizeof(rocksdb::Slice) * (block_num));
+    rocksdb::Slice* slices = (rocksdb::Slice*)arena.allocate(sizeof(rocksdb::Slice) * (block_num + 1));
     if (slices == nullptr) {
         DB_FATAL("Fail to allocate mem, region_id: %ld", _region_id);
         return nullptr;

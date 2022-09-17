@@ -11,6 +11,7 @@ DECLARE_int32(store_port);
 DECLARE_string(resource_tag);
 DECLARE_int32(balance_periodicity);
 DECLARE_string(db_path);
+DECLARE_int32(store_id);
 
 DEFINE_int64(store_heart_beat_interval_us, 30 * 1000 * 1000, "store heartbeat interval, default: 30s"); 
 
@@ -48,7 +49,10 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     // First heartbeat
     pb::StoreHBRequest  request;
     pb::StoreHBResponse response;
-    // construct_heart_beat_request(request);
+
+    // 构造store 心跳信息
+    construct_heart_beat_request(request);
+
     DB_WARNING("heartbeat request: %s is construct when init store", request.ShortDebugString().data());
     TimeCost time_cost;
     if (_meta_server_interact->send_request("store_heartbeat", request, response) == 0){
@@ -121,13 +125,37 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     }
     
     // TODO: start db statitics
-    
-    DB_WARNING("store init before listen success, region size: %ld, doing snapshot region size: %ld", init_region_ids.size(), _doing_snapshot_regions.size());
+    DB_WARNING("store init before listen success, region size: %ld, doing snapshot region size: %ld", 
+            init_region_ids.size(), _doing_snapshot_regions.size());
     
     return 0;
 }
 
 int Store::init_after_listen(const std::vector<std::int64_t>& init_region_ids) {
+    // 开始上报心跳
+    _heart_beat_bth.run([this]() { heart_beat_thread(); });
+
+    TimeCost time_cost;
+    ConcurrencyBthread init_region_bthread(5);
+    // 从本地rocksdb恢复哪些region
+    for (auto& region_id: init_region_ids) {
+        auto init_fn = [this, region_id]() {
+            SmartRegion region = get_region(region_id);
+            if (region == nullptr) {
+                DB_WARNING("region_id: %ld no region info", region_id);
+                return ;
+            }
+            int ret = region->init(false /* new_region = false */, 0);
+            if (ret < 0) {
+                DB_WARNING("region_id: %ld init fail when store init", region_id);
+                return ;
+            }
+        };
+        init_region_bthread.run(init_fn);
+    }
+    init_region_bthread.join();
+    DB_WARNING("Store %d init region sucess, time_cost: %ld", FLAGS_store_id, time_cost.get_time());
+
     return 0;
 }
 
@@ -372,6 +400,35 @@ void Store::check_region_legal_complete(int64_t region_id) {
         DB_WARNING("region_id: %ld split or add peer failed", region_id);
         this->drop_region_from_store(region_id, false);
     }
+}
+
+void Store::heart_beat_thread() {
+    while(!_shutdown) {
+        send_heart_beat();
+        bthread_usleep_fast_shutdown(FLAGS_store_heart_beat_interval_us, _shutdown);
+    }
+}
+
+void Store::send_heart_beat() {
+    pb::StoreHBRequest request;
+    pb::StoreHBResponse response;
+    // 1. 构造心跳
+    construct_heart_beat_request(request);
+    // 2. 发送请求
+    if (_meta_server_interact->send_request("store_heartbeat", request, response)) {
+        DB_WARNING("Error, send heart beat request to meta fail, request: %s",
+                request.ShortDebugString().c_str());
+    } else {
+        process_heart_beat_response(response);
+    }
+    DB_DEBUG("store heart beat request: %s", request.ShortDebugString().c_str());
+    DB_DEBUG("store heart beat response: %s", response.ShortDebugString().c_str());
+    _last_heart_time.reset();
+}
+
+void Store::process_heart_beat_response(const pb::StoreHBResponse& response) {
+    // TODO:
+    DB_WARNING("process_heart_beat_response not implement now");
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

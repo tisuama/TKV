@@ -29,4 +29,10 @@ int64_t parse_snapshot_index_from_path(const std::string& snapshot_path, bool us
 std::string to_hex_str(const std::string& str) {
 	return rocksdb::Slice(str).ToString(true /* hex = true */);
 }
+
+std::string transfer_to_lower(std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(), 
+            [](unsigned char c) -> unsigned char { return std::tolower(c); });
+    return str;
+}
 } // namespace TKV

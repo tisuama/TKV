@@ -135,12 +135,10 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         partition_num = table_info.partition_num();
     }
     // 分区表多region
-    // Set split_key
     if (table_info.has_region_num()) {
         int32_t region_num = table_info.region_num();
         if (region_num > 1) {
             auto skey = table_info.add_split_keys();
-            // split_key index_name为primary_index_name
             // primary_index_name必然是primary_key或者global_index
             // split->keys->set_index_name(primary_index_name);
             for (auto r = 1; r < region_num; r++) {
@@ -148,9 +146,8 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
             }
         }
     }
-    // 校验split_key有序, split_key.index_name必须在index_name中
-    // split_index split_keys(0) split_keys(1)
     int region_cnt = 1; // 主键索引默认先默认设置1个region
+    // 校验普通索引和unique, split_key必须有序, split_key.index_name必须在index_name中
     for (auto& skey: request->table_info().split_keys()) {
         for (auto i = 1; i < skey.split_keys_size(); i++) {
             if (skey.split_keys(i) <= skey.split_keys(i - 1)) {

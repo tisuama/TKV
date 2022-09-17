@@ -70,11 +70,11 @@ int main(int argc, char** argv) {
     while (!brpc::IsAskedToQuit()) {
         bthread_usleep(1000000L);
     }
-    DB_WARNING("receive kill signal, begin to quit");
+    DB_WARNING("Meta %d receive kill signal, begin to quit", TKV::FLAGS_meta_id);
     
     server.Stop(0);
     server.Join();
-    DB_WARNING("meta server quit sucess");
+    DB_WARNING("Meta %d quit sucess", TKV::FLAGS_meta_id);
     return 0;
 }
 

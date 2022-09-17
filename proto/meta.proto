@@ -52,8 +52,9 @@ message InstanceInfo {
     optional int64 raft_total_qps = 10;
     optional int64 select_latency = 11;
     optional int64 select_qps = 12;
-    // The store id of this instance
     optional int64 store_id = 13;
+    optional int64 dml_latency = 14;
+    optional int64 dml_qps = 15; 
 };
 
 message SchemaHB {
@@ -340,7 +341,7 @@ message MetaManagerRequest {
     optional UserPrivilege           user_privilege  = 5;// 创建用户、增加权限
     // 加字段、索引，删除字段、索引，改字段、索引名称，改类型
     // optional AlterTableRequest       alter_table     = 6;
-    optional LogicalRoom             logical_room    = 7;// 新增、删除逻辑机房
+    optional LogicalRoom             logical_rooms   = 7;// 新增、删除逻辑机房
     optional PhysicalRoom            physical_rooms  = 8;// 新增、删除物理机房
     optional InstanceInfo            instance        = 9;// 新增、删除实例
     optional MovePhysicalRequest     move_request    = 10;// 转移逻辑机房

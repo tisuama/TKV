@@ -44,6 +44,12 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
         case pb::OP_ADD_INSTANCE:
             ClusterManager::get_instance()->add_instance(request, done);
             break;
+        case pb::OP_UPDATE_INSTANCE:
+            ClusterManager::get_instance()->update_instance(request, done);
+            break;
+        case pb::OP_UPDATE_INSTANCE_PARAM:
+            ClusterManager::get_instance()->update_instance_param(request, done);
+            break;
         case pb::OP_CREATE_USER:
             PrivilegeManager::get_instance()->create_user(request, done);
             break;
@@ -55,6 +61,12 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
             break;
         case pb::OP_CREATE_TABLE:
             TableManager::get_instance()->create_table(request, iter.index(), done);
+            break;
+        case pb::OP_ADD_LOGICAL:
+            ClusterManager::get_instance()->add_logical(request, done);
+            break;
+        case pb::OP_ADD_PHYSICAL:
+            ClusterManager::get_instance()->add_physical(request, done);
             break;
         default:
             DB_FATAL("unsupport request op_type, type: %s", request.op_type());
@@ -220,10 +232,14 @@ void MetaStateMachine::store_heartbeat(::google::protobuf::RpcController* contro
             request->instance_info().address().c_str(), time_cost.get_time(), log_id);
     
     // 判断Instance信息
+    ClusterManager::get_instance()->process_instance_heartbeat_for_store(request->instance_info());
+    ClusterManager::get_instance()->process_instance_param_heartbeat_for_store(request, response);
     // 判断Peer信息
     // 判断Table信息
     // 判断Peer所在Table
     // 更新Leader信息
+    DB_NOTICE("Store: %s heart beat, time cost: %ld, log_id: %lu", 
+            request->instance_info().address().c_str(), time_cost.get_time(), log_id);
 }
 
 

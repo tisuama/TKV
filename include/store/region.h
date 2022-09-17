@@ -195,9 +195,9 @@ public:
     }
 
     void join() {
-        DB_WARNING("region_id: %ld raft node join completely", _region_id);
         _real_writing_cond.wait();
         _disable_write_cond.wait(); 
+        DB_WARNING("region_id: %ld raft node join completely", _region_id);
     }
 
     void shutdown() {

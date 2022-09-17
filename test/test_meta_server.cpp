@@ -56,6 +56,52 @@ TEST(test_mata_server, create_database) {
     std::cout << "send request: " << r << std::endl;
 }
 
+TEST(test_mata_server, create_table) {
+    pb::MetaManagerRequest request;
+    pb::MetaManagerResponse response;
+    request.set_op_type(pb::OP_CREATE_TABLE);
+    auto info = request.mutable_table_info();
+    info->set_table_name("TEST_TABLE");
+    info->set_database_name("TEST_DB");
+    info->set_namespace_name("TEST_NAMESPACE");
+    info->set_resource_tag("LOCAL");
+    
+    auto meta = MetaServerInteract::get_instance();
+    int r = meta->init_internal(meta_bns);
+    std::cout << "meta interact init: " << r << std::endl;
+    r = meta->send_request("meta_manager", request, response);
+    std::cout << "send request: " << r << std::endl;
+}
+
+TEST(test_mata_server, add_logical) {
+    pb::MetaManagerRequest request;
+    pb::MetaManagerResponse response;
+    request.set_op_type(pb::OP_ADD_LOGICAL);
+    auto info = request.mutable_logical_rooms();
+    info->add_logical_rooms("TEST_LOGICAL");
+    
+    auto meta = MetaServerInteract::get_instance();
+    int r = meta->init_internal(meta_bns);
+    std::cout << "meta interact init: " << r << std::endl;
+    r = meta->send_request("meta_manager", request, response);
+    std::cout << "send request: " << r << std::endl;
+}
+
+TEST(test_mata_server, add_physical) {
+    pb::MetaManagerRequest request;
+    pb::MetaManagerResponse response;
+    request.set_op_type(pb::OP_ADD_PHYSICAL);
+    auto info = request.mutable_physical_rooms();
+    info->set_logical_room("TEST_LOGICAL");
+    info->add_physical_rooms("TEST_PHYSICAL");
+    
+    auto meta = MetaServerInteract::get_instance();
+    int r = meta->init_internal(meta_bns);
+    std::cout << "meta interact init: " << r << std::endl;
+    r = meta->send_request("meta_manager", request, response);
+    std::cout << "send request: " << r << std::endl;
+}
+
 TEST(test_mata_server, add_instance) {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
@@ -67,23 +113,6 @@ TEST(test_mata_server, add_instance) {
     info->set_resource_tag("LOCAL");
     info->set_physical_room("LAB511");
     info->set_status(pb::Status::NORMAL);
-    
-    auto meta = MetaServerInteract::get_instance();
-    int r = meta->init_internal(meta_bns);
-    std::cout << "meta interact init: " << r << std::endl;
-    r = meta->send_request("meta_manager", request, response);
-    std::cout << "send request: " << r << std::endl;
-}
-
-TEST(test_mata_server, create_table) {
-    pb::MetaManagerRequest request;
-    pb::MetaManagerResponse response;
-    request.set_op_type(pb::OP_CREATE_TABLE);
-    auto info = request.mutable_table_info();
-    info->set_table_name("TEST_TABLE");
-    info->set_database_name("TEST_DB");
-    info->set_namespace_name("TEST_NAMESPACE");
-    info->set_resource_tag("LOCAL");
     
     auto meta = MetaServerInteract::get_instance();
     int r = meta->init_internal(meta_bns);
@@ -107,9 +136,11 @@ TEST(test_mata_server, create_user) {
     auto meta = MetaServerInteract::get_instance();
     int r = meta->init_internal(meta_bns);
     std::cout << "meta interact init: " << r << std::endl;
-    // r = meta->send_request("meta_manager", request, response);
+    r = meta->send_request("meta_manager", request, response);
     std::cout << "send request: " << r << std::endl;
 }
+
+
 
 int main(int argc, char** argv) {
     google::ParseCommandLineFlags(&argc, &argv, true); 

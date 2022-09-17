@@ -127,6 +127,37 @@ public:
     bool is_shutdown() const {
         return _shutdown;
     }
+    
+    void shutdown_raft() {
+        _shutdown = true;
+        traverse_copy_region_map([](const SmartRegion& region) {
+            region->shutdown();
+        });
+        traverse_copy_region_map([](const SmartRegion& region) {
+            region->join();    
+        });
+        DB_WARNING("Store shutdown, All region shutdown");
+    }
+    
+    void close() {
+        _add_peer_queue.stop();
+        _remove_region_queue.stop();
+        _compact_queue.stop();
+        _transfer_leader_queue.stop();
+        _shutdown = true;
+        _heart_beat_bth.join();
+        _add_peer_queue.join();
+        _remove_region_queue.join();
+        _compact_queue.join();
+        _transfer_leader_queue.join();
+        _split_check_bth.join();
+        _delay_remove_data_bth.join();
+        _flush_bth.join();
+        _snapshot_bth.join();
+        _multi_thread_cond.wait();
+        // close rocksdb
+        _rocksdb->close();
+    }
 
     void set_can_add_peer_for_region(int64_t region_id) {
         SmartRegion region = get_region(region_id);
@@ -148,6 +179,11 @@ public:
 
     void update_schema_info(const pb::SchemaInfo& table, std::map<int64_t, int64_t>* reverser_index_map);
     int drop_region_from_store(int64_t drop_region_id, bool need_delay_drop);
+    
+    // Bthread fn
+    void heart_beat_thread();
+    void send_heart_beat();
+    void process_heart_beat_response(const pb::StoreHBResponse& response);
 
 private:
     void check_region_legal_complete(int64_t region_id);

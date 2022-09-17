@@ -46,6 +46,35 @@ int main(int argc, char** argv) {
     // register sotre service  
     TKV::Store* store = TKV::Store::get_instance();
     std::vector<int64_t> init_region_ids;
-    store->init_before_listen(init_region_ids);
+    int ret = store->init_before_listen(init_region_ids);
+    if (ret < 0) {
+        DB_FATAL("Store instance init before listen fail");
+        return -1;
+    }
+    if (server.AddService(store, brpc::SERVER_DOESNT_OWN_SERVICE)) {
+        DB_FATAL("Fail to AddService");
+        return -1;
+    }
+    if (server.Start(addr, nullptr)) {
+        DB_FATAL("Fail to start server");
+        return -1;
+    }
+    DB_WARNING("Store start rpc success");
+    ret = store->init_after_listen(init_region_ids);
+    if (ret < 0) {
+        DB_FATAL("Store instance init after listen fail");
+        return -1;
+    }
+    while (!brpc::IsAskedToQuit()) {
+        bthread_usleep(1000000L);
+    }
+    DB_WARNING("Store %d received kill signal, exit now", TKV::FLAGS_store_id);
+    store->shutdown_raft();
+    store->close();
+    
+    server.Stop(0);
+    server.Join();
+    DB_WARNING("Store %d exit success", TKV::FLAGS_store_id);
+    return 0;
 }
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

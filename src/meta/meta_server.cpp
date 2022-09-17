@@ -66,7 +66,9 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
     }     
     RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
     DB_DEBUG("meta manager request: %s",  request->ShortDebugString().c_str());
-    if (request->op_type() == pb::OP_ADD_INSTANCE) {
+    if (request->op_type() == pb::OP_ADD_INSTANCE || 
+        request->op_type() == pb::OP_ADD_PHYSICAL || 
+        request->op_type() == pb::OP_ADD_LOGICAL) {
         ClusterManager::get_instance()->process_cluster_info(controller, request, response, done_guard.release());
         return ;
     } else if (request->op_type() == pb::OP_CREATE_USER) {
@@ -82,7 +84,7 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
         SchemaManager::get_instance()->process_schema_info(controller, request, response, done_guard.release());
         return ;
     } else {
-        DB_WARNING("unknow op_type, requrest: %s", request->ShortDebugString().c_str());
+        DB_WARNING("unknow op_type, request: %s", request->ShortDebugString().c_str());
     }
     response->set_errcode(pb::INPUT_PARAM_ERROR);
     response->set_errmsg("invalid op_type");

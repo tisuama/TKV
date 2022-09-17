@@ -29,7 +29,7 @@ void MetaServerClosure::Run() {
         remote_side = butil::endpoint2str(cntl->remote_side()).c_str();
     }
     if (response != nullptr) {
-        DB_NOTICE("response: %s raft_time_cost: %ld, total_time_cost: %ld, remote_side: %ld", 
+        DB_NOTICE("response: %s raft_time_cost: %ld, total_time_cost: %ld, remote_side: %s", 
                 response->ShortDebugString().c_str(), raft_time_cost, total_time_cost, remote_side.c_str());
     }  
     if (done) {
@@ -87,7 +87,7 @@ void CommonStateMachine::process(::google::protobuf::RpcController* controller,
     braft::Task task;
     task.data = &data;
     task.done = closure;
-    // 异步apply
+    // Async apply
     _node.apply(task);
 }
 
@@ -96,7 +96,6 @@ void CommonStateMachine::start_check_migrate() {
 }
 
 void CommonStateMachine::check_migrate() {
-    
     //
 }
 

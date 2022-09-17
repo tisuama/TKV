@@ -108,43 +108,34 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
     int64_t main_table_id = schema_info.table_id();
     schema_info.clear_init_store();
     schema_info.clear_split_keys();
-    DB_WARNING("write schema_info: %s", table_mem.schema_pb.ShortDebugString().c_str());
+    DB_WARNING("write schema_info: %s, init store size: %d", 
+            table_mem.schema_pb.ShortDebugString().c_str(), table_mem.schema_pb.init_store_size());
     // 全局索引和主键索引需要新建region
     //  - 处理有split_key的索引
     //  - 处理没有split_key的索引
     for (int i = 0; i < table_mem.schema_pb.partition_num(); i++) {
-        if (table_mem.schema_pb.engine() != pb::ROCKSDB ||
+        if (table_mem.schema_pb.engine() != pb::ROCKSDB && 
             table_mem.schema_pb.engine() != pb::ROCKSDB_CSTORE) {
             continue;
-        }    
-
-        for (auto& split_key : table_mem.schema_pb.split_keys()) {
-            CHECK(!split_key.has_index_name());  
-            for (auto j = 0; j <= split_key.split_keys_size(); j++) {
-                pb::InitRegion region_request;
-                pb::RegionInfo* region_info = region_request.mutable_region_info();                 
-                region_info->set_region_id(++max_region_id);
-                region_info->set_table_id(main_table_id);
-                region_info->set_main_table_id(main_table_id);
-                region_info->set_table_name(table_mem.schema_pb.table_name());
-                this->construct_region_common(region_info, table_mem.schema_pb.replica_num());
-                region_info->set_partition_id(i);
-                region_info->add_peers(table_mem.schema_pb.init_store(instance_count));
-                region_info->set_leader(table_mem.schema_pb.init_store(instance_count));
-                // 在快照过后才能add_peer
-                region_info->set_can_add_peer(false);
-                region_info->set_partition_num(table_mem.schema_pb.partition_num());
-                if (j) {
-                    region_info->set_start_key(split_key.split_keys(j - 1));
-                }
-                if (j < split_key.split_keys_size()) {
-                    region_info->set_end_key(split_key.split_keys(j));
-                }
-                *(region_request.mutable_schema_info()) = schema_info;
-                region_request.set_snapshot_times(2);
-                init_regions->push_back(region_request);
-                DB_WARNING("create init region request info: %s", region_request.ShortDebugString().c_str());
-            }
+        }  
+        for (int idx = 0; idx < table_mem.schema_pb.init_store_size(); idx++) {
+            pb::InitRegion region_request;
+            pb::RegionInfo* region_info = region_request.mutable_region_info();                 
+            region_info->set_region_id(++max_region_id);
+            region_info->set_table_id(main_table_id);
+            region_info->set_main_table_id(main_table_id);
+            region_info->set_table_name(table_mem.schema_pb.table_name());
+            this->construct_region_common(region_info, table_mem.schema_pb.replica_num());
+            region_info->set_partition_id(i);
+            region_info->add_peers(table_mem.schema_pb.init_store(instance_count));
+            region_info->set_leader(table_mem.schema_pb.init_store(instance_count));
+            // 在快照过后才能add_peer
+            region_info->set_can_add_peer(false);
+            region_info->set_partition_num(table_mem.schema_pb.partition_num());
+            *(region_request.mutable_schema_info()) = schema_info;
+            region_request.set_snapshot_times(2);
+            init_regions->push_back(region_request);
+            DB_WARNING("create init region request info: %s", region_request.ShortDebugString().c_str());
         }
     }
 

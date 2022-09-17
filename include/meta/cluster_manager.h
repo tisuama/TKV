@@ -2,6 +2,7 @@
 #include <bthread/mutex.h>
 #include "meta/meta_server.h"
 #include "meta/meta_state_machine.h"
+#include "proto/meta.pb.h"
 
 namespace TKV {
 DECLARE_string(default_logical_room);
@@ -15,13 +16,20 @@ struct InstanceStatusInfo {
 
 struct Instance {
     std::string     address;
-    int64_t         capacipy;
+    int64_t         capacity;
     int64_t         used_size;
     std::string     resource_tag;
     std::string     physical_room;
     std::string     logical_room;
     std::string     version;
     InstanceStatusInfo instance_state; 
+    
+    int64_t         dml_latency;
+    int64_t         dml_qps;
+    int64_t         raft_total_latency;
+    int64_t         raft_total_qps;
+    int64_t         select_latency;
+    int64_t         select_qps;
 
     Instance() {
         instance_state.time_stamp = butil::gettimeofday_us();
@@ -30,7 +38,7 @@ struct Instance {
 
     Instance(const pb::InstanceInfo& instance_info)
        : address(instance_info.address())
-       , capacipy(instance_info.capacity())
+       , capacity(instance_info.capacity())
        , used_size(instance_info.capacity())
        , resource_tag(instance_info.resource_tag())
        , physical_room(instance_info.physical_room())
@@ -95,6 +103,14 @@ public:
             const std::set<std::string>& exclude_stores,
             const std::string& logical_room,
             std::string& select_instance);
+    void process_instance_heartbeat_for_store(const pb::InstanceInfo& instance_info);
+    void process_instance_param_heartbeat_for_store(const pb::StoreHBRequest* request, 
+            pb::StoreHBResponse* response);
+    int update_instance_info(const pb::InstanceInfo& info);
+    void update_instance(const pb::MetaManagerRequest& request, braft::Closure* done);
+    void update_instance_param(const pb::MetaManagerRequest& request, braft::Closure* done);
+    void add_logical(const pb::MetaManagerRequest& request, braft::Closure* done);
+    void add_physical(const pb::MetaManagerRequest& request, braft::Closure* done);
 
     int load_snapshot();
     int load_instance_snapshot(const std::string& instance_prefix, 
@@ -123,6 +139,16 @@ private:
             _phy_ins_map[FLAGS_default_physical_room] = std::set<std::string>{};
         }
     } 
+
+    std::string construct_logical_key() {
+        return MetaServer::CLUSTER_IDENTIFY + MetaServer::LOGICAL_CLUSTER_IDENTIFY
+                + MetaServer::LOGICAL_KEY;
+    }
+    
+    std::string construct_physical_key(const std::string& logical_key) {
+        return MetaServer::CLUSTER_IDENTIFY + MetaServer::LOGICAL_CLUSTER_IDENTIFY
+                + logical_key;
+    }
 
 private:
     bthread_mutex_t             _phy_mutex;
