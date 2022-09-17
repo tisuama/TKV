@@ -228,9 +228,6 @@ void MetaStateMachine::store_heartbeat(::google::protobuf::RpcController* contro
     response->set_errcode(pb::SUCCESS);
     response->set_errmsg("sucess");
     
-    DB_DEBUG("TKV store %s heart beat, time cost: %ld log_id: %lu",
-            request->instance_info().address().c_str(), time_cost.get_time(), log_id);
-    
     // 判断Instance信息
     ClusterManager::get_instance()->process_instance_heartbeat_for_store(request->instance_info());
     ClusterManager::get_instance()->process_instance_param_heartbeat_for_store(request, response);

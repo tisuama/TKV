@@ -192,6 +192,7 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
 void TableManager::send_create_table_request(const std::string& namespace_name, 
             const std::string& database_name, const std::string& table_name, 
             std::shared_ptr<std::vector<pb::InitRegion>> init_regions) {
+    DB_WARNING("table start send_create_table_request, init_regions size: %ld", init_regions->size());
     uint64_t log_id = butil::fast_rand();
     // 并发10线程发送
     BthreadCond concurrency_cond(-10);

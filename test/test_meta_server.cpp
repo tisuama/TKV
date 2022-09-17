@@ -9,11 +9,13 @@
 #include "meta/meta_server_interact.h"
 #include "proto/meta.pb.h"
 
-using namespace TKV;
+DEFINE_string(cmd, "test_op_op", "cmd type");
 
+using namespace TKV;
 const std::string meta_bns = "127.0.0.1:8010";
-TEST(test_mata_server, no_op) {
-    // meta manager requets 
+
+void test_no_op() {
+    // meta manager rquest 
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_NONE);
@@ -25,7 +27,7 @@ TEST(test_mata_server, no_op) {
     std::cout << "send request: " << r << std::endl;
 }
 
-TEST(test_mata_server, careate_namespace) {
+void add_namespace() {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_CREATE_NAMESPACE);
@@ -40,7 +42,7 @@ TEST(test_mata_server, careate_namespace) {
     std::cout << "send request: " << r << std::endl;
 }
 
-TEST(test_mata_server, create_database) {
+void add_database() {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_CREATE_DATABASE);
@@ -56,24 +58,7 @@ TEST(test_mata_server, create_database) {
     std::cout << "send request: " << r << std::endl;
 }
 
-TEST(test_mata_server, create_table) {
-    pb::MetaManagerRequest request;
-    pb::MetaManagerResponse response;
-    request.set_op_type(pb::OP_CREATE_TABLE);
-    auto info = request.mutable_table_info();
-    info->set_table_name("TEST_TABLE");
-    info->set_database_name("TEST_DB");
-    info->set_namespace_name("TEST_NAMESPACE");
-    info->set_resource_tag("LOCAL");
-    
-    auto meta = MetaServerInteract::get_instance();
-    int r = meta->init_internal(meta_bns);
-    std::cout << "meta interact init: " << r << std::endl;
-    r = meta->send_request("meta_manager", request, response);
-    std::cout << "send request: " << r << std::endl;
-}
-
-TEST(test_mata_server, add_logical) {
+void add_logical() {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_ADD_LOGICAL);
@@ -87,7 +72,7 @@ TEST(test_mata_server, add_logical) {
     std::cout << "send request: " << r << std::endl;
 }
 
-TEST(test_mata_server, add_physical) {
+void add_physical() {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_ADD_PHYSICAL);
@@ -102,7 +87,7 @@ TEST(test_mata_server, add_physical) {
     std::cout << "send request: " << r << std::endl;
 }
 
-TEST(test_mata_server, add_instance) {
+void add_instance() {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_ADD_INSTANCE);
@@ -121,7 +106,7 @@ TEST(test_mata_server, add_instance) {
     std::cout << "send request: " << r << std::endl;
 }
 
-TEST(test_mata_server, create_user) {
+void add_user() {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_CREATE_USER);
@@ -140,13 +125,46 @@ TEST(test_mata_server, create_user) {
     std::cout << "send request: " << r << std::endl;
 }
 
-
+void add_table() {
+    pb::MetaManagerRequest request;
+    pb::MetaManagerResponse response;
+    request.set_op_type(pb::OP_CREATE_TABLE);
+    auto info = request.mutable_table_info();
+    info->set_table_name("TEST_TABLE");
+    info->set_database_name("TEST_DB");
+    info->set_namespace_name("TEST_NAMESPACE");
+    
+    auto meta = MetaServerInteract::get_instance();
+    int r = meta->init_internal(meta_bns);
+    std::cout << "meta interact init: " << r << std::endl;
+    r = meta->send_request("meta_manager", request, response);
+    std::cout << "send request: " << r << std::endl;
+}
 
 int main(int argc, char** argv) {
     google::ParseCommandLineFlags(&argc, &argv, true); 
-	::testing::InitGoogleTest(&argc, argv);
-    ::testing::GTEST_FLAG(filter) = "test_mata_server.*";
-	srand((unsigned)time(NULL));
-	return RUN_ALL_TESTS();
+    if (FLAGS_cmd == "prepare") {
+        add_namespace();
+        add_database();
+        add_logical();
+        add_physical();
+        add_user();
+    } else if (FLAGS_cmd == "add_table") {
+        add_table();
+    } else if (FLAGS_cmd == "add_namespace") {
+        add_namespace();
+    } else if (FLAGS_cmd == "add_database") {
+        add_database();
+    } else if (FLAGS_cmd == "add_user") { 
+        add_user();
+    } else if (FLAGS_cmd == "add_logical") {
+        add_logical();
+    } else if (FLAGS_cmd == "add_physical") {
+        add_physical();
+    } else if (FLAGS_cmd == "add_user") {
+        add_user();
+    } else {
+        assert(0);
+    }
 }
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

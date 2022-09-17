@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
         fprintf(stderr, "init store log failed, exit now");
         return -1;
     }
-    DB_WARNING("TKV init log success");
+    DB_WARNING("TKVStore %d init log success", TKV::FLAGS_store_id);
     // init something
     TKV::register_myraft_extension();
 
@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     std::vector<int64_t> init_region_ids;
     int ret = store->init_before_listen(init_region_ids);
     if (ret < 0) {
-        DB_FATAL("Store instance init before listen fail");
+        DB_FATAL("Store %d instance init before listen fail", TKV::FLAGS_store_id);
         return -1;
     }
     if (server.AddService(store, brpc::SERVER_DOESNT_OWN_SERVICE)) {
@@ -59,10 +59,10 @@ int main(int argc, char** argv) {
         DB_FATAL("Fail to start server");
         return -1;
     }
-    DB_WARNING("Store start rpc success");
+    DB_WARNING("Store %d start rpc success", TKV::FLAGS_store_id);
     ret = store->init_after_listen(init_region_ids);
     if (ret < 0) {
-        DB_FATAL("Store instance init after listen fail");
+        DB_FATAL("Store %d instance init after listen fail", TKV::FLAGS_store_id);
         return -1;
     }
     while (!brpc::IsAskedToQuit()) {

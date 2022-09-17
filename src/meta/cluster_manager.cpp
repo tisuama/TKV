@@ -56,7 +56,7 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
     std::string physical_room = ins_info.physical_room();
 
     // 检查physical_room -> logical_room
-    if (_phy_log_map.find(physical_room) == _phy_log_map.end()) {
+    if (_phy_log_map.find(physical_room) != _phy_log_map.end()) {
         ins_info.set_logical_room(_phy_log_map[physical_room]);
     } else {
         DB_FATAL("get logical room for physical_room: %s failed", physical_room.c_str());
