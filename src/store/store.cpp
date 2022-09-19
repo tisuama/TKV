@@ -173,7 +173,7 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     }
     if (!_shutdown) {
         DB_WARNING("Store has been shutdown");
-        response->set_errcode(pb::INPUT_PARAM_ERROR);
+        response->set_errcode(pb::INTERNAL_ERROR);
         response->set_errmsg("store has shutdown");
         return ;
     }

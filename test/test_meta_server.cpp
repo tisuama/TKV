@@ -15,7 +15,7 @@ using namespace TKV;
 const std::string meta_bns = "127.0.0.1:8010";
 
 void test_no_op() {
-    // meta manager rquest 
+    // meta manager request 
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_NONE);

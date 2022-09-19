@@ -38,8 +38,8 @@ void MetaStateMachine::on_apply(braft::Iterator& iter) {
         if (done && static_cast<MetaServerClosure*>(done)->response) {
             static_cast<MetaServerClosure*>(done)->response->set_op_type(request.op_type());
         }
-        DB_DEBUG("on_apply, term: %ld, index: %ld, request op_type: %s", 
-                iter.term(), iter.index(), pb::OpType_Name(request.op_type()).c_str());
+        DB_DEBUG("on_apply, term: %ld, index: %ld, request op_type: %s, done: %p", 
+                iter.term(), iter.index(), pb::OpType_Name(request.op_type()).c_str(), done);
         switch (request.op_type()) {
         case pb::OP_ADD_INSTANCE:
             ClusterManager::get_instance()->add_instance(request, done);

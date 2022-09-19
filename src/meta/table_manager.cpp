@@ -108,8 +108,8 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
     int64_t main_table_id = schema_info.table_id();
     schema_info.clear_init_store();
     schema_info.clear_split_keys();
-    DB_WARNING("write schema_info: %s, init store size: %d", 
-            table_mem.schema_pb.ShortDebugString().c_str(), table_mem.schema_pb.init_store_size());
+    DB_WARNING("write schema_info: %s, init store size: %d, done: %p", 
+            table_mem.schema_pb.ShortDebugString().c_str(), table_mem.schema_pb.init_store_size(), done);
     // 全局索引和主键索引需要新建region
     //  - 处理有split_key的索引
     //  - 处理没有split_key的索引
@@ -172,11 +172,11 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
     std::string nname = table_mem.schema_pb.namespace_name();
     std::string db_name = table_mem.schema_pb.database_name();        
     std::string table_name = table_mem.schema_pb.table_name();
-    if (done && table_mem.schema_pb.engine() == pb::ROCKSDB ||
-        table_mem.schema_pb.engine() == pb::ROCKSDB_CSTORE) {
+    if (done && (table_mem.schema_pb.engine() == pb::ROCKSDB ||
+        table_mem.schema_pb.engine() == pb::ROCKSDB_CSTORE)) {
 
         auto create_table_fn = [this, nname, db_name, table_name, init_regions, table_id] () {
-            send_create_table_request(nname, db_name, table_name, init_regions); 
+            this->send_create_table_request(nname, db_name, table_name, init_regions); 
         };
         Bthread bth;
         bth.run(create_table_fn);
@@ -192,15 +192,15 @@ int TableManager::write_schema_for_not_level(TableMem& table_mem, braft::Closure
 void TableManager::send_create_table_request(const std::string& namespace_name, 
             const std::string& database_name, const std::string& table_name, 
             std::shared_ptr<std::vector<pb::InitRegion>> init_regions) {
-    DB_WARNING("table start send_create_table_request, init_regions size: %ld", init_regions->size());
     uint64_t log_id = butil::fast_rand();
     // 并发10线程发送
     BthreadCond concurrency_cond(-10);
     std::string full_table_name = namespace_name + "." + database_name + "." + table_name;
-    bool success = false;
+    bool success = true;
     DB_WARNING("send create table to store, full_table_name: %s, request size: %d", 
             full_table_name.c_str(), init_regions->size());
     for (auto& init_region_request: *init_regions) {
+        DB_WARNING("send init region info: %s", init_region_request.ShortDebugString().c_str());
         auto send_init_region_fn = [&init_region_request, &success, &concurrency_cond, 
              log_id, full_table_name] () {
             std::shared_ptr<BthreadCond> auto_decrease(&concurrency_cond, 
