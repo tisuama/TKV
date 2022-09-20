@@ -171,7 +171,7 @@ void Store::init_region(::google::protobuf::RpcController* controller,
         cntl->SetFailed(EINVAL, "record encoder not set");
         return ;
     }
-    if (!_shutdown) {
+    if (_shutdown) {
         DB_WARNING("Store has been shutdown");
         response->set_errcode(pb::INTERNAL_ERROR);
         response->set_errmsg("store has shutdown");
@@ -429,6 +429,29 @@ void Store::send_heart_beat() {
 void Store::process_heart_beat_response(const pb::StoreHBResponse& response) {
     // TODO:
     DB_WARNING("process_heart_beat_response not implement now");
+}
+
+void Store::query(::google::protobuf::RpcController* controller,
+                  const ::TKV::pb::StoreReq* request, 
+                  ::TKV::pb::StoreRes* response,
+                  ::google::protobuf::Closure* done) {
+    brpc::ClosureGuard doen_gurad(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    uint64_t log_id = 0;
+    const auto& remote_side_tmp = butil::endpoint2str(cntl->remote_side());
+    const char* remote_side = remote_side_tmp.c_str();
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    SmartRegion region = get_region(request->region_id());
+    if (region == nullptr || region->removed()) {
+        response->set_errcode(pb::REGION_NOT_EXIST);
+        response->set_errmsg("region not exist in store");
+        DB_WARNING("region_id: %ld not exist in store, log_id: %lu, remote_side: %s",
+                request->region_id(), log_id, remote_side);
+        return;
+    }
+    region->query(controller, request, response, doen_gurad.release());
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

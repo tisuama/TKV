@@ -41,7 +41,7 @@ public:
 
     int init_after_listen(const std::vector<std::int64_t>& init_region_ids);
 
-    // Fn called by meta_server
+    // rpc function
     virtual void init_region(::google::protobuf::RpcController* controller,
                          const ::TKV::pb::InitRegion* request,
                          ::TKV::pb::StoreRes* response,
@@ -50,6 +50,11 @@ public:
                          const ::TKV::pb::GetAppliedIndex* request,
                          ::TKV::pb::StoreRes* response,
                          ::google::protobuf::Closure* done) override;
+    virtual void query(::google::protobuf::RpcController* controller,
+                        const ::TKV::pb::StoreReq* request, 
+                        ::TKV::pb::StoreRes* response,
+                        ::google::protobuf::Closure* done) override;
+    
     
     // construct heartbeat
     void construct_heart_beat_request(pb::StoreHBRequest& request);

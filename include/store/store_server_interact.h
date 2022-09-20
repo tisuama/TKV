@@ -76,7 +76,8 @@ public:
             return -1;
         }
         if (response.errcode() != pb::SUCCESS) {
-            DB_WARNING("Send store address fail, log_id: %lu, instance: %s, response: %s, request: %s",
+            DB_WARNING("Send store address fail, errcode: %d, log_id: %lu, instance: %s, response: %s, request: %s",
+                    response.errcode(),
                     cntl.log_id(), _store_address.c_str(), 
                     response.ShortDebugString().c_str(),
                     request.ShortDebugString().c_str());

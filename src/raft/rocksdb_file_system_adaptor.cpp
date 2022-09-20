@@ -207,10 +207,11 @@ PosixFileAdaptor::~PosixFileAdaptor() {
 int PosixFileAdaptor::open(int flag) {
     flag &= (~O_CLOEXEC);
     _fd = ::open(_path.c_str(), flag, 0644);
+    DB_WARNING("PosixFileAdaptor read path: %s, _fd: %d", _path.c_str(), _fd);
     if (_fd <= 0) {
         return -1;
     }
-    return _fd;
+    return 0;
 }
 
 ssize_t PosixFileAdaptor::write(const butil::IOBuf& data, off_t offset) {

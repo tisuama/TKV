@@ -26,10 +26,29 @@ void test_no_op() {
     info->set_version(1);
     info->add_peers("127.0.0.1:8110");
     info->set_leader("127.0.0.1:8110");
-
-
+    info->set_can_add_peer(false);
+    info->set_conf_version(1);
+    info->set_main_table_id(1);
+    info->set_partition_id(0);
+    info->set_partition_num(1);
+    auto schema = init_region_req.mutable_schema_info();
+    schema->set_table_id(1);
+    schema->set_table_name("TEST_TABLE");
+    schema->set_database_name("TEST_DB");
+    schema->set_database_id(1);
+    schema->set_namespace_name("TEST_NAMESPACE");
+    schema->set_namespace_id(1);
+    schema->set_region_size(104857600);
+    schema->set_replica_num(3);
+    schema->set_partition_num(1);
+    schema->set_resource_tag("");
+    schema->set_engine(pb::ROCKSDB);
+    schema->set_version(1);
+    init_region_req.set_snapshot_times(2);
+    
+    
     StoreInteract store(store_addr.c_str());
-    std::cout << "StoreInteract" << std::endl;
+    std::cout << "StoreInteract, request info: " << init_region_req.ShortDebugString() << std::endl;
     int r = store.send_request(0, "init_region", init_region_req, store_res);
     std::cout << "send result: " << r << std::endl;
 }

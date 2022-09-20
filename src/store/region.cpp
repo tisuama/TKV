@@ -476,5 +476,13 @@ bool Region::check_region_legal_complete() {
         }
     } while (1);
 }
+
+void Region::query(::google::protobuf::RpcController* controller,
+                   const ::TKV::pb::StoreReq* request, 
+                   ::TKV::pb::StoreRes* response,
+                   ::google::protobuf::Closure* done) {
+    // TODO: region query function
+}
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

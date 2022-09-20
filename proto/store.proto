@@ -68,5 +68,6 @@ service StoreService {
     // 1) 获取region的applied_index，用来分裂后优化选择transfer leader对象
     // 2) 获取region的snapshot数据大小，用作校验
     rpc get_applied_index(GetAppliedIndex) returns (StoreRes);
+    rpc query(StoreReq) returns (StoreRes);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

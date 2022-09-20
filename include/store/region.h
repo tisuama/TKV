@@ -197,7 +197,7 @@ public:
     void join() {
         _real_writing_cond.wait();
         _disable_write_cond.wait(); 
-        DB_WARNING("region_id: %ld raft node join completely", _region_id);
+        DB_WARNING("region_id: %ld raft node join finish", _region_id);
     }
 
     void shutdown() {
@@ -244,6 +244,11 @@ public:
     virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) override;
     virtual int  on_snapshot_load(braft::SnapshotReader* reader) override;
 
+    // rpc function called by Store
+    void query(::google::protobuf::RpcController* controller,
+               const ::TKV::pb::StoreReq* request, 
+               ::TKV::pb::StoreRes* response,
+               ::google::protobuf::Closure* done);
 private:
     void on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
             std::map<int64_t, std::string>& prepared_log_entrys);
