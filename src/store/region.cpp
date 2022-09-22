@@ -481,8 +481,81 @@ void Region::query(::google::protobuf::RpcController* controller,
                    const ::TKV::pb::StoreReq* request, 
                    ::TKV::pb::StoreRes* response,
                    ::google::protobuf::Closure* done) {
-    // TODO: region query function
+    brpc::ClosureGuard done_gurad(done);
+    brpc::Controller* cntl = (brpc::Controller*)controller;
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    const auto& remote_side_tmp = butil::endpoint2str(cntl->remote_side());
+    const char* remote_side = remote_side_tmp.c_str();
+    if (!is_leader()) {
+        // 支持非一致性读
+        if (!request->select_without_leader() || _shutdown || !_init_success
+                || (is_learner() && !learner_ready_for_read())) {
+            response->set_errcode(pb::NOT_LEADER);
+            response->set_errmsg("Not Leader");
+            DB_WARNING("region_id: %ld not leader, leader: %s, log_id: %lu, remote_side: %s",
+                    _region_id, butil::endpoint2str(get_leader()).c_str(), log_id, remote_side);
+            return ;
+        }
+    }
+    // valid region version
+    if (!valid_version(request, response)) {
+        DB_WARNING("region_id: %ld version too old, log_id: %lu, request version: %ld, region version: %ld"  
+                " op_type: %s, remote_side: %s", _region_id, log_id, request->region_version(), get_version(), 
+                pb::OpType_Name(request->op_type()).c_str(), remote_side);
+        return ;
+    }
+    // 启动时，或者Foller落后太多，需要读Leader
+    if (request->op_type() == pb::OP_SELECT && request->region_version() > get_version()) {
+        response->set_errcode(pb::NOT_LEADER); 
+        response->set_leader(butil::endpoint2str(get_leader()).c_str());
+        response->set_errmsg("Not Leader");
+        DB_WARNING("region_id: %ld not leader, request version: %ld, region version: %ld, log_id: %lu, remote_side: %s",
+                _region_id, request->region_version(), get_version(), log_id, butil::endpoint2str(get_leader()).c_str());
+        return ;
+    }
+    // TODO: region query
 }
 
+bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) {
+    if (request->region_version() < get_version()) {
+        response->Clear();
+        response->set_errcode(pb::VERSION_OLD);
+        response->set_errmsg("Region version too old");
+
+        std::string leader_str = butil::endpoint2str(get_leader()).c_str();
+        response->set_leader(leader_str);
+        auto region = response->add_regions();
+        this->copy_region(region);
+        region->set_leader(leader_str);
+        // Case1: mrege
+        if (!region->start_key().empty() && region->start_key() == region->end_key()) {
+            // start_key == end_key, region发生merge
+            response->set_is_merge(true);
+            if (_merge_region_info.start_key() != region->start_key()) {
+                DB_FATAL("region_id: %ld merge region: %ld start key not equal", 
+                        _region_id, _merge_region_info.region_id());
+            } else {
+                response->add_regions()->CopyFrom(_merge_region_info);
+                DB_WARNING("region_id: %d merge region info: %s",
+                        _region_id, _merge_region_info.ShortDebugString().c_str());
+            }
+        } else {  // Case2: split
+            response->set_is_merge(false);
+            for (auto& r: _new_region_infos) {
+                if (r.region_id() != 0 && r.version() != 0) {
+                    response->add_regions()->CopyFrom(r);
+                    DB_WARNING("region_id: %ld new region: %ld", _region_id, r.region_id());
+                } else {
+                    DB_FATAL("region_id: %ld, new region info: %s", _region_id, r.ShortDebugString().c_str());
+                }
+            }
+        }
+        return false;
+    }
+    return true;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

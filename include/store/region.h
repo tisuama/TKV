@@ -233,6 +233,10 @@ public:
         _region_control.reset_region_status(); 
     }
 
+    bool learner_ready_for_read() const {
+        return _learner_ready_for_read;
+    }
+
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
@@ -256,6 +260,8 @@ private:
     int check_learner_snapshot();
     int check_follower_snapshot(const std::string& peer);
     void set_region_with_update_range(const pb::RegionInfo& region_info);
+    bool valid_version(const pb::StoreReq* request, pb::StoreRes* response);
+
 
 private:
     RocksWrapper*           _rocksdb;
