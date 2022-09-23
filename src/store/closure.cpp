@@ -11,5 +11,34 @@ void CovertToSyncClosure::Run() {
     sync_sign.decrease_signal();
     delete this;
 }
+
+void DMLClosure::Run() {
+    int64_t region_id = 0;
+    if (region = nullptr) {
+        region_id = region->get_region_id();
+    }
+    if (!status().ok()) {
+        butil::EndPoint leader;
+        if (region != nullptr) {
+            leader = region->get_leader();
+        }
+        response->set_errcode(pb::NOT_LEADER);
+        response->set_leader(butil::endpoint2str(leader).c_str());
+        response->set_errmsg("Leader transfer");
+        DB_WARNING("region_id: %ld, status: %s, leader: %s, log_id: %lu, remote_side: %s",
+                region_id, status().error_cstr(), butil::endpoint2str(leader).c_str(), 
+                log_id, remote_side.c_str());
+    } 
+    
+    if (is_sync) {
+        cond->decrease_signal();
+    }
+    if (done) {
+        done->Run();
+    }
+    int64_t raft_cost = cost.get_time();
+    delete this;
+
+}
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

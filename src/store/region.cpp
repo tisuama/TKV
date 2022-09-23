@@ -4,6 +4,7 @@
 #include "common/concurrency.h"
 #include "store/store.h"
 #include "store/rpc_sender.h"
+#include "proto/optype.pb.h"
 
 #include <butil/file_util.h>
 #include <butil/files/file_path.h>
@@ -516,7 +517,17 @@ void Region::query(::google::protobuf::RpcController* controller,
                 _region_id, request->region_version(), get_version(), log_id, butil::endpoint2str(get_leader()).c_str());
         return ;
     }
-    // TODO: region query
+    
+    switch(request->op_type()) {
+        case pb::OP_NONE: 
+            if (request->op_type() == pb::OP_NONE) {
+                // TODO: region is splitting                                              
+                 
+            }
+        default:
+            break;
+    }
+    return ; 
 }
 
 bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) {
@@ -557,5 +568,8 @@ bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) 
     }
     return true;
 }
+
+void Region::apply_request(const pb::StoreReq* request, google::protobuf::Closure* done) {
+} 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

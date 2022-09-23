@@ -256,11 +256,18 @@ public:
 private:
     void on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
             std::map<int64_t, std::string>& prepared_log_entrys);
+
     int ingest_snapshot_sst(const std::string& dir);
+
     int check_learner_snapshot();
+
     int check_follower_snapshot(const std::string& peer);
+
     void set_region_with_update_range(const pb::RegionInfo& region_info);
+
     bool valid_version(const pb::StoreReq* request, pb::StoreRes* response);
+    
+    void apply_request(const pb::StoreReq* request, google::protobuf::Closure* done); 
 
 
 private:
