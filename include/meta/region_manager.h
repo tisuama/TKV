@@ -55,6 +55,13 @@ public:
         return max_region_id_key;
     }
 
+    std::string construct_region_key(int64_t region_id) {
+        std::string region_key = MetaServer::SCHEMA_IDENTIFY + 
+            MetaServer::REGION_SCHEMA_IDENTIFY;
+        region_key.append((char*)region_id, sizeof(int64_t));
+        return region_key;
+    }
+
     void set_region_state(int64_t region_id, const RegionStateInfo& region_state) {
         _region_state_map.set(region_id, region_state);
     }  
@@ -62,11 +69,51 @@ public:
     SmartRegionInfo get_region_info(int64_t region_id) {
         return _region_info_map.get(region_id);
     }
+    
+    void set_region_leader(int64_t region_id, const std::string& new_leader) {
+        SmartRegionInfo region = _region_info_map.get(region_id);
+        if (region) {
+            auto new_region = std::make_shared<pb::RegionInfo>(*region);
+            new_region->set_leader(new_leader);
+            _region_info_map.set(region_id, new_region);
+        }
+    }
+
+    void set_region_mem_info(int64_t region_id, int64_t log_index, 
+            int64_t used_size, int64_t num_table_lines) {
+        SmartRegionInfo region = _region_info_map.get(region_id);
+        if (region) {
+            region->set_log_index(log_index);
+            region->set_used_size(used_size);
+            region->set_num_table_lines(num_table_lines);
+        }
+    }
 
     void clear();
     
     int load_region_snapshot(const std::string& value);
+
     void set_region_info(const pb::RegionInfo& region_pb);
+
+    void update_leader_status(const pb::StoreHBRequest* request, int64_t ts);
+    
+    void leader_heartbeat_for_region(const pb::StoreHBRequest* 
+            request, pb::StoreHBResponse* response);
+    
+    void check_whether_update_region(int64_t region_id, bool has_peer_changed, 
+            const pb::LeaderHB& leader_hb, const SmartRegionInfo& pre_region);
+
+    void check_peer_count(int64_t region_id, 
+            const pb::LeaderHB& leader_hb,
+            std::unordered_map<int64_t, int64_t>& table_replica_nums,
+            std::unordered_map<int64_t, std::string>& table_resource_tags,
+            std::unordered_map<int64_t, std::unordered_map<std::string, int64_t>>& table_replica_dists,
+            pb::StoreHBResponse* response);
+
+    // Raft called
+    void update_region(const pb::MetaManagerRequest& request, 
+            const int64_t apply_index, 
+            braft::Closure* done);
 
 
 private:
@@ -103,7 +150,7 @@ private:
     // std::unordered_map<std::string, std::unordered_map<std::string, int64_t>> _ins_pk_leader_count;
     
     // region_id -> logical room
-    // 处理store心跳发现大户不均，标记需要迁移的region_id及候选store需要在logical_room
+    // 处理store心跳发现大部不均，标记需要迁移的region_id及候选store需要在logical_room
     // check_peer_count发现region_id在map里，直接按照大户的维度删除peer数量最多的candidate，
     // 否则按照table的维度删除peer
     std::unordered_map<int64_t, std::string> _remove_region_peer_on_pk_prefix;

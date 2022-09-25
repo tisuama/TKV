@@ -256,7 +256,6 @@ int TableManager::load_table_snapshot(const std::string& value) {
     }
     // 暂时不支持partition
     CHECK(!table_pb.has_partition_info());
-    // No Field/Index    
 
     if (table_pb.deleted()) {
         _table_tombstone_map[table_pb.table_id()] = table_mem;
@@ -353,6 +352,42 @@ int TableManager::check_startkey_region_map() {
         DB_WARNING("table_id: %ld check start key finish", table_id);
     }
     return 0;
+}
+
+void TableManager::update_start_key_region_id_map(int64_t table_id, 
+        std::map<int64_t, std::string>& min_start_key,
+        std::map<int64_t, std::string>& max_end_key, 
+        std::map<int64_t, std::map<std::string, int64_t>>& key_id_map) {
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    if (_table_info_map.find(table_id) == _table_info_map.end()) {
+        DB_WARNING("table_id: %ld not exist, exit now");
+        return ;
+    }
+    auto& start_key_region_map = _table_info_map[table_id].skey_to_region_map;
+    // key_id_map: partition_id => (start_key => region_id)
+    for (auto& key_id: key_id_map) {
+        int64_t partition_id = key_id.first;
+        auto max_iter = max_end_key.find(partition_id); 
+        auto min_iter = min_start_key.find(partition_id);
+        if (max_iter == max_end_key.end() ||
+                min_iter == min_start_key.end()) {
+            DB_WARNING("table_id: %ld has unknow partition", table_id);
+        } else {
+            partition_update_start_key(table_id, min_iter->second, 
+                    max_iter->second, key_id.second, start_key_region_map[partition_id]);
+        }
+    }
+}
+
+void TableManager::partition_update_start_key(int64_t table_id, std::string& min_start_key, 
+        std::string& max_end_key,
+        std::map<std::string, int64_t>& key_id_map,
+        std::map<std::string, RegionStatus>& start_key_region_status) {
+    DB_FATAL("Not implement now");
+}
+
+void TableManager::add_new_region(const pb::RegionInfo& leader_info) {
+    DB_FATAL("Not implement now");
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

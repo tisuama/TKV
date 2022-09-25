@@ -267,8 +267,10 @@ private:
 
     bool valid_version(const pb::StoreReq* request, pb::StoreRes* response);
     
-    void apply_request(const pb::StoreReq* request, google::protobuf::Closure* done); 
+    void apply(const pb::StoreReq* request, pb::StoreRes* response, 
+            brpc::Controller* cntl, google::protobuf::Closure* done); 
 
+    void do_apply(int64_t term, int64_t index, const pb::StoreReq& request, braft::Closure* done);
 
 private:
     RocksWrapper*           _rocksdb;
@@ -313,7 +315,6 @@ private:
     braft::Node             _node;
     std::atomic<bool>       _is_leader;
     
-    int64_t                 _braft_apply_index = 0;
     // on_apply的时候更新，可以用来判断快照
     int64_t                 _applied_index = 0;
     // _applied_index

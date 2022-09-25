@@ -25,9 +25,8 @@ void DMLClosure::Run() {
         response->set_errcode(pb::NOT_LEADER);
         response->set_leader(butil::endpoint2str(leader).c_str());
         response->set_errmsg("Leader transfer");
-        DB_WARNING("region_id: %ld, status: %s, leader: %s, log_id: %lu, remote_side: %s",
-                region_id, status().error_cstr(), butil::endpoint2str(leader).c_str(), 
-                log_id, remote_side.c_str());
+        DB_WARNING("region_id: %ld, status: %s, leader: %s, log_id: %lu",
+                region_id, status().error_cstr(), butil::endpoint2str(leader).c_str(), log_id);
     } 
     
     if (is_sync) {
@@ -36,7 +35,6 @@ void DMLClosure::Run() {
     if (done) {
         done->Run();
     }
-    int64_t raft_cost = cost.get_time();
     delete this;
 
 }

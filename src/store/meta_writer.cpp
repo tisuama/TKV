@@ -379,5 +379,19 @@ int MetaWriter::update_region_info(const pb::RegionInfo& region_info) {
             region_id, region_info.ShortDebugString().c_str());
     return 0;
 }
+
+int MetaWriter::update_apply_index(int64_t region_id, int64_t applied_index, int64_t data_index) {
+    auto s = _rocksdb->put(MetaWriter::write_options, _meta_cf,
+            rocksdb::Slice(applied_index_key(region_id)),
+            rocksdb::Slice(encode_applied_index(applied_index, data_index)));
+    if (!s.ok()) {
+        DB_FATAL("region_id: %ld write applied_index failed, err_msg: %s",
+                region_id, s.ToString().c_str());
+        return -1;
+    }
+    DB_FATAL("region_id: %ld write applied_index: %ld success",
+            region_id, applied_index);
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

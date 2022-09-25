@@ -34,7 +34,11 @@ public:
                             const pb::MetaManagerRequest* request, 
                             pb::MetaManagerResponse* response, 
                             google::protobuf::Closure* done);
+
     int load_snapshot();
+
+    void process_leader_heartbeat_for_store(const pb::StoreHBRequest* request,
+            pb::StoreHBResponse* response, uint64_t log_id);
         
 private:
 	SchemaManager() {};

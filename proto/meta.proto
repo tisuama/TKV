@@ -34,7 +34,7 @@ message PeerStateInfo {
     optional string peer_id = 1;
     optional PeerStatus peer_status = 2;
     optional int64 table_id = 3;
-    optional uint32 timestamp = 4;
+    optional int64 timestamp = 4;
     optional int64 region_id = 5;
     optional bool is_learner = 6;
 };
@@ -187,9 +187,9 @@ message LearnerHB {
 
 message StoreHBRequest {
     required InstanceInfo instance_info = 1;
-    repeated SchemaHB schema_info = 2;
+    repeated SchemaHB schema_infos = 2;
     repeated LeaderHB leader_regions = 3;
-    repeated PeerHB peer_info = 4;
+    repeated PeerHB peer_infos = 4;
     optional bool need_leader_balance = 5;
     optional bool need_peer_balance = 6;
     repeated LearnerHB learner_regions = 7;
@@ -345,15 +345,13 @@ message MetaManagerRequest {
     optional PhysicalRoom            physical_rooms  = 8;// 新增、删除物理机房
     optional InstanceInfo            instance        = 9;// 新增、删除实例
     optional MovePhysicalRequest     move_request    = 10;// 转移逻辑机房
-    optional RegionInfo              region_info     = 11;// 新增、删除region
     repeated int64                   drop_region_ids = 12;// 删除的reion集合
     optional RegionSplitRequest      region_split    = 13;// region 分裂
     optional RestoreRegionRequest    restore_region  = 14;// 恢复误删除的region
     repeated string                  resource_tag    = 15;// resource_tag 的操作
     optional RegionMergeRequest      region_merge    = 16;// region 合并
     optional bool                    need_merge      = 17;
-    // region_info & region_infos 不同在哪里
-    optional RegionInfo              region_infos    = 18;
+    repeated RegionInfo              region_infos    = 18;// 和region_info不能同时使用
     optional bool                    add_delete_region = 19;// 添加被删除的region     
     optional InstanceParam           instance_params = 20;
     optional RecoverOpt              recover_opt     = 21;

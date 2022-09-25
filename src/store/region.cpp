@@ -5,6 +5,7 @@
 #include "store/store.h"
 #include "store/rpc_sender.h"
 #include "proto/optype.pb.h"
+#include "store/closure.h"
 
 #include <butil/file_util.h>
 #include <butil/files/file_path.h>
@@ -50,7 +51,7 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
     
     if (need_peer_balance || is_merged()
             && _report_peer_info) {
-        pb::PeerHB* peer_info = request.add_peer_info(); 
+        pb::PeerHB* peer_info = request.add_peer_infos(); 
         peer_info->set_table_id(copy_region_info.table_id());
         peer_info->set_region_id(_region_id);
         peer_info->set_log_index(_applied_index);
@@ -86,6 +87,35 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
 }
 
 void Region::on_apply(braft::Iterator& iter) {
+    for (; iter.valid(); iter.next()) {
+        braft::Closure* done =  iter.done();
+        brpc::ClosureGuard done_gurad(done);
+        butil::IOBuf data = iter.data();
+        butil::IOBufAsZeroCopyInputStream wrapper(data);
+        pb::StoreReq* request = nullptr;
+        if (!request->ParseFromZeroCopyStream(&wrapper)) {
+            DB_FATAL("Parse failed, region_id: %ld", _region_id);
+            if (done != nullptr) {
+                ((DMLClosure*)done)->response->set_errcode(pb::PARSE_FROM_PB_FAIL);
+                ((DMLClosure*)done)->response->set_errmsg("parse failed");
+                braft::run_closure_in_bthread(done_gurad.release());
+            }
+            continue;
+        }
+
+        // 重置计时器
+        reset_timecost(); 
+        int64_t term = iter.term();
+        int64_t index = iter.index();
+        // 分裂情况下， region version为0 => 异步逻辑 
+        // OP_ADD_VERSION_FOR_SPLIT_REGION以及分裂结束 => 同步逻辑
+        // verion为0时，on_leader_start一定会提交一条OP_CLEAR_APPLYING_TXN => 同步逻辑
+        
+        do_apply(term, index, *request, done);
+        if (done) {
+            done->Run();
+        } 
+    }
 } 
 
 int Region::init(bool new_region, int32_t snapshot_times) {
@@ -520,10 +550,8 @@ void Region::query(::google::protobuf::RpcController* controller,
     
     switch(request->op_type()) {
         case pb::OP_NONE: 
-            if (request->op_type() == pb::OP_NONE) {
-                // TODO: region is splitting                                              
-                 
-            }
+            apply(request, response, cntl, done_gurad.release());
+            break;
         default:
             break;
     }
@@ -569,7 +597,58 @@ bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) 
     return true;
 }
 
-void Region::apply_request(const pb::StoreReq* request, google::protobuf::Closure* done) {
+void Region::apply(const pb::StoreReq* request, pb::StoreRes* response, 
+        brpc::Controller* cntl, google::protobuf::Closure* done) {
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    butil::IOBuf data;
+    butil::IOBufAsZeroCopyOutputStream wrapper(&data);
+    if (!request->SerializeToZeroCopyStream(&wrapper)) {
+        cntl->SetFailed(brpc::EREQUEST, "Fail to serialize request");
+        return ;
+    }
+    DMLClosure* c = new DMLClosure;
+    c->cost.reset();
+    c->op_type = request->op_type();
+    c->log_id = log_id;
+    c->response = response;
+    c->region = this;
+
+    braft::Task task;
+    task.data = &data;
+    task.done = c;
+    _node.apply(task);
 } 
+
+void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, braft::Closure* done) {
+    if (index <= _applied_index) {
+        DB_WARNING("region_id: %ld, log_index: %ld, applied_index: %ld has been exexuted", 
+                _region_id, index, _applied_index);
+        return ;
+    }
+    _region_info.set_log_index(index);
+    _applied_index = index;
+    pb::StoreRes res;
+    switch(request.op_type()) {
+        case pb::OP_NONE:
+            _meta_writer->update_apply_index(_region_id, _applied_index, _data_index);
+            if (done) {
+                ((DMLClosure*)done)->response->set_errcode(pb::SUCCESS);
+            }
+            DB_NOTICE("region_id: %ld OP_NONE sucess, applied_index: %ld, term: %ld",
+                    _region_id, _applied_index,  term);
+            break;
+        default:
+            _meta_writer->update_apply_index(_region_id, _applied_index, _data_index);
+            DB_NOTICE("region_id: %ld OP_TYPE: %d ERROR, not support", _region_id, request.op_type());
+            if (done) {
+                ((DMLClosure*)done)->response->set_errcode(pb::UNSUPPORT_REQ_TYPE);
+                ((DMLClosure*)done)->response->set_errmsg("unsupport request type");
+            }
+            break;
+    }
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

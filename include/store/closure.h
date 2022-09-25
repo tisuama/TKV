@@ -24,7 +24,6 @@ public:
     google::protobuf::Closure* done = nullptr;
     Region* region = nullptr;
     TimeCost cost;
-    std::string remote_side;
     BthreadCond* cond;
 
     bool is_sync = false;

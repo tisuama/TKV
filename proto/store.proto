@@ -10,6 +10,12 @@ message RegionLeader {
     required string leader = 2;
 };
 
+message RemoveRegion {
+    required int64 region_id = 1;
+    optional bool  force = 2;
+    optional bool  need_delay_drop = 3;
+};
+
 message RegionRaftStats {
     optional int64 applied_index = 1;
     optional uint64 snapshot_data_size = 2;

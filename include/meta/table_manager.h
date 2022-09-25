@@ -137,16 +137,63 @@ public:
     }
 
     int load_table_snapshot(const std::string& value);
+
     int add_startkey_region_map(const pb::RegionInfo& region_pb);
+
     int check_startkey_region_map();
+
+    void get_table_info(const std::set<int64_t> table_ids,
+            std::unordered_map<int64_t, int64_t>& table_replica_nums,
+            std::unordered_map<int64_t, std::string>& table_resource_tags,
+            std::unordered_map<int64_t, std::unordered_map<std::string, int64_t>>& table_replica_dists,
+            std::unordered_map<int64_t, std::vector<std::string>>& table_learner_resource_tags) {
+        BAIDU_SCOPED_LOCK(_table_mutex);
+        for (auto& table_id: table_ids) {
+            if (_table_info_map.find(table_id) != _table_info_map.end()) {
+                table_replica_nums[table_id] = _table_info_map[table_id].schema_pb.replica_num();
+                table_resource_tags[table_id] = _table_info_map[table_id].schema_pb.resource_tag();
+                for (auto& learner_resouce: _table_info_map[table_id].schema_pb.learner_resource_tags()) {
+                    table_learner_resource_tags[table_id].push_back(learner_resouce);
+                }
+                table_replica_dists[table_id];
+                for (auto& replica_dist: _table_info_map[table_id].schema_pb.dists()) {
+                    if (replica_dist.count()) {
+                        table_replica_dists[table_id][replica_dist.logical_room()] = replica_dist.count();
+                    }
+                }
+            }
+        }
+    }
+    
+    int whether_exist_table_id(int64_t table_id) {
+        BAIDU_SCOPED_LOCK(_table_mutex);
+        if (_table_info_map.find(table_id) == _table_info_map.end()) {
+            return -1;
+        }
+        return 0;
+    }
 
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
+
     int write_schema_for_not_level(TableMem& table_mem, braft::Closure* done,
                                     int64_t max_table_id, bool has_auto_increment = false);
+
     void send_create_table_request(const std::string& namespace_name, 
             const std::string& database_name, const std::string& table_name, 
             std::shared_ptr<std::vector<pb::InitRegion>> init_regions); 
+    
+    void update_start_key_region_id_map(int64_t table_id, 
+            std::map<int64_t, std::string>& min_start_key,
+            std::map<int64_t, std::string>& max_end_key, 
+            std::map<int64_t, std::map<std::string, int64_t>>& key_id_map);
+
+    void partition_update_start_key(int64_t table_id, std::string& min_start_key, 
+            std::string& max_end_key,
+            std::map<std::string, int64_t>& key_id_map,
+            std::map<std::string, RegionStatus>& start_key_region_status);
+
+    void add_new_region(const pb::RegionInfo& leader_info);
 
 private:
     std::string construct_max_table_id_key() {

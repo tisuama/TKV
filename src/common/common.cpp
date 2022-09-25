@@ -35,4 +35,17 @@ std::string transfer_to_lower(std::string str) {
             [](unsigned char c) -> unsigned char { return std::tolower(c); });
     return str;
 }
+
+int end_key_compare(rocksdb::Slice key1, rocksdb::Slice key2) {
+	if (key1 == key2) {
+		return 0;
+	}
+	if (key1.empty()) {
+		return 1;
+	}
+	if (key2.empty()) {
+		return -1;
+	}
+	return key1.compare(key2);
+}
 } // namespace TKV

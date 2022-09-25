@@ -117,6 +117,7 @@ file(GLOB STORE_SRC
 	src/store/rpc_sender.cpp
 	src/store/closure.cpp
 	src/store/meta_writer.cpp
+	src/store/closure.cpp
 	)
 add_library(store_src_lib OBJECT ${STORE_SRC})
 
@@ -240,5 +241,6 @@ add_executable(rocks_bench
 	tool/rocks_bench.cpp
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:engine_src_lib>
+	$<TARGET_OBJECTS:proto_src_lib>
 	)
 target_link_libraries(rocks_bench ${DEP_LIB})

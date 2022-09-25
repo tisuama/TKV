@@ -144,9 +144,11 @@ using DoubleBufferedSet = butil::DoublyBufferedData<std::unordered_set<T>>;
 using DoubleBufferStringSet = DoubleBufferedSet<std::string>;
 
 class SchemaFactory {
+
 typedef RepeatedPtrField<pb::RegionInfo> RegionVec;
 typedef RepeatedPtrField<pb::SchemaInfo> SchemaVec;
 typedef RepeatedPtrField<pb::DatabaseInfo>  DataBaseVec;
+
 public:
     virtual ~SchemaFactory() {
         bthread_mutex_destroy(&_update_slow_db_mutex);
@@ -157,10 +159,23 @@ public:
         return &instance; 
     }
 
+    int init();
+
     void update_tables_double_buffer_sync(const SchemaVec& tables);
+
+    static int update_regions_double_buffer(void* meta, bthread::TaskIterator<RegionVec>& iter);
+
+    void update_regions_double_buffer(bthread::TaskIterator<RegionVec>& iter);
+
     void get_all_table_version(std::unordered_map<int64_t, int64_t>& table_id_version_map); 
+
     bool exist_table_id(int64_t table_id);
+
     void update_table(const pb::SchemaInfo& table);
+
+    size_t update_regions(std::unordered_map<int64_t, TableRegionPtr>& table_region_mapping, int64_t table_id,
+            std::map<int, std::map<std::string, const pb::RegionInfo*>>& key_region_map);
+
     
 private:
     SchemaFactory() {
@@ -170,7 +185,7 @@ private:
     }
 
     void delete_table_region_map(const pb::SchemaInfo& table);
-    int update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table);
+    int  update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table);
     void delete_table(const pb::SchemaInfo& table, SchemaMapping& background);
 
     bool                            _is_inited {false};
@@ -181,9 +196,9 @@ private:
     // table info
     DoubleBufferedTable             _double_buffer_table;
     // table region info
-    DoubleBufferedTableRegionInfo   _double_buffer_table_region;
+    DoubleBufferedTableRegionInfo   _double_buffer_region;
     // ExecutionQueue
-    bthread::ExecutionQueueId<RegionVec> _region_queue_id {0};
+    bthread::ExecutionQueueId<RegionVec> _region_queue_id = {0};
     
     std::string                     _physical_room;
     std::string                     _logical_room;

@@ -10,6 +10,7 @@
 #include <brpc/controller.h>
 #include <brpc/server.h>
 #include <bthread/execution_queue.h>
+#include <rocksdb/slice.h>
 
 
 #include "common/log.h"
@@ -19,6 +20,7 @@ namespace TKV {
 extern int64_t parse_snapshot_index_from_path(const std::string& snapshot_path, bool use_dirname); 
 extern std::string to_hex_str(const std::string& str);
 extern std::string transfer_to_lower(std::string str);
+extern int end_key_compare(rocksdb::Slice key1, rocksdb::Slice key2);
 
 #define RETURN_IF_NOT_INIT(init, response, log_id) \
     do {\
@@ -59,6 +61,17 @@ extern std::string transfer_to_lower(std::string str);
             response->set_errmsg(err_msg);\
         }\
     } while(0);
+
+#define IF_NOT_LEADER(fsm, response) \
+    do {\
+        if (!fsm->is_leader()) {\
+            response->set_errcode(pb::NOT_LEADER);\
+            response->set_errmsg("Not Leader");\
+            response->set_leader(butil::endpoint2str(fsm->get_leader()).c_str());\
+            return;\
+        }\
+    } while(0);
+         
 
 class ScopeGuard {
 public:

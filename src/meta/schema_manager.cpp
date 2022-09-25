@@ -66,11 +66,7 @@ void SchemaManager::process_schema_info(google::protobuf::RpcController* control
             log_id = cntl->log_id();
         }
     }
-    if (!_meta_state_machine->is_leader()) {
-        ERROR_SET_RESPONSE(response, pb::NOT_LEADER, "not leader", request->op_type(), log_id);
-        response->set_leader(butil::endpoint2str(_meta_state_machine->get_leader()).c_str());
-        return ;
-    }
+    IF_NOT_LEADER(_meta_state_machine, response);
     ON_SCOPED_EXIT(([cntl, log_id, response]() {
         if (response!= nullptr && response->errcode() != pb::SUCCESS) {
             const auto& remote_side = butil::endpoint2str(cntl->remote_side());
@@ -118,6 +114,14 @@ void SchemaManager::process_schema_info(google::protobuf::RpcController* control
                 if (ret < 0) return ;
             }
             _meta_state_machine->process(controller, request, response, done_gurad.release()); 
+            return ;
+        case pb::OP_UPDATE_REGION:
+            if (request->region_infos_size() == 0) {
+                ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR, 
+                        "no region info", request->op_type(), log_id);
+                return ;
+            }
+            _meta_state_machine->process(controller, request, response, done_gurad.release());
             return ;
         default:
             ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
@@ -326,6 +330,20 @@ int SchemaManager::load_max_id_snapshot(const std::string& max_id_prefix,
     return 0;
 }
 
+void SchemaManager::process_leader_heartbeat_for_store(const pb::StoreHBRequest* request,
+        pb::StoreHBResponse* response, uint64_t log_id) {
+    IF_NOT_LEADER(_meta_state_machine, response);
+
+    uint64_t ts = butil::gettimeofday_us();
+    TimeCost time_cost;
+    // step1: leader status
+    RegionManager::get_instance()->update_leader_status(request, ts);
+
+    // step2: heartbeat
+    RegionManager::get_instance()->leader_heartbeat_for_region(request, response);
+
+    // TODO: step3: load_balance
+}
 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

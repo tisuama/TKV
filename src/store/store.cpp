@@ -320,7 +320,7 @@ void Store::construct_heart_beat_request(pb::StoreHBRequest& request) {
     std::unordered_map<int64_t, int64_t> table_id_version_map;
     _factory->get_all_table_version(table_id_version_map);
     for (auto table_info : table_id_version_map) {
-        pb::SchemaHB* schema = request.add_schema_info();
+        pb::SchemaHB* schema = request.add_schema_infos();
         schema->set_table_id(table_info.first);
         schema->set_version(table_info.second);
     }

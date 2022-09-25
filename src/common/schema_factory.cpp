@@ -1,7 +1,61 @@
 #include "common/schema_factory.h"
 #include "common/common.h"
+#include "proto/meta.pb.h"
 
 namespace TKV {
+int SchemaFactory::init() {
+    if (_is_inited) {
+        return 0;
+    }
+
+    int ret = bthread::execution_queue_start(&_region_queue_id, nullptr, 
+            update_regions_double_buffer, (void*)this);
+    if (ret != 0) {
+        DB_FATAL("execution_queue_start error, %d", ret);
+        return -1;
+    }
+
+    _is_inited = true;
+    return 0;
+}
+
+int SchemaFactory::update_regions_double_buffer(void* meta, bthread::TaskIterator<RegionVec>& iter) {
+    SchemaFactory* factory = (SchemaFactory*)meta;
+    TimeCost cost;
+    factory->update_regions_double_buffer(iter);
+    return 0;
+}
+
+void SchemaFactory::update_regions_double_buffer(bthread::TaskIterator<RegionVec>& iter) {
+    // table_id => (partition => (start_key => region_info)
+    std::map<int64_t, std::map<int, std::map<std::string, const pb::RegionInfo*>>> table_key_region_map;
+    for (; iter; ++iter) {
+        for (auto& region: *iter) {
+            int64_t region_id = region.region_id();
+            int64_t table_id = region.table_id();
+            int64_t partition_id = region.partition_id();
+            DB_WARNING("region_id: %ld, update region info: %s", region_id, region.ShortDebugString().c_str());
+            const std::string& start_key = region.start_key();
+            if (!start_key.empty() && start_key == region.end_key()) {
+                DB_WARNING("region_id: %ld table_id: %ld is empty", region_id, table_id);
+                continue;
+            }
+            table_key_region_map[table_id][partition_id][start_key] = &region;
+        }
+    }
+
+    for (auto& table_region:  table_key_region_map) {
+        int64_t table_id = table_region.first;
+        std::function<size_t(std::unordered_map<int64_t, TableRegionPtr>&)> update_fn = 
+            std::bind(&SchemaFactory::update_regions, 
+                    this, 
+                    std::placeholders::_1, 
+                    table_id, 
+                    table_region.second);
+        _double_buffer_region.Modify(update_fn);
+    }
+}
+
 int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table) {
     auto& table_info_mapping = background.table_id_to_table_info;
     auto& table_name_id_mapping = background.table_name_to_id;
@@ -108,17 +162,20 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
 void SchemaFactory::delete_table_region_map(const pb::SchemaInfo& table) {
     if (table.has_deleted() && table.deleted()) {
         DB_DEBUG("erase table: %s", table.ShortDebugString().data());
-        _double_buffer_table_region.Modify(double_buffer_table_region_erase, table.table_id());
+        _double_buffer_region.Modify(double_buffer_table_region_erase, table.table_id());
     }
 }
 
 void SchemaFactory::update_tables_double_buffer_sync(const SchemaVec& tables) {
     for (auto& table: tables) {
-        std::function<int(SchemaMapping& bg, const pb::SchemaInfo& table)> f = 
-            std::bind(&SchemaFactory::update_table_internal, this, std::placeholders::_1, std::placeholders::_2);
+        std::function<int(SchemaMapping& bg, const pb::SchemaInfo& table)> update_fn = 
+            std::bind(&SchemaFactory::update_table_internal, 
+                    this, 
+                    std::placeholders::_1, 
+                    std::placeholders::_2);
         DB_NOTICE("schema info: %s udpate double buffer sync", table.ShortDebugString().data());
         delete_table_region_map(table);
-        _double_buffer_table.Modify(f, table);
+        _double_buffer_table.Modify(update_fn, table);
     }
 }
 
@@ -168,9 +225,68 @@ bool SchemaFactory::exist_table_id(int64_t table_id) {
 
 void SchemaFactory::update_table(const pb::SchemaInfo& table) {
     std::function<int(SchemaMapping& m, const pb::SchemaInfo& table)> update_fn = 
-        std::bind(&SchemaFactory::update_table_internal, this, std::placeholders::_1, std::placeholders::_2);
+        std::bind(&SchemaFactory::update_table_internal, 
+                this, 
+                std::placeholders::_1, 
+                std::placeholders::_2);
     delete_table_region_map(table);
     _double_buffer_table.Modify(update_fn, table);
+}
+
+
+size_t SchemaFactory::update_regions(std::unordered_map<int64_t, TableRegionPtr>& table_region_mapping, int64_t table_id,
+       std::map<int, std::map<std::string, const pb::RegionInfo*>>& key_region_map) {
+    if (table_region_mapping.count(table_id) == 0) {
+        table_region_mapping[table_id] = std::make_shared<TableRegionInfo>();
+    }
+    TableRegionPtr table_info_ptr = table_region_mapping[table_id];
+    DB_NOTICE("table_id: %ld update region table", table_id);
+
+    // key_region_map: partition => (start_key => region_info)
+    for (auto& start_key_region: key_region_map) {
+        // int64_t partition_id = start_key_region.first;
+        auto& start_key_region_map = start_key_region.second;
+        std::vector<const pb::RegionInfo*> last_regions;
+        std::map<std::string, int64_t> clear_regions;
+        
+        std::string end_key;
+        for (auto iter = start_key_region_map.begin(); iter != start_key_region_map.end(); iter++) {
+            const pb::RegionInfo& region = *iter->second;
+            DB_NOTICE("region_id: %ld udpate region info: %s", region.region_id(), region.ShortDebugString().c_str());
+
+            pb::RegionInfo pre_region;
+            int ret = table_info_ptr->get_region_info(region.region_id(), pre_region);            
+            if (ret < 0) { // 之前不存在这个region的信息
+                // 判断加入的region和现在region是否重叠
+            } else if (region.version() > pre_region.version()) {
+                DB_DEBUG("region_id: %ld, new vs old: (%ld, %s, %s) VS (%ld, %s, %s)",
+                        region.region_id(), region.version(), to_hex_str(region.start_key()).c_str(),
+                        to_hex_str(region.end_key()).c_str(), pre_region.version(),
+                        to_hex_str(pre_region.start_key()).c_str(),
+                        to_hex_str(pre_region.end_key()).c_str());
+                clear_regions.clear();
+                last_regions.clear();
+                
+                if (region.start_key() < pre_region.start_key() && 
+                        end_key_compare(region.end_key(), pre_region.end_key()) < 0) {
+                    // Case1: start_key和end_key都变小 => split 和 merge同时发生
+                } else if (region.start_key() < pre_region.start_key() && 
+                        end_key_compare(region.end_key(), pre_region.end_key()) == 0) {
+                    // Case2: start_key变小，end_key不变 => merge
+                } else if (region.start_key() == pre_region.start_key() && 
+                        end_key_compare(region.end_key(), pre_region.end_key()) < 0) {
+                    // Case3: start_key不变, end_key变小 => split
+                } else if (region.start_key() == pre_region.start_key() && 
+                        end_key_compare(region.start_key(), pre_region.end_key())) {
+                    // 仅version变大
+                }
+            } else {
+                DB_DEBUG("region info: %ld, pre_region info: %s",
+                        region.ShortDebugString().c_str(), pre_region.ShortDebugString().c_str());
+            }
+        }
+    }
+    return 1;
 }
 
 } // namespace TKV
