@@ -151,6 +151,12 @@ private:
     }
 
 private:
+    // 对应关系
+    // instance: physical => 1: 1
+    // physical: logical => 1: 1
+    // physical: instance => 1: N
+    // logical: physical => 1: M
+    // resouce_tag: physical => 1: X
     bthread_mutex_t             _phy_mutex;
     // key: 物理机房 value: 逻辑机房
     std::unordered_map<std::string, std::string>           _phy_log_map;

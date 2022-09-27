@@ -189,7 +189,7 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
         }
     }
     mutable_request->mutable_table_info()->set_resource_tag(tag);
-    DB_WARNING("create table should select intance count: %ld", total_region_cnt);
+    DB_WARNING("Table: %s should select intance count: %ld", table_info.c_str(), total_region_cnt);
     
     // Add instance
     for (int i = 0; i < total_region_cnt; i++) {

@@ -424,6 +424,8 @@ void RegionManager::check_peer_count(int64_t region_id,
     bool need_add_peer = false;
     // 选resource_tag
     std::string table_resouce_tag = table_resouce_tag[table_id];
+    DB_WARNING("region_id: %ld => [table_name: %s, table_id: %ld, replica_num: %d]", 
+            regio_id, leader_info.table_name(), table_id, replica_num);
     std::unordered_map<std::string, int> resource_tag_count;
     std::unordered_map<std::string, std::string> peer_resource_tags;
     for(auto& peer: leader_info.peers()) {
@@ -436,9 +438,26 @@ void RegionManager::check_peer_count(int64_t region_id,
         resource_tag_count[peer_resource_tag]++;
     }
 
-    std::string logical_room;
-    std::unordered_map<std::string, int64_t> logical_room_count = table_replica_dists[table_id];
-    std::unordered_map<std::string, int64_t> cur_logical_room_count;
+    // 如果该region所属table的逻辑存储池没有足够的副本
+    if (resource_tag_count[table_resouce_tag] < replica_num) {
+        DB_WARNING("region_id: %ld resource_tag: %s count: %d less than replica num: %ld, NEED ADD PEER",
+                region_id, table_resouce_tag.c_str(), resource_tag_count[table_resouce_tag], replica_num);
+        need_add_peer = true;
+    }
+    // 如果没有指定机房分布表，只需按照replica_num计算, 此时该Region的Leader也没有logical_room
+    if (logical_room_count.size() == 0 && leader_info.peers_size() < replica_num) {
+        need_add_peer = true;
+    }
+
+    if (need_add_peer) {
+        std::set<std::string> peers_in_heart;
+        for(auto& peer: leader_info.peers()) {
+            peers_in_heart.insert(peer);
+        }
+        std::string new_instance;
+
+    }
+
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
