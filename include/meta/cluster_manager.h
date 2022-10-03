@@ -14,6 +14,17 @@ struct InstanceStatusInfo {
     pb::Status  state;
 };
 
+struct InstanceScheduingInfo {
+    // 每个实例上保存每个表的哪些region, table => [region_ids]
+    std::unordered_map<int64_t, std::vector<int64_t>> region_map;
+    // 每个实例上保存每个表的region个数
+    std::unordered_map<int64_t, int64_t>              region_count_map;
+
+    // resource_tag
+    std::string                                       logical_room;
+    std::string                                       resource_tag;
+};
+
 struct Instance {
     std::string     address;
     int64_t         capacity;
@@ -98,6 +109,14 @@ public:
         }
         return false;
     } 
+
+    bool get_resource_tag(const std::string& instance, std::string& resource_tag) {
+        if (_scheduling_info.find(instance) == _scheduling_info.end()) {
+            return false;
+        }
+        resource_tag = _scheduling_info[instance].resource_tag;
+        return true;
+    }
     
     int select_instance_rolling(const std::string& resource_tag, 
             const std::set<std::string>& exclude_stores,
@@ -156,7 +175,7 @@ private:
     // physical: logical => 1: 1
     // physical: instance => 1: N
     // logical: physical => 1: M
-    // resouce_tag: physical => 1: X
+    // resource_tag: physical => 1: X
     bthread_mutex_t             _phy_mutex;
     // key: 物理机房 value: 逻辑机房
     std::unordered_map<std::string, std::string>           _phy_log_map;
@@ -185,7 +204,9 @@ private:
     int                                                   _migreate_concurrency {2};
 
     MetaStateMachine*                                     _meta_state_machine {nullptr};
-
+    
+    bthread_mutex_t                                        _sche_mutex;
+    std::unordered_map<std::string, InstanceScheduingInfo> _scheduling_info;
 };
 
 } // namespace TKV

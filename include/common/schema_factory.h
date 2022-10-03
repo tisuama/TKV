@@ -136,15 +136,8 @@ struct TableRegionInfo {
 };
 
 typedef std::shared_ptr<TableRegionInfo> TableRegionPtr;
-using DoubleBufferedTable = butil::DoublyBufferedData<SchemaMapping>;
-using DoubleBufferedTableRegionInfo = butil::DoublyBufferedData<std::unordered_map<int64_t, TableRegionPtr>>;
-using DoubleBufferedStatus = butil::DoublyBufferedData<StatusMapping>;
-template<typename T>
-using DoubleBufferedSet = butil::DoublyBufferedData<std::unordered_set<T>>;
-using DoubleBufferStringSet = DoubleBufferedSet<std::string>;
 
 class SchemaFactory {
-
 typedef RepeatedPtrField<pb::RegionInfo> RegionVec;
 typedef RepeatedPtrField<pb::SchemaInfo> SchemaVec;
 typedef RepeatedPtrField<pb::DatabaseInfo>  DataBaseVec;
@@ -187,33 +180,29 @@ private:
     void delete_table_region_map(const pb::SchemaInfo& table);
     int  update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table);
     void delete_table(const pb::SchemaInfo& table, SchemaMapping& background);
+    size_t double_buffer_table_region_erase(
+        std::unordered_map<int64_t, TableRegionPtr>& table_region_map, 
+        int64_t table_id);
 
     bool                            _is_inited {false};
     bthread_mutex_t                 _update_slow_db_mutex;
     // use of slow data base
     std::map<int64_t, DatabaseInfo> _slow_db_info;
 
+    bthread_mutex_t                 _table_mutex;
     // table info
-    DoubleBufferedTable             _double_buffer_table;
+    SchemaMapping                   _double_buffer_table;
     // table region info
-    DoubleBufferedTableRegionInfo   _double_buffer_region;
+    bthread_mutex_t                 _region_mutex;
+    
+    std::unordered_map<int64_t, TableRegionPtr> _double_buffer_region;
     // ExecutionQueue
-    bthread::ExecutionQueueId<RegionVec> _region_queue_id = {0};
+    bthread::ExecutionQueueId<RegionVec>        _region_queue_id = {0};
     
     std::string                     _physical_room;
     std::string                     _logical_room;
     int64_t                         _last_update_index {0};
 };
-
-inline size_t double_buffer_table_region_erase(
-        std::unordered_map<int64_t, TableRegionPtr>& table_region_map, int64_t table_id) {
-    DB_DEBUG("double bufer table region erase table id: %ld", table_id);
-    auto it = table_region_map.find(table_id);
-    if (it != table_region_map.end()) {
-        return table_region_map.erase(table_id);
-    } 
-    return 0;
-}
 
 } // namespace TKV
   

@@ -45,18 +45,12 @@ void SchemaFactory::update_regions_double_buffer(bthread::TaskIterator<RegionVec
     }
 
     for (auto& table_region:  table_key_region_map) {
-        int64_t table_id = table_region.first;
-        std::function<size_t(std::unordered_map<int64_t, TableRegionPtr>&)> update_fn = 
-            std::bind(&SchemaFactory::update_regions, 
-                    this, 
-                    std::placeholders::_1, 
-                    table_id, 
-                    table_region.second);
-        _double_buffer_region.Modify(update_fn);
+        update_regions(_double_buffer_region, table_region.first, table_region.second);
     }
 }
 
 int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table) {
+    BAIDU_SCOPED_LOCK(_table_mutex);
     auto& table_info_mapping = background.table_id_to_table_info;
     auto& table_name_id_mapping = background.table_name_to_id;
     auto& db_info_mapping = background.db_id_to_db_info;
@@ -162,20 +156,14 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
 void SchemaFactory::delete_table_region_map(const pb::SchemaInfo& table) {
     if (table.has_deleted() && table.deleted()) {
         DB_DEBUG("erase table: %s", table.ShortDebugString().data());
-        _double_buffer_region.Modify(double_buffer_table_region_erase, table.table_id());
+        double_buffer_table_region_erase(_double_buffer_region, table.table_id());
     }
 }
 
 void SchemaFactory::update_tables_double_buffer_sync(const SchemaVec& tables) {
     for (auto& table: tables) {
-        std::function<int(SchemaMapping& bg, const pb::SchemaInfo& table)> update_fn = 
-            std::bind(&SchemaFactory::update_table_internal, 
-                    this, 
-                    std::placeholders::_1, 
-                    std::placeholders::_2);
-        DB_NOTICE("schema info: %s udpate double buffer sync", table.ShortDebugString().data());
+        update_table_internal(_double_buffer_table, table);
         delete_table_region_map(table);
-        _double_buffer_table.Modify(update_fn, table);
     }
 }
 
@@ -201,41 +189,28 @@ void SchemaFactory::delete_table(const pb::SchemaInfo& table, SchemaMapping& bac
 }
 
 void SchemaFactory::get_all_table_version(std::unordered_map<int64_t, int64_t>& table_id_version_map) {
-    DoubleBufferedTable::ScopedPtr table_ptr;
-    if (_double_buffer_table.Read(&table_ptr) != 0) {
-        DB_WARNING("read double buffer table failed");
-        return ;
-    }
-    for (auto t : table_ptr->table_id_to_table_info) {
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    for (auto t :_double_buffer_table.table_id_to_table_info) {
         table_id_version_map[t.first] = t.second->version;
     }
 }
 
 bool SchemaFactory::exist_table_id(int64_t table_id) {
-    DoubleBufferedTable::ScopedPtr table_ptr;
-    if (_double_buffer_table.Read(&table_ptr) != 0) {
-        DB_WARNING("read double buffer table failed");
-        return false;
-    }
-    if (table_ptr->global_index_id_mapping.count(table_id) == 0) {
+    if (_double_buffer_table.global_index_id_mapping.count(table_id) == 0) {
         return false;
     }
     return true;
 }
 
 void SchemaFactory::update_table(const pb::SchemaInfo& table) {
-    std::function<int(SchemaMapping& m, const pb::SchemaInfo& table)> update_fn = 
-        std::bind(&SchemaFactory::update_table_internal, 
-                this, 
-                std::placeholders::_1, 
-                std::placeholders::_2);
     delete_table_region_map(table);
-    _double_buffer_table.Modify(update_fn, table);
+    update_table_internal(_double_buffer_table, table);
 }
 
 
 size_t SchemaFactory::update_regions(std::unordered_map<int64_t, TableRegionPtr>& table_region_mapping, int64_t table_id,
        std::map<int, std::map<std::string, const pb::RegionInfo*>>& key_region_map) {
+    BAIDU_SCOPED_LOCK(_region_mutex);
     if (table_region_mapping.count(table_id) == 0) {
         table_region_mapping[table_id] = std::make_shared<TableRegionInfo>();
     }
@@ -287,6 +262,18 @@ size_t SchemaFactory::update_regions(std::unordered_map<int64_t, TableRegionPtr>
         }
     }
     return 1;
+}
+
+size_t SchemaFactory::double_buffer_table_region_erase(
+        std::unordered_map<int64_t, TableRegionPtr>& table_region_map, int64_t table_id) {
+    DB_DEBUG("double bufer table region erase table id: %ld", table_id);
+    
+    BAIDU_SCOPED_LOCK(_region_mutex);
+    auto it = table_region_map.find(table_id);
+    if (it != table_region_map.end()) {
+        return table_region_map.erase(table_id);
+    } 
+    return 0;
 }
 
 } // namespace TKV

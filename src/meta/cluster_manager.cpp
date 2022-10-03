@@ -87,7 +87,7 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
         return ;
     }
     
-    // update mem datastruct
+    // 更新mem datastruct
     Instance ins_mem(ins_info);
     {
         BAIDU_SCOPED_LOCK(_ins_mutex);
@@ -98,6 +98,16 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
         _ins_info[address] = ins_mem;
         // 暂时不考虑网段信息
     } 
+
+    // 更新scheduling相关
+    {
+        BAIDU_SCOPED_LOCK(_sche_mutex);
+        auto& scheduling_info = _scheduling_info[ins_mem.address];
+        scheduling_info.resource_tag = ins_mem.resource_tag;
+        scheduling_info.logical_room = ins_mem.logical_room;
+        scheduling_info.region_count_map = std::unordered_map<int64_t, int64_t>{};
+        scheduling_info.region_map = std::unordered_map<int64_t, std::vector<int64_t>>{};
+    }
     IF_DONE_SET_RESPONSE(done, pb::SUCCESS, "success");
     DB_NOTICE("add instance success, request: %s", request.ShortDebugString().c_str());
 } 
@@ -151,11 +161,6 @@ int ClusterManager::select_instance_rolling(const std::string& resource_tag,  //
 }
 
 int ClusterManager::load_snapshot() {
-    _phy_log_map.clear();
-    _log_phy_map.clear();
-    _ins_phy_map.clear();
-    _phy_ins_map.clear();
-    _ins_info.clear();
     DB_WARNING("cluster manager start to load snapshot");
     // init map
     {
@@ -238,6 +243,16 @@ int ClusterManager::load_instance_snapshot(const std::string& instance_prefix,
         _res_ins_map[_ins_info[address].resource_tag].insert(address);
         _res_rolling_ins[_ins_info[address].resource_tag].push_back(address);
     }
+
+    {
+        BAIDU_SCOPED_LOCK(_sche_mutex);        
+        auto& scheduling_info = _scheduling_info[ins_info_pb.address()];
+        scheduling_info.logical_room = ins_info_pb.logical_room();
+        scheduling_info.resource_tag = ins_info_pb.resource_tag();
+        scheduling_info.region_count_map = std::unordered_map<int64_t, int64_t>{};
+        scheduling_info.region_map = std::unordered_map<int64_t, std::vector<int64_t>>{};
+    }
+    
     return 0;
 }
 

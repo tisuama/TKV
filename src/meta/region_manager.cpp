@@ -455,7 +455,7 @@ void RegionManager::check_peer_count(int64_t region_id,
             peers_in_heart.insert(peer);
         }
         std::string new_instance;
-
+        
     }
 
 }
