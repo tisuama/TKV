@@ -1,6 +1,7 @@
 #include "meta/region_manager.h"
 #include "meta/table_manager.h"
 #include "meta/meta_rocksdb.h"
+#include "meta/cluster_manager.h"
 
 #include <functional>
 
@@ -201,6 +202,7 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
                 // 当前添加的region已经存在，但是pre_leader_info为空
                 pb::MetaManagerRequest req;
                 req.set_op_type(pb::OP_UPDATE_REGION);
+                // 删除该region
                 req.set_add_delete_region(true);
                 *(req.add_region_infos()) = leader_info; 
                 SchemaManager::get_instance()->process_schema_info(NULL, &req, NULL, NULL);
@@ -221,19 +223,20 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
         bool peer_changed = (hash_heart != hash_pre);
         check_whether_update_region(region_id, 
                                     peer_changed, 
-                                    leader_info, 
+                                    leader_hb, 
                                     pre_leader_info);
         if (!peer_changed) {
             check_peer_count(region_id, 
-                             leader_info,
+                             leader_hb,
                              table_replica_nums,
                              table_resouce_tags,
                              table_replica_dists,
                              remove_peer_request, 
                              response);
         }
+        // TODO: add_learner, remove_learner
+        // TODO: remove_peer
     }
-    
 }
 
 // 只有Leader才调用此接口
@@ -357,20 +360,20 @@ void RegionManager::update_region(const pb::MetaManagerRequest& request,
 void RegionManager::check_whether_update_region(int64_t region_id, bool has_peer_changed, 
         const pb::LeaderHB& leader_hb, const SmartRegionInfo& pre_region) {
     auto& leader_info = leader_hb.region();
-    if (leader_info.log_index() < pre_region.log_index()) {
+    if (leader_info.log_index() < pre_region->log_index()) {
         DB_WARNING("region_id: %ld Leader log_index: %ld is less than pre region log_index: %ld",
-                region_id, leader_info.log_index(), pre_region.log_index());
+                region_id, leader_info.log_index(), pre_region->log_index());
         return ;
     }
     // 如果version没有变，但是start_key和end_key变了，发生问题
-    if (leader_info.version() == pre_region.version() && 
-            (leader_info.start_key() != pre_region.start_key() || 
-             leader_info.end_key() != pre_region.end_key())) {
+    if (leader_info.version() == pre_region->version() && 
+            (leader_info.start_key() != pre_region->start_key() || 
+             leader_info.end_key() != pre_region->end_key())) {
         DB_FATAL("region_id: %ld version not changed, but start_key or end_key changed"
                 "cur leader info: %s, pre info: %s", 
                 region_id, 
                 leader_info.ShortDebugString().c_str(),
-                pre_region.ShortDebugString().c_str());
+                pre_region->ShortDebugString().c_str());
         return ;
     }
     bool version_changed = false, peer_changed = false;
@@ -389,7 +392,7 @@ void RegionManager::check_whether_update_region(int64_t region_id, bool has_peer
     } else {
         if (leader_info.status() == pb::IDLE && 
                 leader_info.leader() != pre_region->leader()) {
-            set_region_leader(region_id, leader_info->leader());
+            set_region_leader(region_id, leader_info.leader());
         }
         if (leader_info.status() == pb::IDLE && 
                 (leader_info.log_index() != pre_region->log_index() || 
@@ -408,6 +411,7 @@ void RegionManager::check_peer_count(int64_t region_id,
         std::unordered_map<int64_t, int64_t>& table_replica_nums,
         std::unordered_map<int64_t, std::string>& table_resource_tags,
         std::unordered_map<int64_t, std::unordered_map<std::string, int64_t>>& table_replica_dists,
+        std::vector<std::pair<std::string, pb::RaftControlRequest>>& remove_peer_requests,
         pb::StoreHBResponse* response) {
     if (leader_hb.status() != pb::IDLE) {
         return ;
@@ -423,9 +427,9 @@ void RegionManager::check_peer_count(int64_t region_id,
     // add peer
     bool need_add_peer = false;
     // 选resource_tag
-    std::string table_resouce_tag = table_resouce_tag[table_id];
+    std::string table_resource_tag = table_resource_tags[table_id];
     DB_WARNING("region_id: %ld => [table_name: %s, table_id: %ld, replica_num: %d]", 
-            regio_id, leader_info.table_name(), table_id, replica_num);
+            region_id, leader_info.table_name().c_str(), table_id, replica_num);
     std::unordered_map<std::string, int> resource_tag_count;
     std::unordered_map<std::string, std::string> peer_resource_tags;
     for(auto& peer: leader_info.peers()) {
@@ -437,26 +441,72 @@ void RegionManager::check_peer_count(int64_t region_id,
         peer_resource_tags[peer] = peer_resource_tag;
         resource_tag_count[peer_resource_tag]++;
     }
-
+    std::string candicate_logical_room;
+    auto& logical_room_count_map = table_replica_dists[table_id];
+    std::unordered_map<std::string, int64_t> cur_logical_room_count_map;
     // 如果该region所属table的逻辑存储池没有足够的副本
-    if (resource_tag_count[table_resouce_tag] < replica_num) {
+    if (resource_tag_count[table_resource_tag] < replica_num) {
         DB_WARNING("region_id: %ld resource_tag: %s count: %d less than replica num: %ld, NEED ADD PEER",
-                region_id, table_resouce_tag.c_str(), resource_tag_count[table_resouce_tag], replica_num);
+                region_id, table_resource_tag.c_str(), resource_tag_count[table_resource_tag], replica_num);
         need_add_peer = true;
     }
     // 如果没有指定机房分布表，只需按照replica_num计算, 此时该Region的Leader也没有logical_room
-    if (logical_room_count.size() == 0 && leader_info.peers_size() < replica_num) {
+    if (logical_room_count_map.size() == 0 && leader_info.peers_size() < replica_num) {
         need_add_peer = true;
     }
+    
+    // 指定了机房分布表，要选择逻辑机房
+    if (logical_room_count_map.size() > 0) {
+        for (auto& peer: leader_info.peers()) {
+            std::string logical_room = ClusterManager::get_instance()->get_logical_room(peer);
+            if (peer_resource_tags[peer] == table_resource_tag && logical_room.size() > 0) {
+                cur_logical_room_count_map[logical_room]++;
+            }
+        }
+        
+        for (auto& logical_count: logical_room_count_map) {
+            auto& logical_room = logical_count.first;
+            if (logical_room_count_map[logical_room] > cur_logical_room_count_map[logical_room]) {
+                DB_WARNING("select candicate_logical_room: %s", logical_room.c_str());
+                candicate_logical_room = logical_room;
+                need_add_peer = true;
+                break;
+            }
+        }
+    }    
 
+
+    // 一次增加一个peer
     if (need_add_peer) {
         std::set<std::string> peers_in_heart;
         for(auto& peer: leader_info.peers()) {
             peers_in_heart.insert(peer);
         }
         std::string new_instance;
-        
+        auto ret = ClusterManager::get_instance()->select_instance_rolling(
+                table_resource_tag,
+                peers_in_heart,
+                candicate_logical_room,
+                new_instance);
+        if (ret < 0) {
+            DB_FATAL("select store from cluster failed, region_id: %ld, "
+                     "table_resource_tag: %s, peer_size: %ld",
+                      region_id, table_resource_tag.c_str(), 
+                      leader_info.peers_size());
+            return ;
+        } 
+        pb::AddPeer* add_peer = response->add_add_peers();
+        add_peer->set_region_id(region_id);
+        for (auto& peer: leader_info.peers()) {
+            add_peer->add_old_peers(peer);
+            add_peer->add_new_peers(peer);
+        }
+        add_peer->add_new_peers(new_instance);
+        DB_WARNING("region_id: %ld add new peer: %s", region_id, new_instance.c_str());
+        return ;
     }
+
+    // TODO: 选择一个peer remove
 
 }
 } // namespace TKV

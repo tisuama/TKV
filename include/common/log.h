@@ -86,7 +86,7 @@ inline void glog_error_writelog(const char* file, int line, const char* fmt, ...
                 __FUNCTION__, bthread_self(), ##args);\
     } while (0);
 #else
-#define DB_DEBUG(_fmt_, args...) 
+#define DB_DEBUG(_fmt_, args...)
 #endif
 
 #define DB_TRACE(_fmt_, args...) \

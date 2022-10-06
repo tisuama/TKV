@@ -117,18 +117,32 @@ public:
         resource_tag = _scheduling_info[instance].resource_tag;
         return true;
     }
+
+    std::string get_logical_room(const std::string& instance) {
+        if (_scheduling_info.find(instance) != _scheduling_info.end()) {
+            return _scheduling_info[instance].logical_room;
+        }
+        return "";
+    }
     
     int select_instance_rolling(const std::string& resource_tag, 
             const std::set<std::string>& exclude_stores,
             const std::string& logical_room,
             std::string& select_instance);
+
     void process_instance_heartbeat_for_store(const pb::InstanceInfo& instance_info);
+
     void process_instance_param_heartbeat_for_store(const pb::StoreHBRequest* request, 
             pb::StoreHBResponse* response);
+
     int update_instance_info(const pb::InstanceInfo& info);
+
     void update_instance(const pb::MetaManagerRequest& request, braft::Closure* done);
+
     void update_instance_param(const pb::MetaManagerRequest& request, braft::Closure* done);
+
     void add_logical(const pb::MetaManagerRequest& request, braft::Closure* done);
+
     void add_physical(const pb::MetaManagerRequest& request, braft::Closure* done);
 
     int load_snapshot();
@@ -169,13 +183,18 @@ private:
                 + logical_key;
     }
 
+    bool is_legal_for_select_instance(const std::string& candicate_instance,
+            const std::string& resource_tag,
+            const std::set<std::string>& exclude_stores,
+            const std::string& logical_room);
+
 private:
-    // 对应关系
-    // instance: physical => 1: 1
-    // physical: logical => 1: 1
-    // physical: instance => 1: N
-    // logical: physical => 1: M
-    // resource_tag: physical => 1: X
+    // 各种对应关系
+    // instance: 物理机房 => 1: 1
+    // 物理位置: 逻辑机房 => 1: 1
+    // 物理位置: instance => 1: N
+    // 逻辑机房: 物理位置 => 1: M
+    // 资    源: 物理位置 => 1: X
     bthread_mutex_t             _phy_mutex;
     // key: 物理机房 value: 逻辑机房
     std::unordered_map<std::string, std::string>           _phy_log_map;

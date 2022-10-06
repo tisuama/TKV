@@ -109,7 +109,7 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         */
         region->set_restart(true);
         // Inset SmartRegion into _region_mapping
-        this->set_region(region);
+        set_region(region);
         init_region_ids.push_back(region_id);
     }
     
@@ -212,13 +212,13 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     // 新增Table信息
     if (!_factory->exist_table_id(table_id)) {
         if (request->has_schema_info()) {
-            this->update_schema_info(request->schema_info(), nullptr);
+            update_schema_info(request->schema_info(), nullptr);
         } else {
             ERROR_SET_RESPONSE_FAST(response, pb::INPUT_PARAM_ERROR, "table info is missing when add region", log_id);
             return ;
         }
     }
-    auto pre_region = this->get_region(region_id);
+    auto pre_region = get_region(region_id);
     // 已经删除，遇到新建，此时需要马上删除
     if (pre_region != nullptr && pre_region->removed()) {
         drop_region_from_store(region_id, false);
@@ -248,13 +248,13 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     DB_WARNING("new region info: %s, log_id: %ld, remote_side: %s",
             request->ShortDebugString().c_str(), log_id, remote_side);
     // 更新内存信息
-    this->set_region(region);
+    set_region(region);
     // region init
     int ret = region->init(true, request->snapshot_times());
     if (ret < 0) {
         // 删除该region所有的相关信息
         RegionControl::clear_all_info_for_region(region_id);
-        this->erase_region(region_id);
+        erase_region(region_id);
         DB_FATAL("region_id: %ld init fail when add region, log_id: %lu",
                 region_id, log_id);
         response->set_errcode(pb::INTERNAL_ERROR);
@@ -266,7 +266,7 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     if (request->region_info().version() == 0) {
         Bthread bth;
         std::function<void()> check = [this, region_id]() {
-            this->check_region_legal_complete(region_id);
+            check_region_legal_complete(region_id);
         };
         bth.run(check);
         DB_WARNING("region_id: %ld init region version is 0, should check region legal",
@@ -356,7 +356,7 @@ int Store::drop_region_from_store(int64_t drop_region_id, bool need_delay_drop) 
     if (!need_delay_drop) {
         region->set_removed(true);
         RegionControl::clear_all_info_for_region(drop_region_id);
-        this->erase_region(drop_region_id); 
+        erase_region(drop_region_id); 
     }
     return 0;
 }
@@ -398,7 +398,7 @@ void Store::check_region_legal_complete(int64_t region_id) {
         DB_WARNING("region_id: %ld split or add peer success", region_id);
     } else {
         DB_WARNING("region_id: %ld split or add peer failed", region_id);
-        this->drop_region_from_store(region_id, false);
+        drop_region_from_store(region_id, false);
     }
 }
 
@@ -427,8 +427,35 @@ void Store::send_heart_beat() {
 }
 
 void Store::process_heart_beat_response(const pb::StoreHBResponse& response) {
-    // TODO:
-    DB_WARNING("process_heart_beat_response not implement now");
+    DB_DEBUG("process heart beat, response: %s", response.ShortDebugString().c_str());
+    {
+        // 1. update param
+        BAIDU_SCOPED_LOCK(_param_mutex);
+        for (auto& param: response.instance_param()) {
+            for (auto& item: param.params()) {
+                if (!item.is_meta_param()) {
+                    _param_map[item.key()] = item.value();
+                }
+            }
+        }
+        // 更新到flag pram
+        for(auto& iter: _param_map) {
+            update_param(iter.first, iter.second);
+        }
+    }
+    // 更新schema_info
+    for (auto& schema_info: response.schema_change_info()) {
+        update_schema_info(schema_info, nullptr);
+    }
+    // 处理add peer 
+    for (auto& add_peer_request: response.add_peers()) {
+        SmartRegion region = get_region(add_peer_request.region_id());
+        if (region == nullptr) {
+            DB_FATAL("region_id: %ld not exist, maybe removed, can't add peer", add_peer_request.region_id());
+            continue;
+        }
+        region->add_peer(add_peer_request, region, _add_peer_queue);
+    }
 }
 
 void Store::query(::google::protobuf::RpcController* controller,

@@ -36,12 +36,12 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
     if (_num_delete_lines > FLAGS_compact_delete_lines) {
         DB_WARNING("region_id: %ld, delete %ld rows, do compact in queue",
                 _region_id, _num_delete_lines.load());
-        this->compact_data_in_queue();
+        compact_data_in_queue();
     }
     
     // RegionInfo 
     pb::RegionInfo copy_region_info;
-    this->copy_region(&copy_region_info);
+    copy_region(&copy_region_info);
     // Learner 在版本0时可以上报心跳
     if (copy_region_info.version() == 0 && !is_learner()) {
         DB_WARNING("region version is 0, region_id: %ld", _region_id);
@@ -67,12 +67,12 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
     
     // Leader心跳信息
     std::vector<braft::PeerId> peers;
-    if (this->is_leader() && _node.list_peers(&peers).ok()) {
+    if (is_leader() && _node.list_peers(&peers).ok()) {
         pb::LeaderHB* leader_heart = request.add_leader_regions();
         // TODO: region_control
         pb::RegionInfo* leader_region = leader_heart->mutable_region();
         // 将内存的_region_info -> leader_region中
-        this->copy_region(leader_region);
+        copy_region(leader_region);
         leader_region->set_leader(_address); 
         // region_info的log_index是之前持久化在磁盘的log_index，不太准
         leader_region->set_log_index(_applied_index);
@@ -222,7 +222,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
         _region_control.sync_do_snapshot();
         --snapshot_times;
     }
-    this->copy_region(&_resource->region_info);
+    copy_region(&_resource->region_info);
     // TODO: compact时候删除多余数据
     DB_WARNING("region_id: %ld init success, region_info: %s", _region_id, 
             _resource->region_info.ShortDebugString().c_str());
@@ -234,9 +234,9 @@ int Region::init(bool new_region, int32_t snapshot_times) {
 void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) {
     TimeCost time_cost;
     brpc::ClosureGuard done_gurad(done);
-    if (this->get_version() == 0) {
+    if (get_version() == 0) {
         // 等待异步队列为空
-        this->wait_async_apply_log_queue_empty();
+        wait_async_apply_log_queue_empty();
     }
     // META_CF和DATA_CF的数据要做快照
     if (writer->add_file(SNAPSHOT_META_FILE) != 0 ||
@@ -247,7 +247,7 @@ void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* don
     }
     DB_WARNING("region_id: %ld snapshot save complete, time cost: %ld",
             _region_id, time_cost.get_time());
-    this->reset_snapshot_status();
+    reset_snapshot_status();
 }
 
 void Region::reset_snapshot_status() {
@@ -260,7 +260,7 @@ void Region::reset_snapshot_status() {
 }
 
 int Region::on_snapshot_load(braft::SnapshotReader* reader) {
-    this->reset_timecost();
+    reset_timecost();
     TimeCost time_cost;
     DB_WARNING("region_id: %ld start to load snapshot, path: %s", _region_id, reader->get_path().c_str());
     ON_SCOPED_EXIT([this]() {
@@ -337,7 +337,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
             if (is_learner()) {
                 // TODO: check learner snapshot
             } else {
-                if (check_follower_snapshot(butil::endpoint2str(this->get_leader()).c_str()) != 0) {
+                if (check_follower_snapshot(butil::endpoint2str(get_leader()).c_str()) != 0) {
                     DB_FATAL("region_id: %ld check follower snapshot fail", _region_id);
                     return -1;
                 }
@@ -376,8 +376,8 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
         _num_table_lines = 0;
     }
     region_info.set_can_add_peer(true);
-    this->set_region_with_update_range(region_info);
-    if (!this->compare_and_set_legal()) {
+    set_region_with_update_range(region_info);
+    if (!compare_and_set_legal()) {
         DB_FATAL("region_id: %ld is not illegal, should be removed", _region_id);
         return -1;
     }
@@ -385,7 +385,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
     _snapshot_num_table_lines = _num_table_lines.load();
     _snapshot_index = _applied_index;
     _snapshot_time_cost.reset();
-    this->copy_region(&_resource->region_info);
+    copy_region(&_resource->region_info);
     _restart = false;
     // Learner read for read
     _learner_ready_for_read = true;
@@ -446,20 +446,20 @@ int Region::check_follower_snapshot(const std::string& peer) {
             "remote_data_size: %lu, cur_data_size: %lu, "
             "remote_meta_size: %lu, cur_meta_size: %lu, "
             "region_info: %s",
-            _region_id, peer_data_size, this->snapshot_data_size(),
-            peer_meta_size, this->snapshot_meta_size(),
+            _region_id, peer_data_size, snapshot_data_size(),
+            peer_meta_size, snapshot_meta_size(),
             _region_info.ShortDebugString().c_str());
 
-    if (peer_data_size != 0 && this->snapshot_data_size() != 0 && 
-            peer_data_size != this->snapshot_data_size()) {
+    if (peer_data_size != 0 && snapshot_data_size() != 0 && 
+            peer_data_size != snapshot_data_size()) {
         DB_FATAL("region_id: %ld cur_data_size: %lu, remote_data_size: %lu", 
-                _region_id, this->snapshot_data_size(), peer_data_size);
+                _region_id, snapshot_data_size(), peer_data_size);
         return -1;
     }
-    if (peer_meta_size != 0 && this->snapshot_meta_size() != 0 && 
-            peer_meta_size != this->snapshot_meta_size()) {
+    if (peer_meta_size != 0 && snapshot_meta_size() != 0 && 
+            peer_meta_size != snapshot_meta_size()) {
         DB_FATAL("region_id: %ld cur_meta_size: %lu, remote_meta_size: %lu", 
-                _region_id, this->snapshot_meta_size(), peer_meta_size);
+                _region_id, snapshot_meta_size(), peer_meta_size);
         return -1;
     }
     return 0;
@@ -490,20 +490,20 @@ bool Region::check_region_legal_complete() {
             DB_WARNING("region_id: %ld has been removed", _region_id);
             return true;
         }
-        if (this->get_timecost() > FLAGS_split_duration_us) {
-            if (this->compare_and_set_illegal()) {
+        if (get_timecost() > FLAGS_split_duration_us) {
+            if (compare_and_set_illegal()) {
                 DB_WARNING("region_id: %ld split or add peer fail, set illegal", _region_id);
                 return false;
             } else {
                 DB_WARNING("region_id: %ld split or add peer success", _region_id);
                 return true;
             }
-        } else if (this->get_version() > 0) {
+        } else if (get_version() > 0) {
             DB_WARNING("region_id: %ld split or add peer success", _region_id);
             return true;
         } else {
             DB_WARNING("region_id: %ld split or add peer not complete, need wait, time cost: %ld",
-                    _region_id, this->get_timecost());
+                    _region_id, get_timecost());
         }
     } while (1);
 }
@@ -567,7 +567,7 @@ bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) 
         std::string leader_str = butil::endpoint2str(get_leader()).c_str();
         response->set_leader(leader_str);
         auto region = response->add_regions();
-        this->copy_region(region);
+        copy_region(region);
         region->set_leader(leader_str);
         // Case1: mrege
         if (!region->start_key().empty() && region->start_key() == region->end_key()) {

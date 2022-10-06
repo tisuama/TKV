@@ -30,7 +30,9 @@ using DoubleBufRegion = butil::DoublyBufferedData<std::unordered_map<int64_t, Sm
 
 class Store: public pb::StoreService {
 public:
-    virtual ~Store() {}
+    virtual ~Store() {
+        bthread_mutex_destroy(&_param_mutex);
+    }
 
     static Store* get_instance() {
         static Store instance;
@@ -200,6 +202,7 @@ private:
         , _disk_used("disk_used", 0)
         , _raft_total_cost("raft_total_cost", 0)
         , _heart_beat_count("heart_beat_count") {
+        bthread_mutex_init(&_param_mutex, NULL);
     }  
 
     std::string              _address;

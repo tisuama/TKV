@@ -199,6 +199,7 @@ message AddPeer {
     required int64 region_id = 1;
     repeated string old_peers = 2;
     repeated string new_peers = 3;
+    optional bool   is_split = 4;
 };
 
 message TransLeaderRequest {

@@ -65,7 +65,7 @@ void MetaServer::meta_manager(::google::protobuf::RpcController* controller,
         log_id = cntl->log_id();
     }     
     RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
-    DB_DEBUG("meta manager request: %s",  request->ShortDebugString().c_str());
+    DB_DEBUG("meta manager request: %s, response: %p",  request->ShortDebugString().c_str(), response);
     if (request->op_type() == pb::OP_ADD_INSTANCE || 
         request->op_type() == pb::OP_ADD_PHYSICAL || 
         request->op_type() == pb::OP_ADD_LOGICAL) {

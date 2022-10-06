@@ -239,7 +239,7 @@ int SchemaManager::whether_dists_legal(pb::MetaManagerRequest* request,
             }
         }
     }
-    // 检查sum(dists.count) = replica_num
+    // 检查sum(dists) = replica_num
     if (total_count != (uint64_t)request->table_info().replica_num()) {
         ERROR_SET_RESPONSE(response, pb::INPUT_PARAM_ERROR,
                 "replica num not match", request->op_type(), log_id);

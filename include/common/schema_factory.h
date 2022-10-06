@@ -145,6 +145,8 @@ typedef RepeatedPtrField<pb::DatabaseInfo>  DataBaseVec;
 public:
     virtual ~SchemaFactory() {
         bthread_mutex_destroy(&_update_slow_db_mutex);
+        bthread_mutex_destroy(&_region_mutex);
+        bthread_mutex_destroy(&_table_mutex);
     }
 
     static SchemaFactory* get_instance() {
@@ -174,6 +176,8 @@ private:
     SchemaFactory() {
         _is_inited = false;
         bthread_mutex_init(&_update_slow_db_mutex, NULL);
+        bthread_mutex_init(&_region_mutex, NULL);
+        bthread_mutex_init(&_table_mutex, NULL);
         _physical_room = FLAGS_default_physical_room;
     }
 

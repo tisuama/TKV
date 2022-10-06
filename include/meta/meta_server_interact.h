@@ -29,7 +29,7 @@ public:
     // template impl send_request
     template<typename Request, typename Response>
     int send_request(const std::string& service_name, const Request& request, Response& response) {
-        DB_DEBUG("send request for sercive name: %s", service_name.c_str());
+        DB_DEBUG("send request for service name: %s", service_name.c_str());
         const ::google::protobuf::ServiceDescriptor* service_desc = pb::MetaService::descriptor();
         const ::google::protobuf::MethodDescriptor* method = service_desc->FindMethodByName(service_name);
         if (method == NULL) {

@@ -14,6 +14,9 @@ public:
             int64_t& applied_index, int64_t& dml_latency);
     static void get_peer_snapshot_size(const std::string& peer, int64_t region_id,
             uint64_t* data_size, uint64_t* meta_size, int64_t* snapshot_index);
+    static int send_init_region_method(const std::string& instance_address,
+            const pb::InitRegion& init_region_request,
+            pb::StoreRes& response);
 };
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

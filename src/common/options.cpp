@@ -13,6 +13,7 @@ DEFINE_bool(meta_with_any_ip, false, "meta server ip is ip_any or meta_ip");
 DEFINE_int32(meta_id, 0, "meta id in conf file");
 DEFINE_string(meta_ip, "127.0.0.1", "meta ip");
 DEFINE_int32(meta_port, 8010, "meta port");
+DEFINE_int32(disk_used_percent, 80, "max disk used percent, default: 80");
 
 // Sotre Service
 DEFINE_string(default_logical_room, "default", "default logical room");
@@ -22,7 +23,7 @@ DEFINE_int32(store_id, 0, "store id in conf file");
 DEFINE_string(store_ip, "127.0.0.1", "store ip");
 DEFINE_int32(store_port, 8110, "store port");
 
-// Raft
+// Raft Service
 // raft log数据
 DEFINE_string(raftlog_uri, "raft_log://myraftlog?id=", "raft_log uri");
 // raft meta持久化数据

@@ -389,5 +389,54 @@ void TableManager::partition_update_start_key(int64_t table_id, std::string& min
 void TableManager::add_new_region(const pb::RegionInfo& leader_info) {
     DB_FATAL("Not implement now");
 }
+
+int64_t TableManager::get_start_key_region_id(int64_t table_id, 
+       const std::string& start_key, 
+       int64_t partition_id) {
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    if (_table_info_map.find(table_id) == _table_info_map.end()) {
+        DB_WARNING("table_id: %ld not exist", table_id);
+        return -1;
+    }
+    auto& start_key_region_map = _table_info_map[table_id].skey_to_region_map[partition_id];
+    auto iter = start_key_region_map.find(start_key);
+    if (iter == start_key_region_map.end()) {
+        DB_WARNING("table_id: %ld can't find start_key: %s",
+                table_id, to_hex_str(start_key).c_str());
+        return -1;
+    }
+    DB_WARNING("table_id: %ld start_key: %s find region_id: %ld",
+            table_id, to_hex_str(start_key).c_str(), iter->second.region_id);
+    return iter->second.region_id;
+} 
+
+int64_t TableManager::get_pre_region_id(int64_t table_id, 
+       const std::string& start_key,
+       int64_t partition_id) {
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    if (_table_info_map.find(table_id) == _table_info_map.end()) {
+        DB_WARNING("table_id: %ld not exist", table_id);
+        return -1;
+    }
+    auto& start_key_region_map = _table_info_map[table_id].skey_to_region_map[partition_id];
+    auto iter = start_key_region_map.lower_bound(start_key);
+    if (iter == start_key_region_map.end()) {
+        DB_WARNING("table_id: %ld can't find start_key: %s",
+                table_id, to_hex_str(start_key).c_str());
+    } else if (iter->first == start_key) {
+        DB_WARNING("table_id: %ld start key: %s exist", 
+                table_id, to_hex_str(start_key).c_str());
+        return -1;
+    }
+    if (iter == start_key_region_map.begin()) {
+        DB_WARNING("table_id: %ld find start_key: %s at begining", 
+                table_id, to_hex_str(start_key).c_str());
+        return -1;
+    }
+    --iter;
+    DB_WARNING("table_id: %ld start_key: %s, region_id: %ld",
+            table_id, to_hex_str(start_key).c_str(), iter->second.region_id);
+    return iter->second.region_id;
+} 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

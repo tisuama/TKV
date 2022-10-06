@@ -4,6 +4,9 @@
 #include <memory>
 #include "common/log.h"
 #include "proto/meta.pb.h"
+#include "proto/store.pb.h"
+#include "common/common.h"
+
 namespace TKV {
 class Region;
 class RegionControl {
@@ -45,6 +48,20 @@ public:
 
     // called by region
     void sync_do_snapshot();
+    
+    void add_peer(const pb::AddPeer& add_peer, SmartRegion region, ExecutionQueue& queue);
+
+private:
+    int legal_for_add_peer(const pb::AddPeer& add_peer, pb::StoreRes* response);
+    void construct_init_region_request(pb::InitRegion& init_request); 
+    void node_add_peer(const pb::AddPeer& add_peer, 
+                       const std::string& new_instance,
+                       pb::StoreRes* response,
+                       google::protobuf::Closure* done);
+    int init_region_to_store(const std::string& instance_address, 
+                             const pb::InitRegion& init_region_request,
+                             pb::StoreRes* store_response); 
+                
 
 private:
     Region* _region = nullptr;

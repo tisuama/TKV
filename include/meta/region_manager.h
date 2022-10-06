@@ -3,6 +3,7 @@
 #include "meta/schema_manager.h"
 #include "meta/meta_server.h"
 #include "common/common.h"
+#include "meta/table_manager.h"
 #include <unordered_map>
 #include <set>
 
@@ -89,6 +90,31 @@ public:
         }
     }
 
+    /* 判断该region是否已经存在 */
+    bool exist_region(int64_t table_id, const std::string& start_key, 
+            const std::string& end_key, int64_t partition_id) {
+        if (start_key.empty()) {
+            int64_t region_id = TableManager::get_instance()->get_start_key_region_id(
+                    table_id, start_key, partition_id);
+            if (region_id < 0) {
+                // start_key为空且不在map中，说明已经存在
+                return true;
+            }
+        } else {
+            int64_t pre_region_id = TableManager::get_instance()->get_pre_region_id(
+                    table_id, start_key, partition_id);
+            if (pre_region_id > 0) {
+                auto pre_region_info = get_region_info(pre_region_id);
+                if (pre_region_info) {
+                    if (!pre_region_info->end_key().empty() && pre_region_info->end_key() <= start_key) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     void clear();
     
     int load_region_snapshot(const std::string& value);
@@ -108,6 +134,7 @@ public:
             std::unordered_map<int64_t, int64_t>& table_replica_nums,
             std::unordered_map<int64_t, std::string>& table_resource_tags,
             std::unordered_map<int64_t, std::unordered_map<std::string, int64_t>>& table_replica_dists,
+            std::vector<std::pair<std::string, pb::RaftControlRequest>>& remove_peer_requests,
             pb::StoreHBResponse* response);
 
     // Raft called

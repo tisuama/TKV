@@ -4,6 +4,8 @@
 #include "meta/meta_rocksdb.h"
 
 namespace TKV {
+DECLARE_int32(disk_used_percent);
+
 using braft::Closure;
 void ClusterManager::process_cluster_info(google::protobuf::RpcController* controller,
                         const meta_req* request,
@@ -59,7 +61,7 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
     if (_phy_log_map.find(physical_room) != _phy_log_map.end()) {
         ins_info.set_logical_room(_phy_log_map[physical_room]);
     } else {
-        DB_FATAL("get logical room for physical_room: %s failed", physical_room.c_str());
+        DB_FATAL("Get logical room for physical_room: %s failed, done: %p", physical_room.c_str(), done);
         // MetaServer done 
         IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "physical room to logical room failed");
         return;
@@ -67,7 +69,7 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
 
     // 实例已经存在
     if (_ins_info.find(address) != _ins_info.end()) {
-        DB_WARNING("instance: %s is already exist", address.c_str());
+        DB_WARNING("Instance: %s is already exist", address.c_str());
         IF_DONE_SET_RESPONSE(done, pb::INPUT_PARAM_ERROR, "instance already exist");
         return ;
     }
@@ -82,7 +84,7 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
     } 
     auto ret = MetaRocksdb::get_instance()->put_meta_info(construct_instance_key(address), value);
     if (ret < 0) {
-        DB_WARNING("add instance: %s to rocksdb failed", request.ShortDebugString().c_str());
+        DB_WARNING("Add instance: %s to rocksdb failed", request.ShortDebugString().c_str());
         IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "write db failed");
         return ;
     }
@@ -109,7 +111,7 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
         scheduling_info.region_map = std::unordered_map<int64_t, std::vector<int64_t>>{};
     }
     IF_DONE_SET_RESPONSE(done, pb::SUCCESS, "success");
-    DB_NOTICE("add instance success, request: %s", request.ShortDebugString().c_str());
+    DB_NOTICE("Add instance success, request: %s", request.ShortDebugString().c_str());
 } 
 /* 1. dead store下线之前选择补副本的instance
  *   1.1 peer：exclude_stores是peers的store address
@@ -117,8 +119,8 @@ void ClusterManager::add_instance(const meta_req& request, Closure* done) {
  * 2. store进行迁移
  *   2.1 peer：exclude_stores是peers的store address
  *   2.2 learner：exclude_stores是null
- * 3. 处理store心跳，补region peer，exclude_stores是peers store address
- * 4. 建表，创建每一个region的第一个peer，exclude_stores是null
+ * 3. 处理store心跳、补region peer，exclude_stores是peers store address
+ * 4. 建表、创建每一个region的第一个peer，exclude_stores是null
  * 5. region分裂
  *   5.1 尾分裂选一个instance，exclude_stores是原region leader store address
  *   5.2 中间分裂选replica-1个instance，exclude_stores是peer store address
@@ -142,14 +144,19 @@ int ClusterManager::select_instance_rolling(const std::string& resource_tag,  //
     size_t ins_count = _res_ins_map[resource_tag].size();    
     auto& last_rolling_pos = _res_rolling_pos[resource_tag];
     auto& instance = _res_rolling_ins[resource_tag];
-    for (; rolling_times < ins_count; ) {
+    for (; rolling_times < ins_count /* 所有instance都过了一遍 */; ++last_rolling_pos) {
         if (last_rolling_pos >= ins_count) {
             last_rolling_pos = 0;
             continue;
         }
         ++rolling_times;
+        auto& instance_address = instance[last_rolling_pos];
+        if (!is_legal_for_select_instance(instance_address, resource_tag, exclude_stores, logical_room)) {
+            continue;
+        }
         // 找到rolling_address
-        select_instance = instance[last_rolling_pos];
+        select_instance = instance_address;
+        break;
     }
     if (select_instance.empty()) {
         DB_WARNING("select instance fail, has no legal store, resource_tag: %s", resource_tag.c_str());
@@ -467,6 +474,47 @@ void ClusterManager::add_physical(const pb::MetaManagerRequest& request, braft::
     }
     IF_DONE_SET_RESPONSE(done, pb::SUCCESS, "success");
     DB_NOTICE("add physical room success, request: %s", request.ShortDebugString().c_str());
+}
+
+bool ClusterManager::is_legal_for_select_instance(
+        const std::string& candicate_instance,
+        const std::string& resource_tag,
+        const std::set<std::string>& exclude_stores,
+        const std::string& logical_room) {
+    DB_DEBUG("cluster check candicate_instance: %s, resource_tag: %s", 
+            candicate_instance.c_str(), resource_tag.c_str());
+    // instance没找到
+    if (_ins_info.find(candicate_instance) == _ins_info.end()) {
+        DB_WARNING("candicate_instance: %s not found int instance_info", candicate_instance.c_str());
+        return false;
+    }
+    // instance的logical_room不符合
+    if (!logical_room.empty() && _ins_info[candicate_instance].logical_room != logical_room) {
+        DB_WARNING("candicate_instance: %s logical_room: %s not statisfied instance logical_room: %s", 
+                candicate_instance.c_str(), logical_room.c_str(), _ins_info[candicate_instance].logical_room.c_str());
+        return false;
+    }
+    // instance状态或resource_tag
+    if (!_ins_info[candicate_instance].instance_state.state != pb::NORMAL ||
+            _ins_info[candicate_instance].resource_tag != resource_tag ||
+            _ins_info[candicate_instance].capacity == 0) {
+        DB_WARNING("candicate_instance: %s instance_state not statisfied", candicate_instance.c_str()); 
+        return false;
+    }
+    // exclude_stores 已经存在
+    if (exclude_stores.count(candicate_instance) != 0) {
+        DB_WARNING("candicate_instance: %s is exist in exclude_stores", candicate_instance.c_str());
+        return false;
+    }
+    // 空间预估
+    if (_ins_info[candicate_instance].used_size * 100 / _ins_info[candicate_instance].capacity > 
+            FLAGS_disk_used_percent) {
+        DB_WARNING("instance: %s left size not enough, used_size: %ld, capacity: %ld",
+                candicate_instance.c_str(), _ins_info[candicate_instance].used_size,
+                _ins_info[candicate_instance].capacity);
+        return false;
+    }
+    return true;
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

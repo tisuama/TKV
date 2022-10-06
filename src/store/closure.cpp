@@ -38,5 +38,28 @@ void DMLClosure::Run() {
     delete this;
 
 }
+
+void AddPeerClosure::Run() {
+    if (!status().ok()) {
+        DB_WARNING("region_id: %ld ADD_PEER failed, new_instance: %s, status: %s",
+                region->get_region_id(), status().error_cstr(), new_instance.c_str());
+        if (response) {
+            ERROR_SET_RESPONSE_FAST(response, pb::NOT_LEADER, "Not Leader", 0);
+            response->set_leader(butil::endpoint2str(region->get_leader()).c_str());
+        }
+    } else {
+        DB_WARNING("region_id: %ld ADD_PEER success, cost: %ld", 
+                region->get_region_id(), cost.get_time());
+    }
+    if (!is_split) {
+        region->reset_region_status();
+    }
+    DB_WARNING("region_id: %ld region status is reset", region->get_region_id());
+    if (done) {
+        done->Run();
+    }
+    cond.decrease_signal();
+    delete this;
+}
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

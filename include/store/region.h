@@ -201,7 +201,7 @@ public:
     }
 
     void shutdown() {
-        if (this->get_version() == 0) {
+        if (get_version() == 0) {
             wait_async_apply_log_queue_empty();
         }
         if (_need_decrease) {
@@ -235,6 +235,10 @@ public:
 
     bool learner_ready_for_read() const {
         return _learner_ready_for_read;
+    }
+    
+    void add_peer(const pb::AddPeer& add_peer, SmartRegion region, ExecutionQueue& queue) {
+        _region_control.add_peer(add_peer, region, queue);
     }
 
     // public

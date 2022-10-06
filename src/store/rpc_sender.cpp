@@ -44,5 +44,12 @@ void RpcSender::get_peer_snapshot_size(const std::string& peer, int64_t region_i
         *snapshot_index = response.region_raft_stat().snapshot_index();
     }
 }
+
+int RpcSender::send_init_region_method(const std::string& instance_address,
+    const pb::InitRegion& init_region_request,
+    pb::StoreRes& response) {
+    StoreInteract store_interact(instance_address); 
+    return store_interact.send_request("init_region", init_region_request, response);
+}
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

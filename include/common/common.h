@@ -21,6 +21,7 @@ extern int64_t parse_snapshot_index_from_path(const std::string& snapshot_path, 
 extern std::string to_hex_str(const std::string& str);
 extern std::string transfer_to_lower(std::string str);
 extern int end_key_compare(rocksdb::Slice key1, rocksdb::Slice key2);
+extern void update_param(const std::string& name, const std::string& value);
 
 #define RETURN_IF_NOT_INIT(init, response, log_id) \
     do {\

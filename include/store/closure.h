@@ -32,5 +32,18 @@ public:
     int64_t applied_index = 0;
     uint64_t log_id = 0;
 };
+
+struct AddPeerClosure: public braft::Closure {
+    AddPeerClosure(BthreadCond& cond): cond(cond) {}
+    virtual void Run();
+
+    Region* region;
+    std::string new_instance;
+    TimeCost cost;
+    google::protobuf::Closure* done = nullptr;
+    pb::StoreRes* response = nullptr;
+    BthreadCond& cond;
+    bool is_split = false;
+};
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

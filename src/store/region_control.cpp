@@ -12,6 +12,7 @@ DEFINE_int32(compact_interval_s, 1, "compact_interval(s)");
 DEFINE_bool(allow_compact_range, true, "allow_comapct_range");
 DECLARE_string(snapshot_uri);
 DECLARE_string(stable_uri);
+DECLARE_int64(store_heart_beat_interval_us);
 
 class RaftControlDone: public braft::Closure {
 public:
@@ -284,5 +285,179 @@ void common_raft_control(google::protobuf::RpcController* controller,
         return ;
     }
 }
+
+void RegionControl::add_peer(const pb::AddPeer& add_peer, SmartRegion region, ExecutionQueue& queue) {
+    std::string new_instance = add_peer.new_peers(add_peer.new_peers_size() - 1);
+    // 当前add_peer不合法
+    if (legal_for_add_peer(add_peer, NULL) != 0) {
+        return ;
+    }
+    // 在leader_send_init_region 将状态设置为doing，在add_peer结束时将region状态设置回来
+    pb::RegionStatus expect_status = pb::IDLE;
+    if (!_status.compare_exchange_strong(expect_status, pb::DOING)) {
+        DB_WARNING("region_id: %ld status not IDLE, cannot add peer", _region_id);
+        return ;
+    }
+
+    TimeCost cost;
+    DB_WARNING("region_id: %ld add peer: %s and region status set to "
+            "DOING because of ADD_PEER of store heartbeat response",
+            _region_id,  new_instance.c_str());
+
+    auto add_peer_fn = [add_peer, new_instance, region, cost, this]() {
+        if (region->_shutdown) {
+            DB_WARNING("region_id: %ld has REMOVE", region->get_region_id());
+            reset_region_status();
+            return ;
+        } 
+        DB_WARNING("region_id: %ld ADD_PEER start init, wait_time: %ld",
+                region->get_region_id(), cost.get_time());
+        if (cost.get_time() > FLAGS_store_heart_beat_interval_us * 5) {
+            DB_WARNING("region_id: %ld ADD_PEER time_out", region->get_region_id());
+            reset_region_status();
+            return ;
+        }
+        if (legal_for_add_peer(add_peer, NULL) != 0) {
+            reset_region_status();
+            return ;
+        }
+        
+        // region split不走这里
+        // construct request
+        pb::InitRegion init_request;
+        construct_init_region_request(init_request);
+
+        if (init_region_to_store(new_instance, init_request, NULL) != 0) {
+            reset_region_status();
+            return ;
+        }
+        if (legal_for_add_peer(add_peer, NULL) != 0) {
+            reset_region_status();
+            return ;
+        }
+        // 自己的config配置变更
+        node_add_peer(add_peer, new_instance, NULL, NULL);
+    }; 
+    queue.run(add_peer_fn);
+}
+
+int RegionControl::legal_for_add_peer(const pb::AddPeer& add_peer, pb::StoreRes* response) {
+    DB_WARNING("check legal for add peer for region_id: %ld", _region_id);
+    if (!_region->is_leader()) {
+        DB_WARNING("region_id: %ld add_peer failed, not leader", _region_id);
+        if (response) {
+            ERROR_SET_RESPONSE_FAST(response, pb::NOT_LEADER, "Not leader", 0);
+            response->set_leader(butil::endpoint2str(_region->get_leader()).c_str());
+        }
+        return -1;
+    }
+    if (_region->_shutdown) {
+        DB_WARNING("region_id: %ld add_peer failed, node has been shutdown when add_peer", _region_id);
+        if (response) {
+            ERROR_SET_RESPONSE_FAST(response, pb::NOT_LEADER, "Not leader", 0);
+        } 
+        return -1;
+    }
+    if (!add_peer.is_split() && 
+            ((_region->_region_info.has_can_add_peer() && !_region->_region_info.can_add_peer()))) {
+        DB_WARNING("region_id: %ld can't add peer, can_add_peer: %d, region version: %ld",
+                _region_id, _region->_region_info.can_add_peer(), _region->_region_info.version());
+        if (response) {
+            ERROR_SET_RESPONSE_FAST(response, pb::CANNOT_ADD_PEER, "Cannot add peer", 0);
+        }
+        return -1;
+    }
+
+    std::vector<braft::PeerId> peers;
+    std::vector<std::string> peers_str;
+    if (!_region->_node.list_peers(&peers).ok()) {
+        DB_WARNING("regio_id: %ld node list peers failed", _region_id);
+        if (response) {
+            ERROR_SET_RESPONSE_FAST(response, pb::PEER_NOT_EQUAL, "List peers failed", 0);
+        }
+        return -1;
+    }
+    if (peers.size() != (size_t)add_peer.old_peers_size()) {
+        DB_WARNING("region_id: %ld old peers size not equal", _region_id);
+        if (response) {
+            ERROR_SET_RESPONSE_FAST(response, pb::PEER_NOT_EQUAL, "Peer size not equal", 0);
+        }
+        return -1;
+    }
+    for (auto& peer: peers) {
+        peers_str.push_back(butil::endpoint2str(peer.addr /* EndPoint */).c_str());
+    }
+    for (auto& old_peer: add_peer.old_peers()) {
+        auto iter = std::find(peers_str.begin(), peers_str.end(), old_peer);
+        if (iter == peers_str.end()) {
+            DB_FATAL("region_id: %ld old_peer: %s not equal list peer: %s",
+                    _region_id,  add_peer.ShortDebugString().c_str());
+            if (response) {
+                ERROR_SET_RESPONSE_FAST(response, pb::PEER_NOT_EQUAL, "Peer not equal", 0);
+            }
+            return -1;
+        }
+    }
+    // Finally, CHECK SUCCESS
+    return 0;
+}
+
+void RegionControl::construct_init_region_request(pb::InitRegion& init_request) {
+    pb::RegionInfo* region_info = init_request.mutable_region_info();
+    _region->copy_region(region_info);
+
+    region_info->set_log_index(0);
+    region_info->clear_peers();
+    region_info->set_leader(_region->_address);
+    region_info->set_status(pb::IDLE);
+    region_info->set_can_add_peer(true);
+    // ADD_PEER的region version设置为0，
+    // 如果长时间没有通过on_snapshot_load把version对其，自动删除
+    region_info->set_version(0);
+    init_request.set_snapshot_times(0);
+} 
+
+void RegionControl::node_add_peer(const pb::AddPeer& add_peer, 
+                      const std::string& new_instance,
+                      pb::StoreRes* response,
+                      google::protobuf::Closure* done) {
+    DB_WARNING("region_id: %ld Leader ADD_PEER, new_instance: %s",
+            _region_id, new_instance.c_str());
+    Concurrency::get_instance()->add_peer_concurrency.increase_wait();
+    AddPeerClosure* peer_done = new AddPeerClosure(
+            Concurrency::get_instance()->add_peer_concurrency);
+    peer_done->region = _region;
+    peer_done->done = done;
+    peer_done->response = response;
+    peer_done->new_instance = new_instance;
+    if (add_peer.is_split()) {
+        peer_done->is_split = true;
+    }
+    braft::PeerId add_peer_instance;
+    add_peer_instance.parse(new_instance);
+    _region->_node.add_peer(add_peer_instance, peer_done);
+    DB_WARNING("region_id: %ld ADD_PEER send success, new_instance: %ld",
+            _region_id, new_instance.c_str());
+}
+
+int RegionControl::init_region_to_store(const std::string& instance_address, 
+                         const pb::InitRegion& init_region_request,
+                         pb::StoreRes* store_response) {
+    TimeCost cost;
+    pb::StoreRes response;
+    RpcSender::send_init_region_method(instance_address, init_region_request, response);
+    if (store_response) {
+        store_response->set_errcode(response.errcode());
+        store_response->set_errmsg(response.errmsg());
+    }
+    if (response.errcode() != pb::SUCCESS) {
+        DB_WARNING("ADD_PEER failed when init region, region_id: %ld, new_instance: %s, errcode: %d",
+                _region_id, instance_address.c_str(), response.errcode());
+        return -1;
+    }
+    DB_WARNING("region_id: %ld send init store to instance: %s success, cost: %ld",
+            _region_id, instance_address.c_str(), cost.get_time());
+    return 0;
+} 
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

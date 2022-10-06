@@ -48,4 +48,20 @@ int end_key_compare(rocksdb::Slice key1, rocksdb::Slice key2) {
 	}
 	return key1.compare(key2);
 }
+
+void update_param(const std::string& name, const std::string& value) {
+	std::string target;
+	if (!google::GetCommandLineOption(name.c_str(), &target)) {
+		DB_WARNING("get command line: %s failed", name.c_str());
+		return ;
+	}
+	if (target == value) {
+		return ;
+	}
+	if (google::SetCommandLineOption(name.c_str(), value.c_str()).empty()) {
+		DB_WARNING("set command line failed, key: %s, value: %s", name.c_str(), value.c_str());
+		return ;
+	}
+	DB_WARNING("set command line success, key: %s, value: %s", name.c_str(), value.c_str());
+}
 } // namespace TKV

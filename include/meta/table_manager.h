@@ -195,6 +195,14 @@ public:
 
     void add_new_region(const pb::RegionInfo& leader_info);
 
+    int64_t get_start_key_region_id(int64_t table_id, 
+           const std::string& start_key, 
+           int64_t partition_id); 
+
+    int64_t get_pre_region_id(int64_t table_id, 
+           const std::string& start_key,
+           int64_t partition_id); 
+
 private:
     std::string construct_max_table_id_key() {
         std::string max_table_id_key = MetaServer::SCHEMA_IDENTIFY + 
