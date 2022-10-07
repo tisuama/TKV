@@ -89,16 +89,15 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
 void Region::on_apply(braft::Iterator& iter) {
     for (; iter.valid(); iter.next()) {
         braft::Closure* done =  iter.done();
-        brpc::ClosureGuard done_gurad(done);
         butil::IOBuf data = iter.data();
         butil::IOBufAsZeroCopyInputStream wrapper(data);
-        pb::StoreReq* request = nullptr;
+        auto request = std::make_shared<pb::StoreReq>();
         if (!request->ParseFromZeroCopyStream(&wrapper)) {
             DB_FATAL("Parse failed, region_id: %ld", _region_id);
             if (done != nullptr) {
                 ((DMLClosure*)done)->response->set_errcode(pb::PARSE_FROM_PB_FAIL);
                 ((DMLClosure*)done)->response->set_errmsg("parse failed");
-                braft::run_closure_in_bthread(done_gurad.release());
+                braft::run_closure_in_bthread(done);
             }
             continue;
         }
@@ -233,7 +232,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
 
 void Region::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) {
     TimeCost time_cost;
-    brpc::ClosureGuard done_gurad(done);
+    brpc::ClosureGuard done_guard(done);
     if (get_version() == 0) {
         // 等待异步队列为空
         wait_async_apply_log_queue_empty();
@@ -512,7 +511,7 @@ void Region::query(::google::protobuf::RpcController* controller,
                    const ::TKV::pb::StoreReq* request, 
                    ::TKV::pb::StoreRes* response,
                    ::google::protobuf::Closure* done) {
-    brpc::ClosureGuard done_gurad(done);
+    brpc::ClosureGuard done_guard(done);
     brpc::Controller* cntl = (brpc::Controller*)controller;
     uint64_t log_id = 0;
     if (cntl->has_log_id()) {
@@ -550,7 +549,7 @@ void Region::query(::google::protobuf::RpcController* controller,
     
     switch(request->op_type()) {
         case pb::OP_NONE: 
-            apply(request, response, cntl, done_gurad.release());
+            apply(request, response, cntl, done_guard.release());
             break;
         default:
             break;
@@ -649,6 +648,36 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
             }
             break;
     }
+}
+
+void Region::on_shutdown() {
+    DB_WARNING("region_id: %ld shutdown", _region_id);
+}
+
+void Region::on_leader_start(int64_t term) {
+    DB_WARNING("region_id: %ld Leader start at term: %ld", _region_id, term);
+    _region_info.set_leader(butil::endpoint2str(get_leader()).c_str());
+    // TODO: APPLYING_TXN 指定
+    leader_start(term);
+}
+
+void Region::leader_start(int64_t term) {
+    _is_leader.store(true);
+    _expect_term = term;
+    DB_WARNING("region_id: %ld Leader start at term: %ld", _region_id, term);
+}
+
+void Region::on_leader_stop() {
+    DB_WARNING("region_id: %ld Leader stop", _region_id);
+    _is_leader.store(false);
+    // TODO: 只读事务清理
+}
+
+void Region::on_leader_stop(const butil::Status& status) {
+    DB_WARNING("region_id: %ld Leader stop, err_code: %d, err_msg: %s",
+            _region_id, status.error_code(), status.error_cstr());
+    _is_leader.store(false);
+    // 只读事务清理
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -251,6 +251,10 @@ public:
     virtual void on_apply(braft::Iterator& iter) override; 
     virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) override;
     virtual int  on_snapshot_load(braft::SnapshotReader* reader) override;
+    virtual void on_shutdown();
+    virtual void on_leader_start(int64_t term);
+    virtual void on_leader_stop();
+    virtual void on_leader_stop(const butil::Status& status);
 
     // rpc function called by Store
     void query(::google::protobuf::RpcController* controller,
@@ -275,6 +279,11 @@ private:
             brpc::Controller* cntl, google::protobuf::Closure* done); 
 
     void do_apply(int64_t term, int64_t index, const pb::StoreReq& request, braft::Closure* done);
+
+    // Leader切换时确保事务状态一致，提交OP_CLEAR_APPLYING_TXN指令清理不一致事务
+    void apply_clear_transaction_log();
+
+    void leader_start(int64_t term);
 
 private:
     RocksWrapper*           _rocksdb;

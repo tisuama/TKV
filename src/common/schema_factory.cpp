@@ -50,6 +50,8 @@ void SchemaFactory::update_regions_double_buffer(bthread::TaskIterator<RegionVec
 }
 
 int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table) {
+    DB_WARNING("schema update table info: %s", table.ShortDebugString().c_str());
+
     BAIDU_SCOPED_LOCK(_table_mutex);
     auto& table_info_mapping = background.table_id_to_table_info;
     auto& table_name_id_mapping = background.table_name_to_id;

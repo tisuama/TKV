@@ -182,14 +182,16 @@ int SchemaManager::pre_process_for_create_table(const pb::MetaManagerRequest* re
     if (!table_info.has_resource_tag()) {
         std::string nname = table_info.namespace_name();
         std::string db_name = nname + "\001" + table_info.database_name();
+        DB_DEBUG("select resource_tag for db_name: %s", db_name.c_str());
         int64_t db_id = DatabaseManager::get_instance()->get_database_id(db_name);
         std::string db_tag = DatabaseManager::get_instance()->get_resource_tag(db_id);
-        if (tag != "") {
+        if (db_tag != "") {
             tag = db_tag;
         }
     }
     mutable_request->mutable_table_info()->set_resource_tag(tag);
-    DB_WARNING("Table: %s should select intance count: %ld", table_info.table_name().c_str(), total_region_cnt);
+    DB_WARNING("Table: %s table_info: %s, mutable_table_info: %s, should select intance count: %ld", 
+            table_info.table_name().c_str(), table_info.ShortDebugString().c_str(), mutable_request->table_info().ShortDebugString().c_str(), total_region_cnt);
     
     // Add instance
     for (int i = 0; i < total_region_cnt; i++) {
@@ -332,6 +334,7 @@ int SchemaManager::load_max_id_snapshot(const std::string& max_id_prefix,
 
 void SchemaManager::process_leader_heartbeat_for_store(const pb::StoreHBRequest* request,
         pb::StoreHBResponse* response, uint64_t log_id) {
+    DB_DEBUG("process leader heartbeat, request: %s", request->ShortDebugString().c_str());
     IF_NOT_LEADER(_meta_state_machine, response);
 
     uint64_t ts = butil::gettimeofday_us();

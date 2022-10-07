@@ -78,7 +78,8 @@ public:
         if (response.errcode() != pb::SUCCESS) {
             DB_WARNING("Send store address fail, errcode: %d, log_id: %lu, instance: %s, response: %s, request: %s",
                     response.errcode(),
-                    cntl.log_id(), _store_address.c_str(), 
+                    cntl.log_id(), 
+                    _store_address.c_str(), 
                     response.ShortDebugString().c_str(),
                     request.ShortDebugString().c_str());
             return -1;
@@ -109,7 +110,7 @@ public:
             if (response.errcode() != pb::NOT_LEADER) {
                 return -1;
             }
-            DB_WARNING("connect with store %s fail, not leader, redirect to %s",
+            DB_WARNING("connect with store %s fail, not leader, redirect to %s"
                     "log_id: %lu", _store_address.c_str(), response.leader().c_str(), log_id);
             butil::EndPoint leader_addr;
             butil::str2endpoint(response.leader().c_str(), &leader_addr);

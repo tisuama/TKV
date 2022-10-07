@@ -69,6 +69,7 @@ extern void update_param(const std::string& name, const std::string& value);
             response->set_errcode(pb::NOT_LEADER);\
             response->set_errmsg("Not Leader");\
             response->set_leader(butil::endpoint2str(fsm->get_leader()).c_str());\
+            DB_FATAL("Not Leader and exit now");\
             return;\
         }\
     } while(0);

@@ -79,6 +79,7 @@ public:
         bthread_mutex_destroy(&_phy_mutex);
         bthread_mutex_destroy(&_ins_mutex);
         bthread_mutex_destroy(&_ins_param_mutex);
+        bthread_mutex_destroy(&_sche_mutex);
     }
     // called before apply for process
     void process_cluster_info(google::protobuf::RpcController* controller,
@@ -160,6 +161,7 @@ private:
         bthread_mutex_init(&_phy_mutex, NULL);
         bthread_mutex_init(&_ins_mutex, NULL);
         bthread_mutex_init(&_ins_param_mutex, NULL);
+        bthread_mutex_init(&_sche_mutex, NULL);
         {
             BAIDU_SCOPED_LOCK(_phy_mutex);
             _phy_log_map[FLAGS_default_physical_room] = 
@@ -207,9 +209,9 @@ private:
     std::unordered_map<std::string, std::string>           _ins_phy_map;
     // key: 物理机房 value: 实例 
     std::unordered_map<std::string, std::set<std::string>> _phy_ins_map;
-    // key: tag value: 实例 
+    // key: resource_tag value: 实例 
     std::unordered_map<std::string, std::set<std::string>> _res_ins_map;
-    // key: tag value: tag下上一个rolling的instance
+    // key: resource_tag value: tag下上一个rolling的instance
     std::unordered_map<std::string, size_t>                    _res_rolling_pos;
     std::unordered_map<std::string, std::vector<std::string>>  _res_rolling_ins;
 

@@ -32,6 +32,7 @@ void add_namespace() {
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_CREATE_NAMESPACE);
     auto info = request.mutable_namespace_info();
+    info->set_resource_tag("default_resource_tag");
     info->set_namespace_name("TEST_NAMESPACE");
     info->set_quota(1024);
     

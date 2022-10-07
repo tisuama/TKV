@@ -177,8 +177,10 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
     }
     TableManager::get_instance()->get_table_info(table_ids, table_replica_nums, 
             table_resouce_tags, table_replica_dists, table_learner_resource_tags);
+    DB_DEBUG("start process leader heartbeat, request: %s", request->ShortDebugString().c_str());
     // TODO: Learner
     for (auto& leader_hb: request->leader_regions()) {
+        DB_DEBUG("Leader hb: %s", leader_hb.ShortDebugString().c_str());
         auto& leader_info = leader_hb.region(); 
         int64_t region_id = leader_info.region_id();
         auto pre_leader_info = get_region_info(region_id);
@@ -225,6 +227,7 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
                                     peer_changed, 
                                     leader_hb, 
                                     pre_leader_info);
+        DB_DEBUG("Leader HB, region_id: %ld, peer_changed: %d", region_id, peer_changed);
         if (!peer_changed) {
             check_peer_count(region_id, 
                              leader_hb,
@@ -413,6 +416,7 @@ void RegionManager::check_peer_count(int64_t region_id,
         std::unordered_map<int64_t, std::unordered_map<std::string, int64_t>>& table_replica_dists,
         std::vector<std::pair<std::string, pb::RaftControlRequest>>& remove_peer_requests,
         pb::StoreHBResponse* response) {
+    DB_DEBUG("region_id: %ld start check peer count, leader_hb: %d", region_id, leader_hb.status());
     if (leader_hb.status() != pb::IDLE) {
         return ;
     }

@@ -51,6 +51,8 @@ void ClusterManager::process_cluster_info(google::protobuf::RpcController* contr
 // called when on_apply
 void ClusterManager::add_instance(const meta_req& request, Closure* done) {
     auto& ins_info = const_cast<pb::InstanceInfo&>(request.instance());
+    DB_DEBUG("Add instance info: %s", ins_info.ShortDebugString().c_str());
+
     std::string address = ins_info.address();
     if (!ins_info.has_physical_room()) {
         ins_info.set_physical_room(FLAGS_default_physical_room);
@@ -495,10 +497,16 @@ bool ClusterManager::is_legal_for_select_instance(
         return false;
     }
     // instance状态或resource_tag
-    if (!_ins_info[candicate_instance].instance_state.state != pb::NORMAL ||
+    if (_ins_info[candicate_instance].instance_state.state != pb::NORMAL ||
             _ins_info[candicate_instance].resource_tag != resource_tag ||
             _ins_info[candicate_instance].capacity == 0) {
-        DB_WARNING("candicate_instance: %s instance_state not statisfied", candicate_instance.c_str()); 
+        DB_WARNING("candicate_instance: %s instance_state: %d not statisfied, resource_tag: %s, target resource_tag: %s, capacity: %ld", 
+                candicate_instance.c_str(), 
+                _ins_info[candicate_instance].instance_state.state,
+                _ins_info[candicate_instance].resource_tag.c_str(),
+                resource_tag.c_str(),
+                _ins_info[candicate_instance].capacity); 
+
         return false;
     }
     // exclude_stores 已经存在
