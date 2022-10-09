@@ -217,7 +217,7 @@ void TableManager::send_create_table_request(const std::string& namespace_name,
                 success = false;
                 return ;
             }
-            DB_NOTICE("New region id: %ld success, full_table_name: %s", full_table_name.c_str());
+            DB_NOTICE("New region id: %ld success, full_table_name: %s", region_id, full_table_name.c_str());
         };
         if (!success) {
             break;

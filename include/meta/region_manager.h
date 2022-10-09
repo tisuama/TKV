@@ -59,7 +59,7 @@ public:
     std::string construct_region_key(int64_t region_id) {
         std::string region_key = MetaServer::SCHEMA_IDENTIFY + 
             MetaServer::REGION_SCHEMA_IDENTIFY;
-        region_key.append((char*)region_id, sizeof(int64_t));
+        region_key.append((char*)&region_id, sizeof(int64_t));
         return region_key;
     }
 

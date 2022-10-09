@@ -35,6 +35,7 @@ extern void update_param(const std::string& name, const std::string& value);
 
 #define IF_DONE_SET_RESPONSE(done, errcode, err_msg) \
     do {\
+        DB_WARNING("process error, errcode: %d, err_msg: %s", errcode, err_msg);\
         if (done && static_cast<MetaServerClosure*>(done)->response) {\
             auto meta_done = static_cast<MetaServerClosure*>(done);\
             meta_done->response->set_errcode(errcode);\

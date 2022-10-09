@@ -124,7 +124,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
         return 0;
     }
     ON_SCOPED_EXIT([this]() {
-            _can_heartbeat = true;
+        _can_heartbeat = true;
     });
 
     // 设置region成员信息
@@ -214,11 +214,14 @@ int Region::init(bool new_region, int32_t snapshot_times) {
         _need_decrease = true;
     }
     
+    // init 的region会马上选主，等一会成为Leader
+    bthread_usleep(1 * 1000 * 1000LL);
     // snapshot_times = 2
     while(snapshot_times > 0) {
-        // init 的region会马上选主，等一会成为Leader
-        bthread_usleep(1 * 1000 * 1000LL);
         _region_control.sync_do_snapshot();
+
+        DB_DEBUG("region_id: %ld do %d-th snapshot", _region_id, snapshot_times);
+
         --snapshot_times;
     }
     copy_region(&_resource->region_info);
@@ -511,6 +514,9 @@ void Region::query(::google::protobuf::RpcController* controller,
                    const ::TKV::pb::StoreReq* request, 
                    ::TKV::pb::StoreRes* response,
                    ::google::protobuf::Closure* done) {
+    DB_DEBUG("region_id: %ld process query, request: %s, done: %p", 
+            _region_id, request->ShortDebugString().c_str(), done);
+
     brpc::ClosureGuard done_guard(done);
     brpc::Controller* cntl = (brpc::Controller*)controller;
     uint64_t log_id = 0;
@@ -614,6 +620,9 @@ void Region::apply(const pb::StoreReq* request, pb::StoreRes* response,
     c->log_id = log_id;
     c->response = response;
     c->region = this;
+    c->done = done;
+    
+    DB_DEBUG("region_id: %ld appy, done: %p", _region_id, done);
 
     braft::Task task;
     task.data = &data;

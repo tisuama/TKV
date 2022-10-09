@@ -43,11 +43,6 @@ public:
     
     const std::string get_resource_tag(const int64_t db_id) {
         BAIDU_SCOPED_LOCK(_db_mutex);
-        DB_DEBUG("=== Get resource_tag for db_id: %ld, result: %d", 
-                db_id, _db_info_map.find(db_id) != _db_info_map.end());
-        for (auto& it: _db_info_map) {
-            DB_DEBUG("===  db info map, id: %ld, info: %s", it.first, it.second.ShortDebugString().c_str());
-        }
         if (_db_info_map.find(db_id) == _db_info_map.end()) {
             return "";
         }

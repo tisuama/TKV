@@ -64,7 +64,7 @@ void add_logical() {
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_ADD_LOGICAL);
     auto info = request.mutable_logical_rooms();
-    info->add_logical_rooms("TEST_LOGICAL");
+    info->add_logical_rooms("default_logical_room");
     
     auto meta = MetaServerInteract::get_instance();
     int r = meta->init_internal(meta_bns);
@@ -78,8 +78,8 @@ void add_physical() {
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_ADD_PHYSICAL);
     auto info = request.mutable_physical_rooms();
-    info->set_logical_room("TEST_LOGICAL");
-    info->add_physical_rooms("TEST_PHYSICAL");
+    info->set_logical_room("default_logical_room");
+    info->add_physical_rooms("default_physical_room");
     
     auto meta = MetaServerInteract::get_instance();
     int r = meta->init_internal(meta_bns);

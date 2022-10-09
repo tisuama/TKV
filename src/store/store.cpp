@@ -27,6 +27,10 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     }
     _physical_room = FLAGS_default_physical_room;     
     _resource_tag = FLAGS_resource_tag;
+    
+    DB_DEBUG("Store instance init, physical_room: %s, resource_tag: %s", 
+            _physical_room.c_str(), _resource_tag.c_str());
+
     _rocksdb = RocksWrapper::get_instance();
     if (!_rocksdb) {
         DB_FATAL("create rocksdb handle failed, exit now");

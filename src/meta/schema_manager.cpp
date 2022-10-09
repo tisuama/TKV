@@ -334,7 +334,6 @@ int SchemaManager::load_max_id_snapshot(const std::string& max_id_prefix,
 
 void SchemaManager::process_leader_heartbeat_for_store(const pb::StoreHBRequest* request,
         pb::StoreHBResponse* response, uint64_t log_id) {
-    DB_DEBUG("process leader heartbeat, request: %s", request->ShortDebugString().c_str());
     IF_NOT_LEADER(_meta_state_machine, response);
 
     uint64_t ts = butil::gettimeofday_us();

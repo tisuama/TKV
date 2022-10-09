@@ -14,3 +14,17 @@ nohup ./TKVMeta --meta_id=0 &
 nohup ./TKVMeta --meta_id=1 &
 nohup ./TKVMeta --meta_id=2 &
 
+sleep 5
+
+nohup ./test_meta_server --cmd=prepare &
+
+sleep 3
+
+echo "START TKVStore..."
+nohup ./TKVStore --store_id=0 &
+
+sleep 3
+
+echo "ADD TABLE..."
+nohup ./test_meta_server --cmd=add_table &
+

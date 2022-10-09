@@ -32,6 +32,8 @@ void DMLClosure::Run() {
     if (is_sync) {
         cond->decrease_signal();
     }
+    DB_DEBUG("region_id: %ld DMLClosure done run, response: %s, done: %p",  
+            region_id, response->ShortDebugString().c_str(), done);
     if (done) {
         done->Run();
     }

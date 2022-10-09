@@ -245,6 +245,7 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
 // 只有Leader才调用此接口
 void RegionManager::update_region(const pb::MetaManagerRequest& request, 
         const int64_t apply_index, braft::Closure* done) {
+    DB_DEBUG("update_region info: %s", request.ShortDebugString().c_str());
     TimeCost time_cost;
     std::vector<std::string> put_keys;
     std::vector<std::string> put_values;
@@ -292,6 +293,7 @@ void RegionManager::update_region(const pb::MetaManagerRequest& request,
         }
         is_new.push_back(new_add);
         put_keys.push_back(construct_region_key(region_id));
+        put_values.push_back(region_value);
         {
             auto it = min_start_key.find(partition_id);
             if (it == min_start_key.end()) {
@@ -339,6 +341,7 @@ void RegionManager::update_region(const pb::MetaManagerRequest& request,
         min_start_key, max_end_key, key_id_map);
 
 
+    DB_DEBUG("update region mem, region_infos size: %ld", region_infos.size());
     // 更新内存
     for (size_t i = 0; i < region_infos.size(); i++) {
         auto& info = region_infos[i];
@@ -362,6 +365,8 @@ void RegionManager::update_region(const pb::MetaManagerRequest& request,
 
 void RegionManager::check_whether_update_region(int64_t region_id, bool has_peer_changed, 
         const pb::LeaderHB& leader_hb, const SmartRegionInfo& pre_region) {
+    DB_DEBUG("region_id: %ld check update region, leader_hb: %s", 
+            region_id, leader_hb.ShortDebugString().c_str());
     auto& leader_info = leader_hb.region();
     if (leader_info.log_index() < pre_region->log_index()) {
         DB_WARNING("region_id: %ld Leader log_index: %ld is less than pre region log_index: %ld",
