@@ -241,8 +241,8 @@ void MetaStateMachine::store_heartbeat(::google::protobuf::RpcController* contro
     // 是否需要add_peer或者remove_peer
     SchemaManager::get_instance()->process_leader_heartbeat_for_store(request, response, log_id);
 
-    DB_DEBUG("store heart beat request: %s", request->ShortDebugString().c_str());
-    DB_DEBUG("store heart beat response: %s", response->ShortDebugString().c_str());
+    DB_DEBUG("finish store heart beat request: %s", request->ShortDebugString().c_str());
+    DB_DEBUG("finish store heart beat response: %s", response->ShortDebugString().c_str());
     
     DB_NOTICE("Store: %s heart beat, time cost: %ld, log_id: %lu", 
             request->instance_info().address().c_str(), time_cost.get_time(), log_id);

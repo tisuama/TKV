@@ -455,7 +455,7 @@ void RegionManager::check_peer_count(int64_t region_id,
     std::unordered_map<std::string, int64_t> cur_logical_room_count_map;
     // 如果该region所属table的逻辑存储池没有足够的副本
     if (resource_tag_count[table_resource_tag] < replica_num) {
-        DB_WARNING("region_id: %ld resource_tag: %s count: %d less than replica num: %ld, NEED ADD PEER",
+        DB_WARNING("region_id: %ld resource_tag: %s count: %d less than replica num: %ld, [NEED ADD PEER]",
                 region_id, table_resource_tag.c_str(), resource_tag_count[table_resource_tag], replica_num);
         need_add_peer = true;
     }

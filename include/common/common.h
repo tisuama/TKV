@@ -57,7 +57,7 @@ extern void update_param(const std::string& name, const std::string& value);
 #define ERROR_SET_RESPONSE_FAST(response, errcode, err_msg, log_id) \
     do {\
         DB_FATAL("request failed errcode: %d, err_msg: %s, log_id: %lu", \
-                 err_msg, log_id);\
+                 errcode, err_msg, log_id);\
         if (response) { \
             response->set_errcode(errcode);\
             response->set_errmsg(err_msg);\

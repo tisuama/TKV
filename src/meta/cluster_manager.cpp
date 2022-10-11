@@ -147,11 +147,11 @@ int ClusterManager::select_instance_rolling(const std::string& resource_tag,  //
     auto& last_rolling_pos = _res_rolling_pos[resource_tag];
     auto& instance = _res_rolling_ins[resource_tag];
     for (; rolling_times < ins_count /* 所有instance都过了一遍 */; ++last_rolling_pos) {
+        ++rolling_times;
         if (last_rolling_pos >= ins_count) {
             last_rolling_pos = 0;
             continue;
         }
-        ++rolling_times;
         auto& instance_address = instance[last_rolling_pos];
         if (!is_legal_for_select_instance(instance_address, resource_tag, exclude_stores, logical_room)) {
             continue;
