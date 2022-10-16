@@ -234,18 +234,22 @@ void MetaStateMachine::store_heartbeat(::google::protobuf::RpcController* contro
     // step1: 判断Instance信息
     ClusterManager::get_instance()->process_instance_heartbeat_for_store(request->instance_info());
     ClusterManager::get_instance()->process_instance_param_heartbeat_for_store(request, response);
+
     // step2: 判断Peer信息, Peer间做负载均衡
+    SchemaManager::get_instance()->process_schema_heartbeat_for_store(request, response);
+    
     // step3: 判断Table信息,  是否有新增、更新、删除
+     
     // step4: 判断Peer所在Table是否存在, 以及是否存在过期Peer      
+    
     // step5: 更新Leader信息, Leader做负载均衡，是否新增region分裂或peer变更region,
+    
     // 是否需要add_peer或者remove_peer
     SchemaManager::get_instance()->process_leader_heartbeat_for_store(request, response, log_id);
 
-    DB_DEBUG("finish store heart beat request: %s", request->ShortDebugString().c_str());
-    DB_DEBUG("finish store heart beat response: %s", response->ShortDebugString().c_str());
+    DB_DEBUG("[FINISH] store heart beat request: %s", request->ShortDebugString().c_str());
+    DB_DEBUG("[FINISH] store heart beat response: %s", response->ShortDebugString().c_str());
     
-    DB_NOTICE("Store: %s heart beat, time cost: %ld, log_id: %lu", 
-            request->instance_info().address().c_str(), time_cost.get_time(), log_id);
 }
 
 

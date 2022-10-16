@@ -38,12 +38,15 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
     }
     int res = _rocksdb->init(FLAGS_db_path);
     
-    // schema_factory
-    _factory = SchemaFactory::get_instance();
     if (res != 0) {
         DB_FATAL("rocksdb init failed");
         return -1;
     }
+
+    // schema_factory
+    _factory = SchemaFactory::get_instance();
+    _factory->init();
+
     // MetaWriter
     _meta_writer = MetaWriter::get_instance();
     _meta_writer->init(_rocksdb, _rocksdb->get_meta_info_handle());
@@ -67,7 +70,6 @@ int Store::init_before_listen(std::vector<std::int64_t>& init_region_ids) {
         return -1;
     }
     time_cost.reset();
-    DB_WARNING("get schema info from meta server sucess");
 
     // Set region info has been exist before
     std::vector<pb::RegionInfo> region_infos;
@@ -215,6 +217,7 @@ void Store::init_region(::google::protobuf::RpcController* controller,
     
     // 新增Table信息
     if (!_factory->exist_table_id(table_id)) {
+        DB_DEBUG("Table id: %ld not exist, rquest info: %s", table_id, request->ShortDebugString().c_str());
         if (request->has_schema_info()) {
             update_schema_info(request->schema_info(), nullptr);
         } else {
@@ -425,8 +428,7 @@ void Store::send_heart_beat() {
     } else {
         process_heart_beat_response(response);
     }
-    DB_DEBUG("store heart beat request: %s", request.ShortDebugString().c_str());
-    DB_DEBUG("store heart beat response: %s", response.ShortDebugString().c_str());
+    DB_DEBUG("[FINISH] store heart beat response: %s", response.ShortDebugString().c_str());
     _last_heart_time.reset();
 }
 
@@ -449,6 +451,7 @@ void Store::process_heart_beat_response(const pb::StoreHBResponse& response) {
     }
     // 更新schema_info
     for (auto& schema_info: response.schema_change_info()) {
+        DB_FATAL("[SCHEMA UPDATE] update schema_info: %s", schema_info.ShortDebugString().c_str());
         update_schema_info(schema_info, nullptr);
     }
     // 处理add peer 
@@ -458,6 +461,7 @@ void Store::process_heart_beat_response(const pb::StoreHBResponse& response) {
             DB_FATAL("region_id: %ld not exist, maybe removed, can't add peer", add_peer_request.region_id());
             continue;
         }
+        DB_DEBUG("[ADD PEER] request: %s", add_peer_request.ShortDebugString().c_str());
         region->add_peer(add_peer_request, region, _add_peer_queue);
     }
 }

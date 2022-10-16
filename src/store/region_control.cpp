@@ -310,10 +310,10 @@ void RegionControl::add_peer(const pb::AddPeer& add_peer, SmartRegion region, Ex
             reset_region_status();
             return ;
         } 
-        DB_WARNING("region_id: %ld ADD_PEER start init, wait_time: %ld",
+        DB_WARNING("region_id: %ld [ADD PEER] start init, wait_time: %ld",
                 region->get_region_id(), cost.get_time());
         if (cost.get_time() > FLAGS_store_heart_beat_interval_us * 5) {
-            DB_WARNING("region_id: %ld ADD_PEER time_out", region->get_region_id());
+            DB_WARNING("region_id: %ld [ADD PEER] time_out", region->get_region_id());
             reset_region_status();
             return ;
         }

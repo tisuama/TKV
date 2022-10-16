@@ -438,5 +438,38 @@ int64_t TableManager::get_pre_region_id(int64_t table_id,
             table_id, to_hex_str(start_key).c_str(), iter->second.region_id);
     return iter->second.region_id;
 } 
+
+void TableManager::process_schema_heartbeat_for_store(
+        std::unordered_map<int64_t, int64_t>& store_table_id_version,
+        pb::StoreHBResponse* response) {
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    // 发生改变(新增或更新)的table
+    for (auto& it : _table_info_map) {
+        int64_t table_id = it.first;
+        auto&  table_mem = it.second;
+        if (store_table_id_version.count(table_id) == 0  ||
+                store_table_id_version[table_id] < table_mem.schema_pb.version()) {
+            pb::SchemaInfo* new_table_info = response->add_schema_change_info();
+            *new_table_info = table_mem.schema_pb;
+            DB_DEBUG("Table_id: %ld add schema change info: %s", 
+                    table_id, new_table_info->ShortDebugString().c_str());
+        }
+    }
+
+    // 要删除的table
+    for (auto& it: store_table_id_version) {
+        int64_t table_id = it.first;
+        if (_table_info_map.find(table_id) == _table_info_map.end()) {
+            pb::SchemaInfo* new_table_info = response->add_schema_change_info();
+            new_table_info->set_table_id(table_id);
+            new_table_info->set_deleted(true);
+            new_table_info->set_table_name("deleted");
+            new_table_info->set_database_name("deleted");
+            new_table_info->set_table_name("deleted");
+            DB_DEBUG("Table_id: %ld delete schema change info: %s", 
+                    table_id, new_table_info->ShortDebugString().c_str());
+        } 
+    }
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

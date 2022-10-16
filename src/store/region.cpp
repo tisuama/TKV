@@ -419,10 +419,12 @@ int Region::ingest_snapshot_sst(const std::string& dir) {
         // stars_with
         if (data_path.find(SNAPSHOT_DATA_FILE) == 0) {
             std::string link_path = dir + "/link." + data_path;
-            ::link(sub_path.c_str(), link_path.c_str());
-            DB_WARNING("region_id: %ld ingest source path: %s", _region_id, link_path.c_str());
+            std::string child_path = dir + "/" + data_path;
+            ::link(child_path.c_str(), link_path.c_str());
+            DB_WARNING("region_id: %ld ingest source path: %s, child_path: %s", _region_id, link_path.c_str(), child_path.c_str());
             if (is_addpeer() && !_restart) {
                 // TODO: wait rocksdb not stall
+                DB_WARNING("region_id: %ld ingest data failed", _region_id);
             }
             int ret = RegionControl::ingest_data_sst(link_path, _region_id, true);
             if (ret < 0) {

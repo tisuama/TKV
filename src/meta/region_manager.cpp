@@ -177,7 +177,8 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
     }
     TableManager::get_instance()->get_table_info(table_ids, table_replica_nums, 
             table_resouce_tags, table_replica_dists, table_learner_resource_tags);
-    DB_DEBUG("start process leader heartbeat, request: %s", request->ShortDebugString().c_str());
+    DB_DEBUG("start process leader heartbeat, has leader info: %d, request: %s, ", 
+            request->leader_regions_size() != 0, request->ShortDebugString().c_str());
     // TODO: Learner
     for (auto& leader_hb: request->leader_regions()) {
         DB_DEBUG("Leader hb: %s", leader_hb.ShortDebugString().c_str());
@@ -384,12 +385,15 @@ void RegionManager::check_whether_update_region(int64_t region_id, bool has_peer
                 pre_region->ShortDebugString().c_str());
         return ;
     }
+
     bool version_changed = false, peer_changed = false;
+    // version发生变化，说明发生分裂或合并
     if (leader_info.version() > pre_region->version() || 
             leader_info.start_key() != pre_region->start_key() || 
             leader_info.end_key() != pre_region->end_key()) {
         version_changed = true;
     }
+    // peer发生变化
     if (leader_info.status() == pb::IDLE && has_peer_changed) {
         peer_changed = true;
     }

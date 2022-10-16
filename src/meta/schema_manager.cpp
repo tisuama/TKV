@@ -347,5 +347,18 @@ void SchemaManager::process_leader_heartbeat_for_store(const pb::StoreHBRequest*
     // TODO: step3: load_balance
 }
 
+void SchemaManager::process_schema_heartbeat_for_store(const pb::StoreHBRequest* request,
+        pb::StoreHBResponse* response) {
+    IF_NOT_LEADER(_meta_state_machine, response);
+
+    std::unordered_map<int64_t, int64_t> store_table_id_version;
+    for (auto& store_schema_info: request->schema_infos()) {
+        int64_t table_id = store_schema_info.table_id();
+        store_table_id_version[table_id] = store_schema_info.version();
+    }
+    TableManager::get_instance()->process_schema_heartbeat_for_store(
+            store_table_id_version,
+            response);
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

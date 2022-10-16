@@ -39,6 +39,9 @@ public:
 
     void process_leader_heartbeat_for_store(const pb::StoreHBRequest* request,
             pb::StoreHBResponse* response, uint64_t log_id);
+
+    void process_schema_heartbeat_for_store(const pb::StoreHBRequest* request,
+            pb::StoreHBResponse* response);
         
 private:
 	SchemaManager() {};

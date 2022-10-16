@@ -8,13 +8,6 @@ int SchemaFactory::init() {
         return 0;
     }
 
-    int ret = bthread::execution_queue_start(&_region_queue_id, nullptr, 
-            update_regions_double_buffer, (void*)this);
-    if (ret != 0) {
-        DB_FATAL("execution_queue_start error, %d", ret);
-        return -1;
-    }
-
     _is_inited = true;
     return 0;
 }
@@ -49,21 +42,22 @@ void SchemaFactory::update_regions_double_buffer(bthread::TaskIterator<RegionVec
     }
 }
 
-int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::SchemaInfo& table) {
+int SchemaFactory::update_table_internal(SchemaMapping& schema_mem, const pb::SchemaInfo& table) {
     DB_WARNING("schema update table info: %s", table.ShortDebugString().c_str());
 
     BAIDU_SCOPED_LOCK(_table_mutex);
-    auto& table_info_mapping = background.table_id_to_table_info;
-    auto& table_name_id_mapping = background.table_name_to_id;
-    auto& db_info_mapping = background.db_id_to_db_info;
-    auto& db_name_id_mapping = background.db_name_to_db_id;
+    auto& table_info_mapping = schema_mem.table_id_to_table_info;
+    auto& table_name_id_mapping = schema_mem.table_name_to_id;
+    auto& db_info_mapping = schema_mem.db_id_to_db_info;
+    auto& db_name_id_mapping = schema_mem.db_name_to_db_id;
+    auto& global_index_id_mapping = schema_mem.global_index_id_mapping;
     
     if (!_is_inited) {
         DB_FATAL("schema_factory not inited");
         return -1;
     }
     if (table.has_deleted() && table.deleted()) {
-        delete_table(table, background);
+        delete_table(table, schema_mem);
         return 1;
     }
     
@@ -150,8 +144,13 @@ int SchemaFactory::update_table_internal(SchemaMapping& background, const pb::Sc
     std::string db_table(transfer_to_lower(namesp + "." + db_name + "." + table_name));
     table_name_id_mapping[db_table] = table_id;
     
+    // db_id -> db_info
     db_info_mapping[db_id] = db_info;
     table_info_mapping[table_id] = table_info_ptr;
+
+    // global_index_id -> table_id
+    global_index_id_mapping[table_id] = table_id;
+    
     return 1; // SUCCESS NUM
 }
 
@@ -169,13 +168,13 @@ void SchemaFactory::update_tables_double_buffer_sync(const SchemaVec& tables) {
     }
 }
 
-void SchemaFactory::delete_table(const pb::SchemaInfo& table, SchemaMapping& background) {
+void SchemaFactory::delete_table(const pb::SchemaInfo& table, SchemaMapping& schema_mem) {
     if (!table.has_table_id()) {
         DB_FATAL("missing fields in schemainfo");
         return ;
     }
-    auto& table_info_mapping = background.table_id_to_table_info;
-    auto& table_name_id_mapping = background.table_name_to_id;
+    auto& table_info_mapping = schema_mem.table_id_to_table_info;
+    auto& table_name_id_mapping = schema_mem.table_name_to_id;
     int64_t id = table.table_id();
     if (table_info_mapping.count(id) == 0) {
         DB_FATAL("no table found with table_id: %ld", id);
@@ -198,6 +197,8 @@ void SchemaFactory::get_all_table_version(std::unordered_map<int64_t, int64_t>& 
 }
 
 bool SchemaFactory::exist_table_id(int64_t table_id) {
+    // 1. primary的index_id是table_id
+    // 2. global_index的index_id自增
     if (_double_buffer_table.global_index_id_mapping.count(table_id) == 0) {
         return false;
     }

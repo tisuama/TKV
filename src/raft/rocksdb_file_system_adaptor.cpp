@@ -216,15 +216,18 @@ int PosixFileAdaptor::open(int flag) {
 
 ssize_t PosixFileAdaptor::write(const butil::IOBuf& data, off_t offset) {
     // braft/util.cpp
+    DB_WARNING("PosixFileAdaptor file path: %s, _fd: %d, offset: %ld", _path.c_str(), _fd, offset);
     ssize_t ret = braft::file_pwrite(data, _fd, offset);
     return ret;
 }
 ssize_t PosixFileAdaptor::read(butil::IOPortal* portal, off_t offset, size_t size) {
+    DB_WARNING("PosixFileAdaptor file path: %s, _fd: %d, offset: %ld", _path.c_str(), _fd, offset);
     return braft::file_pread(portal, _fd, offset, size);
 }
 
 ssize_t PosixFileAdaptor::size() {
     off_t sz = lseek(_fd, 0, SEEK_END);
+    DB_WARNING("PosixFileAdaptor file path: %s, _fd: %d, size: %ld", _path.c_str(), _fd, sz);
     return ssize_t(sz);
 }
 
@@ -236,6 +239,7 @@ bool PosixFileAdaptor::close() {
     if (_fd > 0) {
         bool res = ::close(_fd) == 0;
         _fd = -1;
+        DB_WARNING("PosixFileAdaptor file path: %s, _fd: %d close", _path.c_str(), _fd);
         return res;
     }
     return true;
@@ -256,6 +260,7 @@ bool PosixDirReader::next() {
 }
 
 const char* PosixDirReader::name() const {
+    DB_WARNING("PosixDirReader name: %s", _dir_reader.name());
     return _dir_reader.name();
 }
 
@@ -479,7 +484,7 @@ void RocksdbFileSystemAdaptor::close_snapshot(const std::string& path) {
         if (_snapshot[path].count == 0) {
             _snapshot.erase(iter);
             _snapshot_cond.decrease_broadcast();            
-            DB_WARNING("region_id: %ld close snapshot path: %s release", _region_id, path.c_str());
+            DB_WARNING("region_id: %ld close snapshot path: %s success and release", _region_id, path.c_str());
         }
     }
 }
@@ -590,7 +595,7 @@ braft::FileAdaptor* RocksdbFileSystemAdaptor::open_reader_adaptor(const std::str
             }
             snapshot_ctx->data_context = iter_context;
             DB_WARNING("region_id: %ld open reader, data_index: %ld, peer_next_index: %ld, path: %s, time_cost: %ld",
-                    _region_id, snapshot_ctx->data_index, path.c_str(), time_cost.get_time());
+                    _region_id, snapshot_ctx->data_index, peer_next_index, path.c_str(), time_cost.get_time());
         }
     }
     

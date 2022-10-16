@@ -203,6 +203,10 @@ public:
            const std::string& start_key,
            int64_t partition_id); 
 
+    void process_schema_heartbeat_for_store(
+            std::unordered_map<int64_t, int64_t>& store_table_id_version,
+            pb::StoreHBResponse* response);
+
 private:
     std::string construct_max_table_id_key() {
         std::string max_table_id_key = MetaServer::SCHEMA_IDENTIFY + 
