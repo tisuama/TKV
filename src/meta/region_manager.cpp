@@ -177,8 +177,6 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
     }
     TableManager::get_instance()->get_table_info(table_ids, table_replica_nums, 
             table_resouce_tags, table_replica_dists, table_learner_resource_tags);
-    DB_DEBUG("start process leader heartbeat, has leader info: %d, request: %s, ", 
-            request->leader_regions_size() != 0, request->ShortDebugString().c_str());
     // TODO: Learner
     for (auto& leader_hb: request->leader_regions()) {
         DB_DEBUG("Leader hb: %s", leader_hb.ShortDebugString().c_str());
@@ -228,7 +226,11 @@ void RegionManager::leader_heartbeat_for_region(const pb::StoreHBRequest* reques
                                     peer_changed, 
                                     leader_hb, 
                                     pre_leader_info);
-        DB_DEBUG("Leader HB, region_id: %ld, peer_changed: %d", region_id, peer_changed);
+        DB_DEBUG("Leader HB, region_id: %ld, peer_changed: %d, [leader info peers info]: %s, [pre leader info peers]: %s", 
+                region_id, peer_changed, 
+                leader_info.ShortDebugString().c_str(), 
+                pre_leader_info->ShortDebugString().c_str()); 
+
         if (!peer_changed) {
             check_peer_count(region_id, 
                              leader_hb,
@@ -393,15 +395,32 @@ void RegionManager::check_whether_update_region(int64_t region_id, bool has_peer
             leader_info.end_key() != pre_region->end_key()) {
         version_changed = true;
     }
-    // peer发生变化
+    // region的peer发生变化
     if (leader_info.status() == pb::IDLE && has_peer_changed) {
         peer_changed = true;
     }
+    // region的version发生变化
     if (version_changed) {
-        DB_WARNING("Not implment version_changed");
+        TableManager::get_instance()->check_update_region(leader_hb, pre_region);
     } else if (peer_changed) {
-        DB_WARNING("Not implment peer_changed");
+        pb::MetaManagerRequest request;
+       request.set_op_type(pb::OP_UPDATE_REGION); 
+       pb::RegionInfo* region_info = request.add_region_infos();
+       *region_info = *pre_region;
+       region_info->set_leader(leader_info.leader());
+       region_info->clear_peers();
+       for (auto& peer: leader_info.peers()) {
+           region_info->add_peers(peer);
+       }
+       region_info->set_used_size(leader_info.used_size());
+       region_info->set_log_index(leader_info.log_index());
+       region_info->set_conf_version(leader_info.conf_version() + 1);
+       DB_WARNING("region_id: %ld peer changed changed: %d, version changed: %d, region info update to: %s",
+               region_id, peer_changed, version_changed, region_info->ShortDebugString().c_str());
+       SchemaManager::get_instance()->process_schema_info(NULL, &request, NULL, NULL);
+
     } else {
+        // 更新内存就够了
         if (leader_info.status() == pb::IDLE && 
                 leader_info.leader() != pre_region->leader()) {
             set_region_leader(region_id, leader_info.leader());

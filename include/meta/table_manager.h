@@ -37,7 +37,7 @@ struct TableMem {
     std::map<int64_t, std::map<std::string, SmartRegionInfo>> skey_to_new_region_map;
     // region_id -> none region： 存放空region
     std::map<int64_t, SmartRegionInfo> id_to_none_map;
-    // region_id -> region
+    // region_id -> region info
     // 存放key发生变化的region，以该region为准，查找merge和split涉及到的所有region
     std::map<int64_t, SmartRegionInfo> id_to_region_map; 
     int64_t main_table_id {0}; 
@@ -136,12 +136,6 @@ public:
         _table_info_map.clear();
     }
 
-    int load_table_snapshot(const std::string& value);
-
-    int add_startkey_region_map(const pb::RegionInfo& region_pb);
-
-    int check_startkey_region_map();
-
     void get_table_info(const std::set<int64_t> table_ids,
             std::unordered_map<int64_t, int64_t>& table_replica_nums,
             std::unordered_map<int64_t, std::string>& table_resource_tags,
@@ -172,6 +166,12 @@ public:
         }
         return 0;
     }
+
+    int load_table_snapshot(const std::string& value);
+
+    int add_startkey_region_map(const pb::RegionInfo& region_pb);
+
+    int check_startkey_region_map();
 
     // Raft 串行调用接口
     void create_table(const pb::MetaManagerRequest& request, const int64_t apply_index, braft::Closure* done);
@@ -206,6 +206,11 @@ public:
     void process_schema_heartbeat_for_store(
             std::unordered_map<int64_t, int64_t>& store_table_id_version,
             pb::StoreHBResponse* response);
+
+    void check_update_region(const pb::LeaderHB& leader_hb,
+            const SmartRegionInfo& pre_region);
+
+    void add_update_region(const pb::RegionInfo& leader_info, bool is_none);
 
 private:
     std::string construct_max_table_id_key() {

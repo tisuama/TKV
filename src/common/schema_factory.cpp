@@ -110,6 +110,7 @@ int SchemaFactory::update_table_internal(SchemaMapping& schema_mem, const pb::Sc
         table_info.region_split_lines = table.region_size() / table_info.byte_size_per_record;
     }
     // SETTING PARTITION INFO HERE
+    table_info.version = table.version();
     table_info.name = db_name + "." + table_name;
     table_info.short_name = table_name;
     table_info.namesp = namesp;

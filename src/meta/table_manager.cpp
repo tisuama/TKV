@@ -451,7 +451,7 @@ void TableManager::process_schema_heartbeat_for_store(
                 store_table_id_version[table_id] < table_mem.schema_pb.version()) {
             pb::SchemaInfo* new_table_info = response->add_schema_change_info();
             *new_table_info = table_mem.schema_pb;
-            DB_DEBUG("Table_id: %ld add schema change info: %s", 
+            DB_DEBUG("table_id: %ld add schema change info: %s", 
                     table_id, new_table_info->ShortDebugString().c_str());
         }
     }
@@ -469,6 +469,74 @@ void TableManager::process_schema_heartbeat_for_store(
             DB_DEBUG("Table_id: %ld delete schema change info: %s", 
                     table_id, new_table_info->ShortDebugString().c_str());
         } 
+    }
+}
+
+void TableManager::check_update_region(const pb::LeaderHB& leader_hb,
+        const SmartRegionInfo& pre_region) {
+    const pb::RegionInfo& leader_info = leader_hb.region();
+    if (leader_info.start_key() == leader_info.end_key()) {
+        add_update_region(leader_info, true);
+    } else {
+        add_update_region(leader_info, false);
+    }
+}
+
+/*  更新region info, is_none: 是否为空region */
+void TableManager::add_update_region(const pb::RegionInfo& leader_info, bool is_none) {
+    int64_t table_id = leader_info.table_id(); 
+    int64_t region_id = leader_info.region_id();
+    BAIDU_SCOPED_LOCK(_table_mutex);
+    if (_table_info_map.find(table_id) == _table_info_map.end()) {
+        DB_WARNING("table_id: %ld not exist", table_id);
+        return ;
+    }
+    
+    _need_apply_raft_table_ids.insert(table_id);
+
+    std::map<int64_t, SmartRegionInfo>* region_id_map;
+    if (is_none) {
+        region_id_map = &_table_info_map[table_id].id_to_none_map;
+    } else {
+        region_id_map = &_table_info_map[table_id].id_to_region_map;
+    }
+
+    auto iter = region_id_map->find(region_id);
+    if (iter == region_id_map->end()) {
+        auto ori_region_info = iter->second;
+        if (leader_info.log_index() < ori_region_info->log_index()) {
+            DB_WARNING("region_id: %ld leader_info: %s log_index: %ld < origin region_info: %s, log_index: %ld",
+                    region_id, 
+                    leader_info.ShortDebugString().c_str(),
+                    leader_info.log_index(),
+                    ori_region_info->ShortDebugString().c_str(),
+                    ori_region_info->log_index());
+            return ;
+        }
+        // 发生merge/split/update
+        if (leader_info.version() > ori_region_info->version()) {
+            region_id_map->erase(iter);
+            auto region_ptr = std::make_shared<pb::RegionInfo>(leader_info);
+            region_id_map->insert(std::make_pair(region_id, region_ptr));
+            DB_WARNING("region_id: %ld table_id: %ld has changed (version, start_key, end_key)"
+                    "(%ld, %s, %s) to (%ld, %s, %s)",
+                    region_id, table_id,
+                    ori_region_info->version(),
+                    to_hex_str(ori_region_info->start_key()).c_str(), 
+                    to_hex_str(ori_region_info->end_key()).c_str(),
+                    leader_info.version(),
+                    to_hex_str(leader_info.start_key()).c_str(),
+                    to_hex_str(leader_info.end_key()).c_str());
+        }
+    } else {
+        auto region_ptr = std::make_shared<pb::RegionInfo>(leader_info);
+        region_id_map->insert(std::make_pair(region_id, region_ptr));
+        DB_WARNING("region_id: %ld, table_id: %ld (version, start_key, end_key)"
+                "(%ld, %s, %s)",
+                table_id, region_id,
+                leader_info.version(),
+                to_hex_str(leader_info.start_key()).c_str(),
+                to_hex_str(leader_info.end_key()).c_str());
     }
 }
 } // namespace TKV
