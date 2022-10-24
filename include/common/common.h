@@ -11,7 +11,7 @@
 #include <brpc/server.h>
 #include <bthread/execution_queue.h>
 #include <rocksdb/slice.h>
-
+#include <braft/raft.h>
 
 #include "common/log.h"
 

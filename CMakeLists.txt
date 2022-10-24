@@ -121,6 +121,11 @@ file(GLOB STORE_SRC
 	)
 add_library(store_src_lib OBJECT ${STORE_SRC})
 
+file(GLOB TKV_CLIENT
+	src/client/*.cpp
+	)
+add_library(tkv_client_src OBJECT ${TKV_CLIENT})
+
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto/
 	${GFLAGS_INCLUDE_DIR}
@@ -244,3 +249,9 @@ add_executable(rocks_bench
 	$<TARGET_OBJECTS:proto_src_lib>
 	)
 target_link_libraries(rocks_bench ${DEP_LIB})
+
+add_library(tkv_client
+	$<TARGET_OBJECTS:common_src_lib>
+	$<TARGET_OBJECTS:tkv_client_src>
+	)
+target_link_libraries(tkv_client ${DEP_LIB})
