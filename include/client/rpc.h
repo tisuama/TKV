@@ -47,23 +47,33 @@ struct AsyncSendClosure: public braft::Closure {
 };
 
 class RpcClient {
-    RpcClient* get_instance() {
-        static RpcClient instance;
-        return &instance;
+public:
+    RpcClient() {
+        bthread_mutex_init(&_mutex, NULL);
+    }
+
+    ~RpcClient() {
+        bthread_mutex_destroy(&_mutex);
     }
 
     brpc::Channel* get_conn(const std::string& addr);
     brpc::Channel* create_conn(const std::string& addr);
 
+    // TKVStore
     template<typename T>
     void send_request(const std::string& addr,  
                       AsyncSendMeta* meta,
                       google::Closure* done);
+
+    // TKVMeta
+    void get_region_by_key(const std::string& key);
     
 private:
     bthread_mutex_t _mutex;
     // address -> channel
     std::map<std::string, brpc::Channel*> _channels;
 };
+
+using SmartRpcClient = std::unique_ptr<RpcClient>;
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

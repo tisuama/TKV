@@ -47,5 +47,11 @@ void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, googl
     pb::StoreService_Stub stub(&channel);    
     stub.query(&cntl, meta->request, meta->response, new AsyncSendClosure(meta, done));
 }
+
+void RpcClient::get_region_by_key(const std::string& key) {
+    pb::QueryRequest    request;
+    pb::QueryResponse   response;
+
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
