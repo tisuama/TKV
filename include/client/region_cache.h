@@ -90,31 +90,36 @@ struct KeyLocation {
 
 class RegionCache {
 public:
-    RegionCache() {
+    RegionCache(SharedMetaClient meta_client) 
+        : _meta_client(meta_client)
+    {
         bthread_mutex_init(&_store_mutex, NULL);
         bthread_mutex_init(&_region_mutex, NULL);
     }
     
-
-    SmartRegion  search_cache_region(const std::string& key);
-    KeyLocation  locate_key(const std::string& key);
-    SmartRegion  load_region_by_key(const std::string& key); 
-
     ~RegionCache() {
         bthread_mutex_destroy(&_store_mutex);
         bthread_mutex_destroy(&_region_mutex);
     }
 
+    SmartRegion  search_cache_region(const std::string& key);
+    KeyLocation  locate_key(const std::string& key);
+    SmartRegion  reload_region(const std::string& key); 
+
+
 private:
     // end_key -> SmartRegion
+    // 普通请求是确定是哪个region
     std::map<std::string, SmartRegion>           _regions_map;
     // region_ver -> SmartRegion
+    // 客户端调用split_region时使用
     std::unordered_map<RegionVerId, SmartRegion> _regions;
-    std::map<uint64_t, Store>   _stores;
+    std::map<uint64_t, Store>                    _stores;
+    
+    std::shared_ptr<MetaClient>                  _meta_client;
+
     bthread_mutex_t             _store_mutex;
     bthread_mutex_t             _region_mutex;
 };
-
-using SmartRegionCache = std::unique_ptr<RegionCache>;
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

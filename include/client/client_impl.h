@@ -16,10 +16,12 @@ struct RpcSendClosure {
 
 class ClientImpl {
 public:
-    ClientImpl(const std::string& meta_server_bns)
-        : _meta_server_bns(meta_server_bns)
-        , _cache(std::unqiue_ptr<RegionCache>())
-        , _rpc(std::unqiue_ptr<RpcClient>())
+    // meta_server_bns: meta_server地址
+    // table_name: 请求的表的资源
+    ClientImpl(const std::string& meta_server_bns, const std::string& table_name)
+        , _meta_client(std::make_shared<MetaClient>(meta_server_bns, table_name))
+        , _cache(std::make_unique<RegionCache>(_meta_client))
+        , _rpc_client(std::make_unique<RpcClient>())
     {}
 
     int init();
@@ -29,11 +31,10 @@ public:
     
     
 private: 
-    std::string         _meta_server_bns;    
     // std::shared_ptr也行
-    MetaServerInteract* _meta_server;
-    SmartRegionCache    _cache;
-    SmartRpcClient      _rpc;
+    std::shared_ptr<MetaClient>  _meta_client;
+    std::unique_ptr<RegionCache> _cache;
+    std::unique_ptr<RpcClient>   _rpc_client;
     bool                _is_inited { false };
 }; 
 } // namespace TKV

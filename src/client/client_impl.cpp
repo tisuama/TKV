@@ -5,11 +5,6 @@
 
 namespace TKV {
 int ClientImpl::init() {
-    _meta_server = MetaServerInteract::get_instance();
-    if (!_meta_server->is_inited()) {
-        _meta_server->init_internal(_meta_server_bns);
-    }
-    _sender = RpcClient::get_instance();
     _is_inited = true;
 }
 

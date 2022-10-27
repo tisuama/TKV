@@ -393,7 +393,7 @@ message MetaManagerResponse {
     optional RegionRecoverResponse recover_response = 9;
 };
 
-message QueryRequest {
+message MetaReq {
     required QueryOpType    op_type = 1;
     optional string         logical_room = 2;
     optional string         physical_room = 3;
@@ -412,8 +412,8 @@ message QueryRequest {
     optional string         string_region_id = 16;
 };
 
-message QueryResponse {
-    required ErrorCode            errcode             = 1;
+message MetaRes {
+    required ErrorCode          errcode             = 1;
     optional string             errmsg              = 2;
     optional string             leader              = 3;
     repeated PhysicalRoom       physical_rooms      = 4;
@@ -435,6 +435,6 @@ service MetaService {
     rpc store_heartbeat(StoreHBRequest) returns (StoreHBResponse);
     rpc meta_manager(MetaManagerRequest) returns (MetaManagerResponse);
     rpc raft_control(RaftControlRequest) returns (RaftControlResponse);
-    rpc query(QueryRequest) returns (QueryResponse);
+    rpc query(MetaReq) returns (MetaRes);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

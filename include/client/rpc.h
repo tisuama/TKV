@@ -6,8 +6,8 @@
 #include <butil/time.h>
 #include <bthread/mutex.h>
 
-#include <TKV/store.pb.h>
-#include <TKV/log.h>
+#include "proto/store.pb.h"
+#include "common/log.h"
 
 
 namespace TKV {
@@ -73,7 +73,5 @@ private:
     // address -> channel
     std::map<std::string, brpc::Channel*> _channels;
 };
-
-using SmartRpcClient = std::unique_ptr<RpcClient>;
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
