@@ -3,17 +3,30 @@
 #include "common/closure.h"
 
 namespace TKV {
-struct TKVClosure: braft::Closure {
+struct ClientClosure: braft::Closure {
     braft::Closure* done;  // 外部closure
                            
-    virtual void set_status(butil::Status s) {
+    ClientClosure(braft::Closure* done)
+        : done(done)
+    {}
+    
+    virtual void set_status(const butil::Status& s) {
         status() = s;
     }
-    virtual void set_result(std::string& result);
+    virtual void set_result(std::string& result) { 
+        /* Nothing To do */
+    }
+    
+    void Run() {
+        if (!stauts().ok()) {
+            DB_WARNING("KV request error, errmsg: %s", status().error_cstart());
+        }
+    }
+
 };    
 
 
-struct GetClosure: public TKVClosure {
+struct GetClosure: public ClientClosure {
     std::string*    result;
     braft::Closure* done;
     
@@ -26,28 +39,16 @@ struct GetClosure: public TKVClosure {
     }
 
     void Run() {
+        if (!stauts().ok()) {
+            DB_WARNING("KV request error, errmsg: %s", status().error_cstart());
+        }
         if (done) {
+            done->status() = status();
             done->Run();
         }
         delete this;
     }
 };
-
-struct PutClosure: public TKVClosure {
-    braft::Closure* done;
-
-    PutClosure(braft::Closure* done)
-        : done(done)
-    {}
-
-    void RUn() {
-        if (done) {
-            done->Run();
-        }
-        delete this;
-    }
-};
-
 
 class RawKVClient: public Client {
 public:
@@ -58,18 +59,10 @@ public:
     int init() override;
     
     void put(const std::string& key,
-             const std::string& value) override {
-        SyncClosure* done = new SyncClosure;
-        _kv->put(key, value, new PutClosure(done));
-        done->Wait();  
-    }
+             const std::string& value) override;
 
     void get(const std::string& key, 
-             std::string* value) override {
-        SyncClosure* done = new SyncClosure;
-        _kv->get(key, new GetClosure(value, done)); 
-        done->wait();
-    }
+             std::string* value) override;
 
 
 private:

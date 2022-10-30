@@ -8,6 +8,8 @@
 #include "meta/table_manager.h"
 #include "meta/database_manager.h"
 
+#include "meta/query_region_manager.h"
+
 namespace TKV {
 DECLARE_int32(meta_port); 
 DECLARE_int32(meta_replica_num);
@@ -130,6 +132,39 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     ClusterManager::get_instance()->set_meta_state_machine(_meta_state_machine);
     
     return 0;
+}
+
+void MetaServer::query(::google::protobuf::RpcController* controller,
+                   const ::TKV::pb::MetaReq* request,
+                   ::TKV::pb::MetaRes* response,
+                   ::google::protobuf::Closure* done) {
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    const auto& remote_side_tmp = butil::endpoint2str(cntl->remote_side());
+    const char* remote_side = remote_side_tmp.c_str();
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
+
+    TimeCost time_cost;
+    response->set_errcode(pb::SUCCESS);
+    response->set_errmsg("success");
+    switch(request->op_type()) {
+    case pb::QUERY_REGION:
+        QueryRegionManager::get_instance()->get_region_info(request, response);
+        break;
+    default:
+        DB_WARNING("query op_type:%s not valid, request: %s, log_id: %lu",
+                request->op_type(), request->ShortDebugString().c_str(), log_id);
+        response->set_errcode(pb::INPUT_PARAM_ERROR);
+        response->set_errmsg("invalid op type");
+    }
+    DB_NOTICE("qeury op_type: %s, time cost: %ld, log_id: %lu, address: %s, request: %s",
+            pb::QueryOpType_Name(request->op_type()).c_str(),
+            time_cost.get_time(), log_id, remote_side, 
+            request->ShortDebugString().c_str());
 }
 } //namespace of TKV
 

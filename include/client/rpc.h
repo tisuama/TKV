@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 
+#include <braft/util.h>
 #include <brpc/channel.h>
 #include <gflags/gflags.h>
 #include <butil/time.h>
@@ -11,37 +12,41 @@
 
 
 namespace TKV {
-
+/* 请求超时、失败、重试等情况 */
 struct AsyncSendMeta {
-    StoreReq* request;
-    StoreRes* response;
+    int64_t region_id;
+    std::shared_ptr<BatchData> batch_data;
+
+
+    int64_t start_time_us;
+    int64_t retry_time;
     brpc::Controller controller;
 
-    int64_t region_id;
-    int64_t start_time_us;
 
-
-    AsyncSendMeta(StoreReq* request, StoreRes* res)
-        : request(request), response(response) 
+    AsyncSendMeta(int64_t region_id, std::shared_ptr<BatchData> batch_data)
+        : region_id(region_id), batch_data(batch_data)
     {}
+
+    /* request 请求成功 */
+    void on_success();
+    /* request 请求失败 */
+    void on_failed();
     
-    ~AsyncSendMeta() {
-        if (request) {
-            delete request;
-        }
-        if (response) {
-            delete response;
-        }
-    }
 };
 
 struct AsyncSendClosure: public braft::Closure {
    AsyncSendMeta* meta;
-   google::Closure* done;
+   braft::Closure* done;
    
-   AsyncSendClosure(AsyncSendMeta* meta, google::Closure* done)
-       : meta(meta), done(done) 
+   AsyncSendClosure(AsyncSendMeta* meta)
+       : meta(meta)
    {}
+   
+   ~AsyncSendMeta() {
+       if (meta) {
+           delete meta;
+       }
+   }
 
    virtual void Run() override;
 };
@@ -63,10 +68,7 @@ public:
     template<typename T>
     void send_request(const std::string& addr,  
                       AsyncSendMeta* meta,
-                      google::Closure* done);
-
-    // TKVMeta
-    void get_region_by_key(const std::string& key);
+                      AsyncSendClosure* done);
     
 private:
     bthread_mutex_t _mutex;

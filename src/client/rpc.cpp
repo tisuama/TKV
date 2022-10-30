@@ -1,4 +1,5 @@
 #include "client/rpc.h"
+#include <brpc/channel.h>
 
 namespace TKV {
 
@@ -20,8 +21,8 @@ brpc::Channel* RpcClient::get_conn(const std::string& addr) {
 brpc::Channel* RpcClient::create_conn(const std::string& addr) {
     brpc::Channel* channel = new brpc::Channel;
     
-    brpc::ChnnelOptions options;
-    options.conection_type = "single";
+    brpc::ChannelOptions options;
+    options.connection_type = "single";
     options.timeout_ms = 2000;
     options.max_retry = 5;
 
@@ -44,14 +45,12 @@ void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, googl
     }
 
     auto& cntl = meta->controller;
+    uint64_t log_id =  butil::fast_rand();
+    cntl->set_log_id(log_id);
+
     pb::StoreService_Stub stub(&channel);    
     stub.query(&cntl, meta->request, meta->response, new AsyncSendClosure(meta, done));
 }
 
-void RpcClient::get_region_by_key(const std::string& key) {
-    pb::QueryRequest    request;
-    pb::QueryResponse   response;
-
-}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -40,12 +40,12 @@ enum OpType {
     OP_TXN_COMPLETE                         = 26; // 手动完成特定事务处理
     OP_CLEAR_APPLYING_TXN                   = 27; // 清理未apply的事务
     OP_SELECT_FOR_UPDATE                    = 28;
-    // fake op
+    // Fake op
     OP_UNION                                = 51;
     OP_LOAD                                 = 52;
     OP_UPDATE_PRIMARY_TIMESTAMP             = 53; // 大事务更新primary reigon时间戳，防止超时回滚
     
-    // for meta 
+    // For meta 
     OP_ADD_LOGICAL                          = 114; //建逻辑机房
     OP_ADD_PHYSICAL                         = 115; //建物理机房
     OP_ADD_INSTANCE                         = 116; //建实例, 实例通过上报心跳创建，此借口暂时无用
@@ -122,7 +122,7 @@ enum OpType {
     OP_DROP_LEARNER                         = 188;
     OP_OPEN_NETWORK_SEGMENT_BALANCE         = 189; // 打开一个resource tag的按网段进行balance
     OP_CLOSE_NETWORK_SEGMENT_BALANCE        = 190; // 关闭一个resource tag的按网段进行balance
-    OP_UPDATE_TABLE_COMMENT                 = 191; //修改表的comment
+    OP_UPDATE_TABLE_COMMENT                 = 191; // 修改表的comment
 };
 
 enum QueryOpType {
@@ -150,4 +150,10 @@ enum QueryOpType {
     QUERY_NETWORK_SEGMENT                         = 307;
     QUERY_RESOURCE_TAG_SWITCH                     = 308;
     QUERY_SHOW_VIRINDX_INFO_SQL                   = 309;//展示虚拟索引的影响   
+};
+
+enum BatchOpType {
+	OP_RAW_GET = 1;
+	OP_RAW_PUT = 2;
+	OP_RAW_DELETE = 3;	
 };

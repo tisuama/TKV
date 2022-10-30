@@ -41,6 +41,11 @@ public:
                        const ::TKV::pb::MetaManagerRequest* request,
                        ::TKV::pb::MetaManagerResponse* response,
                        ::google::protobuf::Closure* done) override;
+    
+    virtual void query(::google::protobuf::RpcController* controller,
+                       const ::TKV::pb::MetaReq* request,
+                       ::TKV::pb::MetaRes* response,
+                       ::google::protobuf::Closure* done) override;
 
     static MetaServer* get_instance() {
         static MetaServer meta_server;

@@ -7,7 +7,7 @@ namespace TKV {
 void MetaClient::init() {
     auto meta = MetaServerInteract::get_instance();
     meta->init_internal(_meta_server_bns);
-    is_inited = true;
+    _is_inited = true;
 }
 
 int MetaClient::reaload_region(std::vector<pb::RegionInfo>& region_infos) {
@@ -19,7 +19,7 @@ int MetaClient::reaload_region(std::vector<pb::RegionInfo>& region_infos) {
     int ret = meta->send_request("query", &request, &response);    
     if (!ret) {
         for (auto& info: response.region_infos()) {
-            region_info.push_back(info);
+            region_infos.push_back(info);
         } 
     }
     return ret;

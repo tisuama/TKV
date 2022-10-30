@@ -12,6 +12,7 @@
 #include <bthread/execution_queue.h>
 #include <rocksdb/slice.h>
 #include <braft/raft.h>
+#include <braft/util.h>
 
 #include "common/log.h"
 
@@ -557,5 +558,6 @@ void bthread_usleep_fast_shutdown(int64_t interval_us, T& shutdown) {
         ++time;
     }
 }
+
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

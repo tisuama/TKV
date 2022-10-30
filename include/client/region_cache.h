@@ -1,17 +1,10 @@
 #pragma once
 #include <string>
-
+#include <functional>
 #include <bthread/mutex.h>
 
-class TKV::RegionVerId;
-template<>
-struct hash<TKV::RegionVerId>
-{
-    using argument_type = TKV::RegionVerId;
-    using result_type = size_t;
-    size_t operator()(const TKV::RegionVerId& key) const { return key.id };
-}
-
+#include "proto/meta.pb.h"
+#include "client/meta_client.h"
 
 namespace TKV {
 struct Store {
@@ -21,24 +14,24 @@ struct Store {
 };
 
 struct RegionVerId {
-    uint64_t id;
-    uint64_t conf_ver;
-    uint64_t ver;
+    int64_t  region_id;
+    int64_t  conf_ver;
+    int64_t  ver;
 
     RegionVerId()
         : RegionVerId(0, 0, 0)
     {}
     
-    RegionVerId(uint64_t id, uint64_t conf_ver, uint64_t ver)
-       : id(id), conf_ver(conf_ver), ver(ver)
+    RegionVerId(int64_t region_id, int64_t conf_ver, int64_t ver)
+       : region_id(region_id), conf_ver(conf_ver), ver(ver)
     {} 
 
-    bool operator=(const RegionVerId& rhs) const {
-        return id == rhs.id  && conf_ver == rhs.conf_ver && ver == rhs.ver;
+    bool operator==(const RegionVerId& rhs) const {
+        return region_id == rhs.region_id  && conf_ver == rhs.conf_ver && ver == rhs.ver;
     }
     
     std::string to_string() {
-        return "{" + std::to_string(id) + "," + std::to_string(conf_ver) + "," + std::to_string(ver) + ")";
+        return "{" + std::to_string(region_id) + "," + std::to_string(conf_ver) + "," + std::to_string(ver) + ")";
     }
 };
 
@@ -55,18 +48,18 @@ struct Region {
     const std::string& end_key()   const { return meta.end_key();   }
 
     bool contains(const std::string& key) const { 
-        return key >= start_key() && (key < end_key() || meta.end_key().empty()) 
+        return key >= start_key() && (key < end_key() || meta.end_key().empty());
     }
     
     RegionVerId ver_id() const {
         return RegionVerId {
-            meta.id(),
+            meta.region_id(),
             meta.conf_version(),
             meta.version()
         };
     }
 
-    bool switch_peer(const std::string& peer) {
+    void switch_peer(const std::string& peer) {
         leader = peer;
     }
 };
@@ -88,9 +81,22 @@ struct KeyLocation {
     }
 };
 
+} // namespace TKV
+
+namespace std {
+template<>
+struct hash<TKV::RegionVerId>
+{
+    using argument_type = TKV::RegionVerId;
+    using result_type = size_t;
+    size_t operator()(const TKV::RegionVerId& key) const { return key.region_id; }
+};
+}
+
+namespace TKV {
 class RegionCache {
 public:
-    RegionCache(SharedMetaClient meta_client) 
+    RegionCache(std::shared_ptr<MetaClient> meta_client) 
         : _meta_client(meta_client)
     {
         bthread_mutex_init(&_store_mutex, NULL);
@@ -103,8 +109,14 @@ public:
     }
 
     SmartRegion  search_cache_region(const std::string& key);
+
     KeyLocation  locate_key(const std::string& key);
-    SmartRegion  reload_region(const std::string& key); 
+
+    void reload_region(); 
+
+    void update_region(SmartRegion region);
+
+    SmartRegion get_region(const RegionVerId& id);
 
 
 private:
@@ -121,5 +133,6 @@ private:
     bthread_mutex_t             _store_mutex;
     bthread_mutex_t             _region_mutex;
 };
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -26,6 +26,7 @@ struct RegionLearnerState {
 
 typedef std::shared_ptr<RegionStateInfo> SmartRegionStateInfo;
 class RegionManager {
+    friend class QueryRegionManager;
 public:
     ~RegionManager() {
         bthread_mutex_destroy(&_region_mutex);
@@ -137,7 +138,15 @@ public:
             std::vector<std::pair<std::string, pb::RaftControlRequest>>& remove_peer_requests,
             pb::StoreHBResponse* response);
 
-    // Raft called
+    void traverse_region_map(const std::function<void(SmartRegionInfo& region)>& call) {
+        _region_info_map.traverse(call);
+    }
+
+    void traverse_copy_region_map(const std::function<void(SmartRegionInfo& region)>& call) {
+        _region_info_map.traverse_copy(call);
+    }
+
+    // Raft Called
     void update_region(const pb::MetaManagerRequest& request, 
             const int64_t apply_index, 
             braft::Closure* done);
