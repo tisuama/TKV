@@ -50,7 +50,7 @@ struct Region {
     bool contains(const std::string& key) const { 
         return key >= start_key() && (key < end_key() || meta.end_key().empty());
     }
-    
+
     RegionVerId ver_id() const {
         return RegionVerId {
             meta.region_id(),

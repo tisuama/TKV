@@ -10,13 +10,14 @@ void MetaClient::init() {
     _is_inited = true;
 }
 
-int MetaClient::reaload_region(std::vector<pb::RegionInfo>& region_infos) {
+int MetaClient::reload_region(std::vector<pb::RegionInfo>& region_infos) {
     pb::MetaReq request;
     pb::MetaRes response;
 
-    request.set_op_type(QUERY_REGION);
+    request.set_op_type(pb::QUERY_REGION);
     request.set_table_name(_table_name);
-    int ret = meta->send_request("query", &request, &response);    
+    auto meta = MetaServerInteract::get_instance();
+    int ret = meta->send_request("query", request, response);    
     if (!ret) {
         for (auto& info: response.region_infos()) {
             region_infos.push_back(info);

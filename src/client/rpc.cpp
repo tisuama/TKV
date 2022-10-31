@@ -4,9 +4,8 @@
 namespace TKV {
 
 void AsyncSendClosure::Run() {
-    if (done) {
-        done->Run();
-    }
+    auto batch = meta->batch_data;
+    auto closures = batch->closures(
     delete this;
 }
 
@@ -36,8 +35,7 @@ brpc::Channel* RpcClient::create_conn(const std::string& addr) {
     return channel;
 }
 
-template<typename T>
-void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, google::Closure* done) {
+void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, AsyncSendClosure* done) {
     auto channel = get_conn(addr);
     if (channel == nullptr) {
         DB_FATAL("Get addr: %s failed", addr.c_str());
@@ -46,9 +44,9 @@ void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, googl
 
     auto& cntl = meta->controller;
     uint64_t log_id =  butil::fast_rand();
-    cntl->set_log_id(log_id);
+    cntl.set_log_id(log_id);
 
-    pb::StoreService_Stub stub(&channel);    
+    pb::StoreService_Stub stub(channel);    
     stub.query(&cntl, meta->request, meta->response, new AsyncSendClosure(meta, done));
 }
 

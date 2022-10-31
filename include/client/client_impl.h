@@ -31,8 +31,7 @@ public:
 
     void process_request(std::shared_ptr<BatchData> batch_data);
     
-    int64_t locate_key(const std::string& key);
-    
+    KeyLocation locate_key(const std::string& key);
     
 private: 
     // std::shared_ptr也行

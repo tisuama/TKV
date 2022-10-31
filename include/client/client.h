@@ -10,7 +10,7 @@ extern Client* NewRawClient(const std::string& meta_server_bns);
 
 class Client {
 public:
-    virtual int inited();
+    virtual int init();
     
     virtual void put(const std::string& key,
                       const std::string& value);

@@ -56,6 +56,10 @@ public:
                 return _batch->get_closure(_iter->first);
             }
             
+            RegionVerId& version() {
+                return _batch->get_version(_iter->first);
+            }
+            
             void next() {
                 _iter++;
             }
@@ -66,10 +70,7 @@ public:
             // 内置迭代器
             std::map<int64_t, pb::StoreReq>::const_iterator _iter;
     };
-     
 
-private:
-    
     pb::StoreReq* get_request(int64_t region_id) {
         return &_batch_request[region_id];
     }
@@ -78,13 +79,24 @@ private:
         return &_batch_response[region_id];
     }
     
+    RegionVerId& get_version(int64_t region_id) {
+        return _batch_ver[region_id];
+    }
+     
     std::vector<braft::Closure*>* get_closure(int64_t region_id) {
         return &_batch_closure[region_id];
     }
 
+private:
+    
+    // region_id -> request
     std::map<int64_t, pb::StoreReq> _batch_request;
+    // region_id -> response
     std::map<int64_t, pb::StoreRes> _batch_response;
+    // region_id -> closures
     std::map<int64_t, std::vector<braft::Closure*>> _batch_closure;
+    // region_id -> region_ver_id
+    std::map<int64_t, RegionVerId>  _batch_ver;
 };
 	
 } // namespace TKV 

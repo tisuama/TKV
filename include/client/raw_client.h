@@ -3,34 +3,11 @@
 #include "common/closure.h"
 
 namespace TKV {
-struct ClientClosure: braft::Closure {
-    braft::Closure* done;  // 外部closure
-                           
-    ClientClosure(braft::Closure* done)
-        : done(done)
-    {}
-    
-    virtual void set_status(const butil::Status& s) {
-        status() = s;
-    }
-    virtual void set_result(std::string& result) { 
-        /* Nothing To do */
-    }
-    
-    void Run() {
-        if (!stauts().ok()) {
-            DB_WARNING("KV request error, errmsg: %s", status().error_cstart());
-        }
-    }
-
-};    
-
-
-struct GetClosure: public ClientClosure {
-    std::string*    result;
+struct RawClosure: braft::Closure {
+    std::string*    result {nullptr};
     braft::Closure* done;
     
-    GetClosure(const std::string* result, braft::Closure* done)
+    RawClosure(std::string* result, braft::Closure* done)
         : result(result), done(done)
     {}
 
@@ -38,9 +15,13 @@ struct GetClosure: public ClientClosure {
         *result = res;
     }
 
+    bool has_result() {
+        return result != nullptr;
+    }
+
     void Run() {
-        if (!stauts().ok()) {
-            DB_WARNING("KV request error, errmsg: %s", status().error_cstart());
+        if (!status().ok()) {
+            DB_WARNING("KV request error, errmsg: %s", status().error_cstr());
         }
         if (done) {
             done->status() = status();

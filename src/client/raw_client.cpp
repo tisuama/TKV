@@ -1,4 +1,5 @@
 #include "client/raw_client.h"
+namespace TKV {
 
 int RawKVClient::init() {
     DB_WARNING("Raw KV Client init success");
@@ -27,6 +28,5 @@ void RawKVClient::get(const std::string& key,
     sync_done->wait();
 }
 
-namespace TKV {
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

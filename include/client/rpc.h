@@ -9,6 +9,7 @@
 
 #include "proto/store.pb.h"
 #include "common/log.h"
+#include "client/batch_data.h"
 
 
 namespace TKV {
@@ -42,7 +43,7 @@ struct AsyncSendClosure: public braft::Closure {
        : meta(meta)
    {}
    
-   ~AsyncSendMeta() {
+   ~AsyncSendClosure() {
        if (meta) {
            delete meta;
        }
@@ -65,7 +66,6 @@ public:
     brpc::Channel* create_conn(const std::string& addr);
 
     // TKVStore
-    template<typename T>
     void send_request(const std::string& addr,  
                       AsyncSendMeta* meta,
                       AsyncSendClosure* done);
