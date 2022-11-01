@@ -4,10 +4,27 @@
 namespace TKV {
 
 void AsyncSendClosure::Run() {
-    auto batch = meta->batch_data;
-    auto closures = batch->closures(
+    on_success();
     delete this;
 }
+
+void AsyncSendClosure::on_success() {
+    auto batch = meta->batch_data;
+    auto region_id = meta->region_id;
+    auto response = batch->get_response(region_id);
+    auto dones = batch->get_closure(region_id);
+    
+    CHECK(dones.size() == 1);
+
+    auto raw_done = static_cast<RawClosure*>(dones[0]);
+    if (raw_done->has_result()) {
+        CHECK(response->kvpairs_size() == 1);
+        raw_done->set_result(response->kvpairs(0).value());
+    }
+    raw_done->Run();
+}
+/* request 请求失败 */
+void AsyncSendClosure::on_failed();
 
 brpc::Channel* RpcClient::get_conn(const std::string& addr) {
     BAIDU_SCOPED_LOCK(_mutex);    

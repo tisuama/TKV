@@ -19,12 +19,12 @@ enum RaftControlOp {
 
 message RaftControlRequest {
 	required RaftControlOp op_type = 1;
-	optional int64 region_id = 2;
+	optional int64  region_id = 2;
 	optional string new_leader = 3;
 	repeated string old_peers = 4;
 	repeated string new_peers = 5;
-	optional int64 election_time = 6;
-	optional bool force = 7;
+	optional int64  election_time = 6;
+	optional bool   force = 7;
 };
 
 message RaftControlResponse {

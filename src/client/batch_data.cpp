@@ -20,8 +20,8 @@ void BatchData::put(const std::string& key,
 
     auto request = get_request(region_id);
 
-    auto closures = get_closure(region_id);
-    closures->push_back(done);
+    auto closure = get_closure(region_id);
+    closure.push_back(done);
 
     auto version = get_version(region_id);
     version = region_ver;
@@ -42,8 +42,9 @@ void BatchData::get(const std::string& key,
     int64_t region_id =region_ver.region_id;
 
     auto request = get_request(region_id);
-    auto closures = get_closure(region_id);
-    closures->push_back(done);
+
+    auto closure = get_closure(region_id);
+    closure.push_back(done);
 
     auto version = get_version(region_id);
     version = region_ver;

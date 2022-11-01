@@ -13,6 +13,39 @@
 
 
 namespace TKV {
+
+struct RawClosure: public braft::Closure {
+    std::string*    result {nullptr};
+    braft::Closure* done;
+    
+    RawClosure(std::string* result, braft::Closure* done)
+        : result(result), done(done)
+    {}
+
+    void set_result(const std::string& res) {
+        *result = res;
+    }
+
+    bool has_result() {
+        return result != nullptr;
+    }
+    
+    void set_status(butil::Status& s) {
+        status() = s;
+    }
+    
+    void Run() {
+        if (!status().ok()) {
+            DB_WARNING("KV request error, errmsg: %s", status().error_cstr());
+        }
+        if (done) {
+            done->status() = status();
+            done->Run();
+        }
+        delete this;
+    }
+};
+
 /* 请求超时、失败、重试等情况 */
 struct AsyncSendMeta {
     int64_t region_id;
@@ -28,11 +61,6 @@ struct AsyncSendMeta {
         : region_id(region_id), batch_data(batch_data)
     {}
 
-    /* request 请求成功 */
-    void on_success();
-    /* request 请求失败 */
-    void on_failed();
-    
 };
 
 struct AsyncSendClosure: public braft::Closure {
@@ -49,6 +77,11 @@ struct AsyncSendClosure: public braft::Closure {
        }
    }
 
+   /* request 请求成功 */
+   void on_success();
+   /* request 请求失败 */
+   void on_failed();
+    
    virtual void Run() override;
 };
 

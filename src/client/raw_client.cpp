@@ -11,7 +11,7 @@ void RawKVClient::put(const std::string& key,
     auto batch_data = std::make_shared<BatchData>();
     auto key_location = _kv->locate_key(key);
     auto sync_done = new SyncClosure;
-    batch_data->put(key, value, key_location, new ClientClosure(done));
+    batch_data->put(key, value, key_location, new RawClosure(nullptr, done));
     _kv->process_request(batch_data);
 
     sync_done->wait();
@@ -22,7 +22,7 @@ void RawKVClient::get(const std::string& key,
     auto batch_data = std::make_shared<BatchData>();
     auto key_location = _kv->locate_key(key);
     auto sync_done = new SyncClosure;
-    batch_data->get(key, value, key_location, new GetClosure(value, done));
+    batch_data->get(key, value, key_location, new RawClosure(value, done));
     _kv->process_request(batch_data);
 
     sync_done->wait();

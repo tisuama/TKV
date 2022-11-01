@@ -41,20 +41,20 @@ message PeerStateInfo {
 
 message InstanceInfo {
     required string address = 1;
-    optional int64 capacity = 2; 
-    optional int64 used_size = 3;
+    optional int64  capacity = 2; 
+    optional int64  used_size = 3;
     optional string resource_tag = 4;
     optional string physical_room = 5;
     optional Status status = 6;
     optional string logical_room = 7;
     optional string version = 8;
-    optional int64 raft_total_latency = 9;
-    optional int64 raft_total_qps = 10;
-    optional int64 select_latency = 11;
-    optional int64 select_qps = 12;
-    optional int64 store_id = 13;
-    optional int64 dml_latency = 14;
-    optional int64 dml_qps = 15; 
+    optional int64  raft_total_latency = 9;
+    optional int64  raft_total_qps = 10;
+    optional int64  select_latency = 11;
+    optional int64  select_qps = 12;
+    optional int64  store_id = 13;
+    optional int64  dml_latency = 14;
+    optional int64  dml_qps = 15; 
 };
 
 message SchemaHB {
@@ -63,24 +63,24 @@ message SchemaHB {
 };
 
 message RegionInfo {
-    required int64 region_id = 1;
+    required int64  region_id = 1;
     optional string table_name = 2;
-    required int64 table_id = 3;
-    required int64 replica_num = 4;
-    required int64 version = 5;
-    optional bytes start_key = 6;
-    optional bytes end_key = 7;
+    required int64  table_id = 3;
+    required int64  replica_num = 4;
+    required int64  version = 5;
+    optional bytes  start_key = 6;
+    optional bytes  end_key = 7;
     repeated string peers = 8; // 包含leader
     optional string leader = 9;
     optional RegionStatus status = 10;
     optional int64 used_size = 11;
     optional int64 log_index = 12;
-    optional bool deleted = 13; 
-    optional bool can_add_peer = 14;
+    optional bool  deleted = 13; 
+    optional bool  can_add_peer = 14;
     optional int64 parent = 15;
     optional uint32 timestamp = 16;
     repeated string learners = 17;
-    optional bool is_learner = 18;
+    optional bool  is_learner = 18;
     optional int64 num_table_lines = 19; // region包含主表行数
     required int64 conf_version = 20;    // 同步peer和learner信息
     optional int64 main_table_id = 21;
@@ -89,8 +89,8 @@ message RegionInfo {
 };
 
 message LeaderHB {
-    required RegionInfo region =  1;
-    optional RegionStatus status = 2;
+    required RegionInfo    region =  1;
+    optional RegionStatus  status = 2;
     repeated PeerStateInfo peer_status = 3;
 };
 
@@ -130,11 +130,11 @@ message PrivilegeDatabase {
 
 message PrivilegeTable {
     required string database = 1;
-    optional int64 database_id = 2; 
+    optional int64  database_id = 2; 
     required string table_name = 3;
     optional int64 table_id = 4;
-    optional RW table_rw = 5;
-    optional bool force = 6;
+    optional RW    table_rw = 5;
+    optional bool  force = 6;
 };
 
 enum PartitionType {
@@ -151,68 +151,68 @@ message PartitionInfo {
 // No Fileds
 // No Index
 message SchemaInfo {
-    optional int64 table_id = 1;
+    optional int64  table_id = 1;
     required string table_name = 2;
     optional string new_table_name = 3;
     required string database_name = 4;
-    optional int64 database_id = 5;
+    optional int64  database_id = 5;
     required string namespace_name = 6;
-    optional int64 namespace_id = 7;
-    optional int64 region_size = 8;
-    optional int64 replica_num = 9;
+    optional int64  namespace_id = 7;
+    optional int64  region_size = 8;
+    optional int64  replica_num = 9;
     repeated string init_store = 10;
-    optional bool deleted = 11;
-    optional int64 byte_size_per_record = 12;
+    optional bool   deleted = 11;
+    optional int64  byte_size_per_record = 12;
     optional uint32 timestamp = 13;
     repeated ReplicaDist dists = 14;
     optional string main_logical_room = 15;
     optional int64  region_split_lines = 16;
     repeated SplitKey split_keys = 17;
     repeated string  learner_resource_tags = 19;
-    optional int32 region_num = 20;
-    optional string comment = 21; 
+    optional int32   region_num = 20;
+    optional string  comment = 21; 
     optional PartitionInfo partition_info = 22;
     // 若为层次表，固定为1
-    optional int64 partition_num = 23;
-    optional string resource_tag = 24;
+    optional int64   partition_num = 23;
+    optional string  resource_tag = 24;
     optional Engine  engine = 25;
-    optional int64 version = 26;
+    optional int64   version = 26;
 };
 
 message LearnerHB {
-    repeated RegionInfo region = 1;
+    repeated RegionInfo   region = 1;
     optional RegionStatus status =  2;
-    optional PeerStatus state = 3;
+    optional PeerStatus   state = 3;
 };
 
 message StoreHBRequest {
     required InstanceInfo instance_info = 1;
     repeated SchemaHB schema_infos = 2;
     repeated LeaderHB leader_regions = 3;
-    repeated PeerHB peer_infos = 4;
+    repeated PeerHB   peer_infos = 4;
     optional bool need_leader_balance = 5;
     optional bool need_peer_balance = 6;
     repeated LearnerHB learner_regions = 7;
 };
 
 message AddPeer {
-    required int64 region_id = 1;
+    required int64  region_id = 1;
     repeated string old_peers = 2;
     repeated string new_peers = 3;
     optional bool   is_split = 4;
 };
 
 message TransLeaderRequest {
-    required int64 region_id = 1;
+    required int64  region_id = 1;
     required string old_leader = 2;
     required string new_leader = 3;
-    optional int64 table_id = 4;
+    optional int64  table_id = 4;
 };
 
 message ParamDesc {
     optional string key = 1;
     optional string value = 2;
-    optional bool is_meta_param = 3;
+    optional bool   is_meta_param = 3;
 };
 
 message InstanceParam {
@@ -305,11 +305,11 @@ message MovePhysicalRequest {
 };
 
 message RegionSplitRequest {
-    required int64 region_id = 1;
-    required bytes split_key = 2;
+    required int64  region_id = 1;
+    required bytes  split_key = 2;
     optional string new_instance = 3;
-    optional bool tail_split = 4;// 是否为尾分裂
-    optional int64 table_id = 5;
+    optional bool   tail_split = 4;// 是否为尾分裂
+    optional int64  table_id = 5;
     optional string resource_tag = 6;
 };
 
@@ -367,12 +367,12 @@ message RegionSplitResponse {
 };
 
 message RegionMergeResponse {
-    optional int64 dst_region_id = 1;
+    optional int64  dst_region_id = 1;
     optional string dst_instance = 2;
-    optional bytes dst_start_key = 3;
-    optional bytes dst_end_key = 4;
-    optional int64 version = 5;
-    optional int64 dst_version = 6;
+    optional bytes  dst_start_key = 3;
+    optional bytes  dst_end_key = 4;
+    optional int64  version = 5;
+    optional int64  dst_version = 6;
 };
 
 message RegionRecoverResponse {

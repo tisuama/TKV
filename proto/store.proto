@@ -17,25 +17,31 @@ message RemoveRegion {
 };
 
 message RegionRaftStats {
-    optional int64 applied_index = 1;
+    optional int64  applied_index = 1;
     optional uint64 snapshot_data_size = 2;
     optional uint64 snapshot_meta_size = 3;
-    optional int64 snapshot_index = 4;
-    optional int64 dml_latency = 5;
+    optional int64  snapshot_index = 4;
+    optional int64  dml_latency = 5;
+};
+
+message KVPair {
+    optional string key = 1;
+    optional string value = 2;
 };
 
 message StoreRes {
-    required ErrorCode   errcode = 1;
-    optional bytes       errmsg  = 2;
-    optional string      leader = 3;
-    repeated RegionInfo   regions = 4;
-    optional int64       applied_index = 5;
-    optional int32       last_seq_id = 6; // 事务已执行的最后一个cmd的seq_id
-    optional int64       region_count = 7;
-    repeated RegionLeader region_leaders = 8;
-    optional bool        is_merge = 9;
-    optional PeerStatus  region_status = 10;
+    required ErrorCode       errcode = 1;
+    optional bytes           errmsg  = 2;
+    optional string          leader = 3;
+    repeated RegionInfo      regions = 4;
+    optional int64           applied_index = 5;
+    optional int32           last_seq_id = 6; // 事务已执行的最后一个cmd的seq_id
+    optional int64           region_count = 7;
+    repeated RegionLeader    region_leaders = 8;
+    optional bool            is_merge = 9;
+    optional PeerStatus      region_status = 10;
     optional RegionRaftStats region_raft_stat = 11;
+    repeated KVPair          kvpairs = 12;
 };
 
 message BatchData {
@@ -46,18 +52,18 @@ message BatchData {
 
 message StoreReq {
     required OpType op_type = 1;
-    required int64 region_id = 2;
-    required int64 region_version = 3;
-    optional int64 log_id = 4;           // For print log 
-    optional bytes start_key = 5;
-    optional bytes end_key = 6;
-    optional int64 split_term = 7;
-    optional int64 split_end_index = 8;
-    optional int64 reduce_num_lines = 9; // split需要删除的行数
-    optional bool force = 10;
-    optional bool not_check_region = 11; // 不判断数据与region的匹配性
+    required int64  region_id = 2;
+    required int64  region_version = 3;
+    optional int64  log_id = 4;           // For print log 
+    optional bytes  start_key = 5;
+    optional bytes  end_key = 6;
+    optional int64  split_term = 7;
+    optional int64  split_end_index = 8;
+    optional int64  reduce_num_lines = 9; // split需要删除的行数
+    optional bool   force = 10;
+    optional bool   not_check_region = 11; // 不判断数据与region的匹配性
     optional RegionInfo new_region_info = 12;
-    optional bool select_without_leader = 13; // selcet 不判断Leader
+    optional bool  select_without_leader = 13; // selcet 不判断Leader
     optional int64 num_increase_rows = 14;
     optional int64 conf_version = 15;
     optional int64 version = 16;
