@@ -8,6 +8,7 @@ void AsyncSendClosure::Run() {
     delete this;
 }
 
+/* request 请求成功 */
 void AsyncSendClosure::on_success() {
     auto batch = meta->batch_data;
     auto region_id = meta->region_id;
@@ -23,8 +24,10 @@ void AsyncSendClosure::on_success() {
     }
     raw_done->Run();
 }
+
 /* request 请求失败 */
-void AsyncSendClosure::on_failed();
+void AsyncSendClosure::on_failed() {
+}
 
 brpc::Channel* RpcClient::get_conn(const std::string& addr) {
     BAIDU_SCOPED_LOCK(_mutex);    
@@ -62,9 +65,14 @@ void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, Async
     auto& cntl = meta->controller;
     uint64_t log_id =  butil::fast_rand();
     cntl.set_log_id(log_id);
+    
+    auto batch_data = meta->batch_data;
+    auto region_id =  meta->region_id;
+    auto request =  batch_data->get_request(region_id);
+    auto response = batch_data->get_response(region_id);
 
     pb::StoreService_Stub stub(channel);    
-    stub.query(&cntl, meta->request, meta->response, new AsyncSendClosure(meta, done));
+    stub.query(&cntl, request, response, new AsyncSendClosure(meta));
 }
 
 } // namespace TKV

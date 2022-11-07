@@ -251,7 +251,7 @@ add_executable(rocks_bench
 	)
 target_link_libraries(rocks_bench ${DEP_LIB})
 
-add_library(tkv_client
+add_library(tkv_client SHARED
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:tkv_client_src>
 	)

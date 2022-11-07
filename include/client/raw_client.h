@@ -1,4 +1,5 @@
 #pragma once
+#include "client/client.h"
 #include "client/client_impl.h"
 #include "common/closure.h"
 
