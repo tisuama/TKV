@@ -6,8 +6,8 @@
 namespace TKV {
 class RawKVClient: public Client {
 public:
-    RawKVClient(const std::string& meta_server_bns)
-        : _meta_server_bns(meta_server_bns)
+    RawKVClient(const std::string& meta_server_bns, const std::string& table_name)
+        : _kv(std::make_shared<ClientImpl>(meta_server_bns, table_name))
     {} 
     
     int init() override;
@@ -20,8 +20,7 @@ public:
 
 
 private:
-    ClientImpl*     _kv; 
-    std::string     _meta_server_bns; 
+    std::shared_ptr<ClientImpl> _kv; 
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

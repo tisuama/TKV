@@ -6,7 +6,8 @@
 
 namespace TKV {
 class Client;
-extern Client* NewRawClient(const std::string& meta_server_bns);
+extern std::shared_ptr<Client> NewRawKVClient(const std::string& meta_server_bns, 
+                            const std::string& table_name);
 
 class Client {
 public:

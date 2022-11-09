@@ -187,7 +187,7 @@ add_executable(TKVStore
 	)
 target_link_libraries(TKVStore ${DEP_LIB})
 
-# add_executable for test
+# TKV internal test
 add_executable(test_meta_server
 	test/test_meta_server.cpp
 	$<TARGET_OBJECTS:common_src_lib>
@@ -254,5 +254,13 @@ target_link_libraries(rocks_bench ${DEP_LIB})
 add_library(tkv_client SHARED
 	$<TARGET_OBJECTS:common_src_lib>
 	$<TARGET_OBJECTS:tkv_client_src>
+	$<TARGET_OBJECTS:proto_src_lib>
+	$<TARGET_OBJECTS:meta_interact_lib>
 	)
 target_link_libraries(tkv_client ${DEP_LIB})
+
+# TKV client test
+add_executable(test_op
+	test/test_op.cpp	
+	)
+target_link_libraries(test_op tkv_client)
