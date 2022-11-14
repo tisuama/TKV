@@ -2,11 +2,22 @@
 namespace TKV {
 
 int RawKVClient::init() {
+    int ret = init_log("rawclient");
+    if (ret < 0) {
+        return -1;
+    }
+
+    ret = _kv->init();
+    if (ret < 0) {
+        DB_WARNING("ClientImpl init failed");
+        return -1;
+    }
+    
     DB_WARNING("Raw KV Client init success");
     return 0;
 }
 
-void RawKVClient::put(const std::string& key,
+int RawKVClient::put(const std::string& key,
          const std::string& value) {
     auto batch_data = std::make_shared<BatchData>();
     auto key_location = _kv->locate_key(key);
@@ -15,9 +26,13 @@ void RawKVClient::put(const std::string& key,
     _kv->process_request(batch_data);
 
     sync_done->wait();
+    if (sync_done->status().ok()) {
+        return 0;
+    }
+    return -1;
 }
 
-void RawKVClient::get(const std::string& key, 
+int RawKVClient::get(const std::string& key, 
          std::string* value) {
     auto batch_data = std::make_shared<BatchData>();
     auto key_location = _kv->locate_key(key);
@@ -26,6 +41,10 @@ void RawKVClient::get(const std::string& key,
     _kv->process_request(batch_data);
 
     sync_done->wait();
+    if (sync_done->status().ok()) {
+        return 0;
+    }
+    return -1;
 }
 
 } // namespace TKV

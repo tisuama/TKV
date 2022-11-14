@@ -13,7 +13,7 @@ public:
         , _table_name(table_name)
     {}
 
-    void init();
+    int init();
     
     int reload_region(std::vector<pb::RegionInfo>& region_infos);
 

@@ -47,6 +47,8 @@ struct Region {
 
     const std::string& end_key()   const { return meta.end_key();   }
 
+    int64_t region_id()      const { return meta.region_id(); }
+
     bool contains(const std::string& key) const { 
         return key >= start_key() && (key < end_key() || meta.end_key().empty());
     }

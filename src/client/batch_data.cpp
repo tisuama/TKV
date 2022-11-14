@@ -1,3 +1,4 @@
+#include "common/log.h"
 #include "client/batch_data.h"
 #include "client/region_cache.h"
 
@@ -32,6 +33,8 @@ void BatchData::put(const std::string& key,
     batch_data->set_key(key);
     batch_data->set_value(value);
     batch_data->set_op_type(pb::OP_RAW_PUT);
+    
+    DB_DEBUG("region_id: %ld put data, request: %s", region_id, request->ShortDebugString().c_str());
 } 
 
 void BatchData::get(const std::string& key, 
@@ -54,6 +57,8 @@ void BatchData::get(const std::string& key,
     auto batch_data = request->add_batch_data();
     batch_data->set_key(key);
     batch_data->set_op_type(pb::OP_RAW_GET);
+
+    DB_DEBUG("region_id: %ld get data, request: %s", region_id, request->ShortDebugString().c_str());
 }
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

@@ -20,6 +20,8 @@ int MetaServerInteract::init_internal(const std::string& meta_bns) {
     channel_opt.connect_timeout_ms = FLAGS_meta_connect_timeout;
     std::string meta_server_addr = meta_bns;
     
+    DB_DEBUG("init meta server interact with: %s", meta_bns.c_str());
+    
     // list or bns
      if (meta_bns.find(":") == std::string::npos) {
         meta_server_addr = std::string("bns://") + meta_bns;

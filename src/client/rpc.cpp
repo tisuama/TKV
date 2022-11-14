@@ -72,6 +72,7 @@ void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, Async
     auto response = batch_data->get_response(region_id);
 
     pb::StoreService_Stub stub(channel);    
+    DB_DEBUG("log_id: %ld region_id: %ld request: %s", log_id, region_id, request->ShortDebugString().c_str());
     stub.query(&cntl, request, response, new AsyncSendClosure(meta));
 }
 

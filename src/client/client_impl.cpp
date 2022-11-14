@@ -6,6 +6,13 @@
 namespace TKV {
 
 int ClientImpl::init() {
+    /* init meta client */
+    int ret = _meta_client->init();
+    if (ret < 0) {
+        return -1;
+    }
+
+    /* set inited */
     _is_inited = true;
     return 0;
 }

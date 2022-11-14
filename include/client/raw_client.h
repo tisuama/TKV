@@ -12,11 +12,11 @@ public:
     
     int init() override;
     
-    void put(const std::string& key,
-             const std::string& value) override;
+    int put(const std::string& key,
+            const std::string& value) override;
 
-    void get(const std::string& key, 
-             std::string* value) override;
+    int get(const std::string& key, 
+            std::string* value) override;
 
 
 private:

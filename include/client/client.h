@@ -15,14 +15,16 @@ public:
         return true;
     }
     
-    virtual void put(const std::string& key,
+    virtual int put(const std::string& key,
                      const std::string& value) {
         /* Not impl */
+        return 0;
     }
 
-    virtual void get(const std::string& key, 
+    virtual int get(const std::string& key, 
                      std::string* value) {
         /* Not impl */
+        return 0;
     }
 };
 } // namespace TKV
