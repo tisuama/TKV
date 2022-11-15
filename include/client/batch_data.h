@@ -52,11 +52,11 @@ public:
                 return _batch->get_response(_iter->first);
             }
 
-            std::vector<braft::Closure*>& done() {
+            std::vector<braft::Closure*>* done() {
                 return _batch->get_closure(_iter->first);
             }
             
-            RegionVerId& version() {
+            RegionVerId* version() {
                 return _batch->get_version(_iter->first);
             }
             
@@ -79,12 +79,12 @@ public:
         return &_batch_response[region_id];
     }
     
-    RegionVerId& get_version(int64_t region_id) {
-        return _batch_ver[region_id];
+    RegionVerId* get_version(int64_t region_id) {
+        return &_batch_ver[region_id];
     }
      
-    std::vector<braft::Closure*>& get_closure(int64_t region_id) {
-        return _batch_closure[region_id];
+    std::vector<braft::Closure*>* get_closure(int64_t region_id) {
+        return &_batch_closure[region_id];
     }
     
 private:

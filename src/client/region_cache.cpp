@@ -50,6 +50,7 @@ void RegionCache::reload_region() {
 
 void RegionCache::update_region(SmartRegion region) {
     BAIDU_SCOPED_LOCK(_region_mutex);
+    DB_DEBUG("update region: %p, addr: %s", region.get(), region->leader.c_str());
     _regions_map[region->end_key()] = region;
     _regions[region->ver_id()] = region;
 }
@@ -58,7 +59,7 @@ SmartRegion RegionCache::get_region(const RegionVerId& id) {
     BAIDU_SCOPED_LOCK(_region_mutex);
     auto it = _regions.find(id);
     if (it == _regions.end()) {
-        return nullptr;
+        CHECK("region not found");
     }
     return it->second;
 }

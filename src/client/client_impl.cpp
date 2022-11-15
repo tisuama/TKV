@@ -19,12 +19,19 @@ int ClientImpl::init() {
 
 void ClientImpl::process_request(std::shared_ptr<BatchData> batch_data) {
     CHECK(batch_data);
-    // request先根据region进行group分组
+    /* request先根据region进行group分组 */
     for (auto iter = batch_data->new_iterator(); iter->valid(); iter->next()) {
         auto region_id = iter->region_id();
+        /* new AsyncSendMeta for region */
         auto meta = new AsyncSendMeta(region_id, batch_data);
+
+        /* new AsyncSendClosure for region */
         auto done = new AsyncSendClosure(meta);
-        auto region = _region_cache->get_region(iter->version());
+        
+        DB_DEBUG("region_id: %ld meta: %p, done: %p, version: %p", 
+                region_id, meta, done, iter->version());
+
+        auto region = _region_cache->get_region(*iter->version());
         if (region == nullptr) {
             CHECK("region not found");
         }

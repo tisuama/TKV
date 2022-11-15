@@ -30,8 +30,10 @@ struct RegionVerId {
         return region_id == rhs.region_id  && conf_ver == rhs.conf_ver && ver == rhs.ver;
     }
     
-    std::string to_string() {
-        return "{" + std::to_string(region_id) + "," + std::to_string(conf_ver) + "," + std::to_string(ver) + ")";
+    std::string to_string() const {
+        /* (region_id, conf_ver, region_ver) */
+        return "(" + std::to_string(region_id) + "," + 
+            std::to_string(conf_ver) + "," + std::to_string(ver) + ")";
     }
 };
 
@@ -128,6 +130,7 @@ private:
     // region_ver -> SmartRegion
     // 客户端调用split_region时使用
     std::unordered_map<RegionVerId, SmartRegion> _regions;
+
     std::map<uint64_t, Store>                    _stores;
     
     std::shared_ptr<MetaClient>                  _meta_client;

@@ -2,7 +2,7 @@
 namespace TKV {
 
 int RawKVClient::init() {
-    int ret = init_log("rawclient");
+    int ret = init_log("client");
     if (ret < 0) {
         return -1;
     }

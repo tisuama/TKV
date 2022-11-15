@@ -32,7 +32,6 @@ void add_namespace() {
     pb::MetaManagerResponse response;
     request.set_op_type(pb::OP_CREATE_NAMESPACE);
     auto info = request.mutable_namespace_info();
-    info->set_resource_tag("default_resource_tag");
     info->set_namespace_name("TEST_NAMESPACE");
     info->set_quota(1024);
     
@@ -88,25 +87,6 @@ void add_physical() {
     std::cout << "send request: " << r << std::endl;
 }
 
-void add_instance() {
-    pb::MetaManagerRequest request;
-    pb::MetaManagerResponse response;
-    request.set_op_type(pb::OP_ADD_INSTANCE);
-    auto info = request.mutable_instance();
-    info->set_address("127.0.0.1:8010");
-    info->set_capacity(1024000);
-    info->set_used_size(0);
-    info->set_resource_tag("LOCAL");
-    info->set_physical_room("LAB511");
-    info->set_status(pb::Status::NORMAL);
-    
-    auto meta = MetaServerInteract::get_instance();
-    int r = meta->init_internal(meta_bns);
-    std::cout << "meta interact init: " << r << std::endl;
-    r = meta->send_request("meta_manager", request, response);
-    std::cout << "send request: " << r << std::endl;
-}
-
 void add_user() {
     pb::MetaManagerRequest request;
     pb::MetaManagerResponse response;
@@ -134,6 +114,7 @@ void add_table() {
     info->set_table_name("TEST_TABLE");
     info->set_database_name("TEST_DB");
     info->set_namespace_name("TEST_NAMESPACE");
+    info->set_resource_tag("default_resource_tag");
     
     auto meta = MetaServerInteract::get_instance();
     int r = meta->init_internal(meta_bns);

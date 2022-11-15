@@ -22,10 +22,10 @@ void BatchData::put(const std::string& key,
     auto request = get_request(region_id);
 
     auto closure = get_closure(region_id);
-    closure.push_back(done);
+    closure->push_back(done);
 
     auto version = get_version(region_id);
-    version = region_ver;
+    *version = region_ver;
 
     set_region_ver(request, key_location);
     
@@ -34,7 +34,11 @@ void BatchData::put(const std::string& key,
     batch_data->set_value(value);
     batch_data->set_op_type(pb::OP_RAW_PUT);
     
-    DB_DEBUG("region_id: %ld put data, request: %s", region_id, request->ShortDebugString().c_str());
+    DB_DEBUG("region_id: %ld put data, request: %s, version: %s, version point: %p", 
+            region_id, 
+            request->ShortDebugString().c_str(), 
+            version->to_string().c_str(),
+            version);
 } 
 
 void BatchData::get(const std::string& key, 
@@ -47,10 +51,10 @@ void BatchData::get(const std::string& key,
     auto request = get_request(region_id);
 
     auto closure = get_closure(region_id);
-    closure.push_back(done);
+    closure->push_back(done);
 
     auto version = get_version(region_id);
-    version = region_ver;
+    *version = region_ver;
 
     set_region_ver(request, key_location);
 
@@ -58,7 +62,11 @@ void BatchData::get(const std::string& key,
     batch_data->set_key(key);
     batch_data->set_op_type(pb::OP_RAW_GET);
 
-    DB_DEBUG("region_id: %ld get data, request: %s", region_id, request->ShortDebugString().c_str());
+    DB_DEBUG("region_id: %ld get data, request: %s, version: %s, version point: %p", 
+            region_id, 
+            request->ShortDebugString().c_str(), 
+            version->to_string().c_str(),
+            version);
 }
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

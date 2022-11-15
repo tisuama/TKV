@@ -15,9 +15,9 @@ void AsyncSendClosure::on_success() {
     auto response = batch->get_response(region_id);
     auto dones = batch->get_closure(region_id);
     
-    CHECK(dones.size() == 1);
+    CHECK(dones->size() == 1);
 
-    auto raw_done = static_cast<RawClosure*>(dones[0]);
+    auto raw_done = static_cast<RawClosure*>(dones->at(0));
     if (raw_done->has_result()) {
         CHECK(response->kvpairs_size() == 1);
         raw_done->set_result(response->kvpairs(0).value());
@@ -50,7 +50,6 @@ brpc::Channel* RpcClient::create_conn(const std::string& addr) {
         return nullptr;
     }
 
-    BAIDU_SCOPED_LOCK(_mutex);
     _channels[addr] = channel;
     return channel;
 }
@@ -72,7 +71,8 @@ void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, Async
     auto response = batch_data->get_response(region_id);
 
     pb::StoreService_Stub stub(channel);    
-    DB_DEBUG("log_id: %ld region_id: %ld request: %s", log_id, region_id, request->ShortDebugString().c_str());
+    DB_DEBUG("log_id: %lu region_id: %ld request: %s", 
+            log_id, region_id, request->ShortDebugString().c_str());
     stub.query(&cntl, request, response, new AsyncSendClosure(meta));
 }
 

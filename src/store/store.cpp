@@ -252,7 +252,7 @@ void Store::init_region(::google::protobuf::RpcController* controller,
         return ;
     }
     // binglog region = false;
-    DB_WARNING("new region info: %s, log_id: %ld, remote_side: %s",
+    DB_WARNING("new region info: %s, log_id: %lu, remote_side: %s",
             request->ShortDebugString().c_str(), log_id, remote_side);
     // 更新内存信息
     set_region(region);
@@ -276,7 +276,7 @@ void Store::init_region(::google::protobuf::RpcController* controller,
             check_region_legal_complete(region_id);
         };
         bth.run(check);
-        DB_WARNING("region_id: %ld init region version is 0, should check region legal",
+        DB_WARNING("region_id: %ld log_id: %lu init region version is 0, should check region legal",
                 region_id, log_id);
     }
     DB_WARNING("region_id: %ld init region success, log_id: %lu, time_cost: %lu, remote_side: %s",
