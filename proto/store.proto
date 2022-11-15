@@ -47,7 +47,6 @@ message StoreRes {
 message BatchData {
     optional string  key = 1;
     optional string  value = 2;
-    required BatchOpType op_type = 3;
 };
 
 message StoreReq {

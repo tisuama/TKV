@@ -7,7 +7,7 @@ option cc_generic_services = true;
 // 100+是meta上的操作
 // NOT ALL OP IS SUPPORT NOW, A SUB OF OP IS IMPLED CURRENTLY 
 enum OpType {
-    // for store
+    // For store
     OP_NONE                                 = 0;
     OP_INSERT                               = 1;
     OP_DELETE                               = 2;
@@ -18,7 +18,7 @@ enum OpType {
     OP_COMMIT                               = 6;
     OP_ROLLBACK                             = 7;
     OP_KILL                                 = 8;
-    OP_START_SPLIT                          = 9; //走raft,创建迭代器，取出index
+    OP_START_SPLIT                          = 9;  //走raft,创建迭代器，取出index
     OP_START_SPLIT_FOR_TAIL                 = 10; //分发数据完成之后，验证请求的有效性
     OP_VALIDATE_AND_ADD_VERSION             = 11; //分裂时version + 1
     OP_ADD_VERSION_FOR_SPLIT_REGION         = 12; //给新分裂的region发送vertion+1，该接口是通过网络请求发送的， 上边三个都不是
@@ -33,7 +33,7 @@ enum OpType {
     OP_KV_BATCH                             = 20;
     OP_PUT_KV                               = 21;  
     OP_DELETE_KV                            = 22;
-    OP_KV_BATCH_SPLIT                       = 23;
+    OP_GET_KV 								= 23;
 
     OP_TXN_QUERY_PRIMARY_REGION             = 24; // Percolator反查primary region
     OP_TXN_QUERY_STATE                      = 25; // 查询事务状态
@@ -104,9 +104,9 @@ enum OpType {
     OP_DROP_TABLE_TOMBSTONE                 = 170; //清理TABLE的残留墓碑
     OP_RECOVERY_ALL_REGION                  = 171; //恢复region状态
     OP_UPDATE_STATISTICS                    = 172; //update statistics
-    OP_GEN_TSO                              = 173; // 获取时间戳
-    OP_RESET_TSO                            = 174; // 重置时间戳
-    OP_UPDATE_TSO                           = 175; // 更新时间戳
+    OP_GEN_TSO                              = 173; //获取时间戳
+    OP_RESET_TSO                            = 174; //重置时间戳
+    OP_UPDATE_TSO                           = 175; //更新时间戳
     OP_QUERY_TSO_INFO                       = 176; 
     OP_LINK_BINLOG                          = 177; //创建binlog关联
     OP_UNLINK_BINLOG                        = 178; //清除binlog关联
@@ -150,10 +150,4 @@ enum QueryOpType {
     QUERY_NETWORK_SEGMENT                         = 307;
     QUERY_RESOURCE_TAG_SWITCH                     = 308;
     QUERY_SHOW_VIRINDX_INFO_SQL                   = 309;//展示虚拟索引的影响   
-};
-
-enum BatchOpType {
-	OP_RAW_GET = 1;
-	OP_RAW_PUT = 2;
-	OP_RAW_DELETE = 3;	
 };

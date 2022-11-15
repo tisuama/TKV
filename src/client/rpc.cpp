@@ -14,9 +14,13 @@ void AsyncSendClosure::on_success() {
     auto region_id = meta->region_id;
     auto response = batch->get_response(region_id);
     auto dones = batch->get_closure(region_id);
+
+    if (meta->controller.Failed()) {
+        DB_WARNING("region_id: %ld send rpc faild, msg: %s", 
+                region_id, meta->controller.ErrorText().c_str());
+    }
     
     CHECK(dones->size() == 1);
-
     auto raw_done = static_cast<RawClosure*>(dones->at(0));
     if (raw_done->has_result()) {
         CHECK(response->kvpairs_size() == 1);

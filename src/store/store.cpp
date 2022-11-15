@@ -470,6 +470,7 @@ void Store::query(::google::protobuf::RpcController* controller,
                   const ::TKV::pb::StoreReq* request, 
                   ::TKV::pb::StoreRes* response,
                   ::google::protobuf::Closure* done) {
+    DB_DEBUG("sotre: %s start process query: %s", _address.c_str(), request->ShortDebugString().c_str());
     brpc::ClosureGuard doen_gurad(done);
     brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
     uint64_t log_id = 0;
