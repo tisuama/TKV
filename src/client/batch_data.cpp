@@ -30,9 +30,9 @@ void BatchData::put(const std::string& key,
     
     request->set_op_type(pb::OP_PUT_KV);
     
-    auto batch_data = request->add_batch_data();
-    batch_data->set_key(key);
-    batch_data->set_value(value);
+    auto op = request->add_kv_ops();
+    op->set_key(key);
+    op->set_value(value);
     
     DB_DEBUG("region_id: %ld put data, request: %s, version: %s, version point: %p", 
             region_id, 
@@ -59,8 +59,8 @@ void BatchData::get(const std::string& key,
     set_region_ver(request, key_location);
 
     request->set_op_type(pb::OP_GET_KV);
-    auto batch_data = request->add_batch_data();
-    batch_data->set_key(key);
+    auto op = request->add_kv_ops();
+    op->set_key(key);
 
     DB_DEBUG("region_id: %ld get data, request: %s, version: %s, version point: %p", 
             region_id, 

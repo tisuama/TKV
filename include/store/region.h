@@ -265,11 +265,11 @@ private:
     void on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
             std::map<int64_t, std::string>& prepared_log_entrys);
 
-    int ingest_snapshot_sst(const std::string& dir);
+    int  ingest_snapshot_sst(const std::string& dir);
 
-    int check_learner_snapshot();
+    int  check_learner_snapshot();
 
-    int check_follower_snapshot(const std::string& peer);
+    int  check_follower_snapshot(const std::string& peer);
 
     void set_region_with_update_range(const pb::RegionInfo& region_info);
 
@@ -284,6 +284,16 @@ private:
     void apply_clear_transaction_log();
 
     void leader_start(int64_t term);
+
+    void exec_out_txn_query(google::protobuf::RpcController* controller, 
+            const pb::StoreReq* request, 
+            pb::StoreRes*       response,
+            google::protobuf::Closure* done);
+
+    void exec_in_txn_query(google::protobuf::RpcController* controller, 
+            const pb::StoreReq* request, 
+            pb::StoreRes*       response,
+            google::protobuf::Closure* done);
 
 private:
     RocksWrapper*           _rocksdb;

@@ -545,20 +545,26 @@ void Region::query(::google::protobuf::RpcController* controller,
                 pb::OpType_Name(request->op_type()).c_str(), remote_side);
         return ;
     }
-    // 启动时，或者Foller落后太多，需要读Leader
-    if (request->op_type() == pb::OP_SELECT && request->region_version() > get_version()) {
-        response->set_errcode(pb::NOT_LEADER); 
-        response->set_leader(butil::endpoint2str(get_leader()).c_str());
-        response->set_errmsg("Not Leader");
-        DB_WARNING("region_id: %ld not leader, request version: %ld, region version: %ld, log_id: %lu, remote_side: %s",
-                _region_id, request->region_version(), get_version(), log_id, butil::endpoint2str(get_leader()).c_str());
-        return ;
-    }
     
     switch(request->op_type()) {
         case pb::OP_NONE: 
             apply(request, response, cntl, done_guard.release());
             break;
+        case pb::OP_KV_BATCH:
+        case pb::OP_PUT_KV:
+        case pb::OP_DELETE_KV:
+        case pb::OP_GET_KV: {
+            uint64_t txn_id = 0;
+            if (request->txn_infos_size() > 0) {
+                txn_id = request->txn_infos(0).txn_id();
+            }
+            if (txn_id == 0) {
+                exec_out_txn_query(controller, request, response, done_guard.release());
+            } else {
+                exec_in_txn_query(controller, request, response, done_guard.release());
+            }
+            break;
+        }
         default:
             break;
     }
@@ -576,9 +582,8 @@ bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) 
         auto region = response->add_regions();
         copy_region(region);
         region->set_leader(leader_str);
-        // Case1: mrege
         if (!region->start_key().empty() && region->start_key() == region->end_key()) {
-            // start_key == end_key, region发生merge
+            /* start_key == end_key, region发生merge */
             response->set_is_merge(true);
             if (_merge_region_info.start_key() != region->start_key()) {
                 DB_FATAL("region_id: %ld merge region: %ld start key not equal", 
@@ -588,7 +593,8 @@ bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) 
                 DB_WARNING("region_id: %d merge region info: %s",
                         _region_id, _merge_region_info.ShortDebugString().c_str());
             }
-        } else {  // Case2: split
+        } else {
+            /* region发生split */
             response->set_is_merge(false);
             for (auto& r: _new_region_infos) {
                 if (r.region_id() != 0 && r.version() != 0) {
@@ -689,6 +695,18 @@ void Region::on_leader_stop(const butil::Status& status) {
             _region_id, status.error_code(), status.error_cstr());
     _is_leader.store(false);
     // 只读事务清理
+}
+
+void Region::exec_out_txn_query(google::protobuf::RpcController* controller, 
+        const pb::StoreReq* request, 
+        pb::StoreRes*       response,
+        google::protobuf::Closure* done) {
+}
+
+void Region::exec_in_txn_query(google::protobuf::RpcController* controller, 
+        const pb::StoreReq* request, 
+        pb::StoreRes*       response,
+        google::protobuf::Closure* done) {
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

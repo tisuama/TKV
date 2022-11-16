@@ -35,38 +35,64 @@ message StoreRes {
     optional string          leader = 3;
     repeated RegionInfo      regions = 4;
     optional int64           applied_index = 5;
-    optional int32           last_seq_id = 6; // 事务已执行的最后一个cmd的seq_id
+    optional int32           last_seq_id = 6;   // 事务已执行的最后一个cmd的seq_id
     optional int64           region_count = 7;
     repeated RegionLeader    region_leaders = 8;
     optional bool            is_merge = 9;
     optional PeerStatus      region_status = 10;
     optional RegionRaftStats region_raft_stat = 11;
     repeated KVPair          kvpairs = 12;
+    repeated TransactionInfo txn_infos = 16;
 };
 
-message BatchData {
+message KvOp {
     optional string  key = 1;
     optional string  value = 2;
     optional int64   ttl_timestamp_us = 3;
+};
+
+enum TxnState {
+    TXN_UNKNOW     = 0;
+    TXN_BEGINED    = 1;
+    TXN_PREPARED   = 2;
+    TXN_COMMITTED  = 3;
+    TXN_ROLLBACKED = 4;
+};
+
+message TransactionInfo {
+    required uint64     txn_id = 1;
+    required int32      seq_id = 2;
+    optional int32      start_req_id = 3;
+    optional bool       optimize_1pc = 4;
+    optional int32      need_rollback_seq = 5;
+    optional int64      num_rows = 6;
+    optional bool       autocommit = 7;
+    optional int64      primary_region_id = 8;
+    optional TxnState   txn_state = 9;
+    optional int64      live_time = 10;
+    optional int64      start_ts = 11;
+    optional int64      commit_ts = 12;
+    optional int64      txn_timeout = 13;
+    optional bool       need_update_primary_ts = 14;
 };
 
 message StoreReq {
     required OpType op_type = 1;
     required int64  region_id = 2;
     required int64  region_version = 3;
-    optional int64  log_id = 4;           // For print log 
+    optional int64  log_id = 4;
     optional bytes  start_key = 5;
     optional bytes  end_key = 6;
     optional int64  split_term = 7;
     optional int64  split_end_index = 8;
-    optional int64  reduce_num_lines = 9; // split需要删除的行数
+    optional int64  reduce_num_lines = 9;       // split需要删除的行数
     optional bool   force = 10;
-    optional bool   not_check_region = 11; // 不判断数据与region的匹配性
+    optional bool   not_check_region = 11;      // 不判断数据与region的匹配性
     optional RegionInfo new_region_info = 12;
-    optional bool  select_without_leader = 13; // selcet 不判断Leader
+    optional bool  select_without_leader = 13;  // selcet 不判断Leader
     optional int64 num_increase_rows = 14;
-    repeated BatchData  batch_data = 15;
-    // SQL相关
+    repeated KvOp  kv_ops = 15;
+    repeated TransactionInfo txn_infos = 16;
 };
 
 message InitRegion {
