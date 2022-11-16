@@ -6,8 +6,7 @@ namespace TKV {
 static inline void set_region_ver(pb::StoreReq* request, KeyLocation& key_location) {
     auto region_ver = key_location.region_ver;
     request->set_region_id(region_ver.region_id);
-    request->set_conf_version(region_ver.conf_ver);
-    request->set_version(region_ver.ver);
+    request->set_region_version(region_ver.ver);
     request->set_start_key(key_location.start_key);
     request->set_end_key(key_location.end_key);
 }
@@ -28,6 +27,8 @@ void BatchData::put(const std::string& key,
     *version = region_ver;
 
     set_region_ver(request, key_location);
+    
+    request->set_op_type(pb::OP_PUT_KV);
     
     auto batch_data = request->add_batch_data();
     batch_data->set_key(key);
@@ -57,6 +58,7 @@ void BatchData::get(const std::string& key,
 
     set_region_ver(request, key_location);
 
+    request->set_op_type(pb::OP_GET_KV);
     auto batch_data = request->add_batch_data();
     batch_data->set_key(key);
 

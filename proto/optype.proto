@@ -30,6 +30,7 @@ enum OpType {
     OP_START_DDL_FOR_DROP_INDEX             = 18;
     OP_UPDATE_STORE_DDLWORK                 = 19; //更新store ddl状态
 
+	// RawKVClient
     OP_KV_BATCH                             = 20;
     OP_PUT_KV                               = 21;  
     OP_DELETE_KV                            = 22;
