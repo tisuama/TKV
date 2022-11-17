@@ -14,13 +14,13 @@
 namespace TKV {
 DECLARE_int32(election_timeout_ms);
 DECLARE_int32(snapshot_interval_s);
+DECLARE_string(raftlog_uri);
+DECLARE_string(stable_uri);
+DECLARE_string(snapshot_uri);
 
 DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
 DEFINE_int64(split_duration_us, 3600 * 1000 * 1000LL, "split duration, default: 3600s");
 
-DECLARE_string(raftlog_uri);
-DECLARE_string(stable_uri);
-DECLARE_string(snapshot_uri);
 
 void Region::compact_data_in_queue() {
     // 删除数据太多，开始compact
@@ -701,12 +701,51 @@ void Region::exec_out_txn_query(google::protobuf::RpcController* controller,
         const pb::StoreReq* request, 
         pb::StoreRes*       response,
         google::protobuf::Closure* done) {
+    /* Not impl */
 }
 
 void Region::exec_in_txn_query(google::protobuf::RpcController* controller, 
         const pb::StoreReq* request, 
         pb::StoreRes*       response,
         google::protobuf::Closure* done) {
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller* cntl = (brpc::Controller*)controller;
+    uint64_t log_id = 0; 
+    if (cntl->has_log_id()) { 
+        log_id = cntl->log_id();
+    }
+    const auto& remote_side_tmp = butil::endpoint2str(cntl->remote_side());
+    const char* remote_side = remote_side_tmp.c_str();
+
+    pb::OpType op_type = request->op_type();
+    switch(op_type) {
+    case pb::OP_PUT_KV: {
+        if (_split_param.split_slow_down) {
+            /* split 处于slow down阶段，需要sleep */
+            DB_WARNING("region_id: %ld is spliting, slow down time: %ld, remote_side: %s",
+                    _region_id, _split_param.split_slow_down_cost, remote_side);
+            bthread_usleep(_split_param.split_slow_down_cost);
+        }
+        /* 最长30s */
+        int64_t disable_write_wait = get_split_wait_time();
+        int ret = _disable_write_cond.timed_wait(disable_write_wait);
+        if (ret != 0) {
+            DB_WARNING("region_id: %ld disable write timeout: %ld", _region_id, disable_write_wait);
+            ERROR_SET_RESPONSE_FAST(response, pb::DISABLE_WRITE_TIMEOUT, "disable write timeout", log_id);
+            return ;
+        }
+
+        _real_writing_cond.increase();
+        ON_SCOPED_EXIT([this]() {
+            _real_writing_cond.decrease_broadcast();
+        });
+
+
+    } break;
+    default:
+        DB_WARNING("region_id: %ld op_type: %d not support", _region_id, op_type);
+        break;
+    }
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

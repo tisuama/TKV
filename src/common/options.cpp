@@ -22,6 +22,7 @@ DEFINE_string(resource_tag, "default_resource_tag", "resource_tag");
 DEFINE_int32(store_id, 0, "store id in conf file");
 DEFINE_string(store_ip, "127.0.0.1", "store ip");
 DEFINE_int32(store_port, 8110, "store port");
+DEFINE_int64(disable_write_wait_timeout_us, 1000 * 1000, "disable write wait timeout us");
 
 // Raft Service
 // raft log数据

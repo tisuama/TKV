@@ -19,6 +19,9 @@
 #include "common/concurrency.h"
 
 namespace TKV {
+DECLARE_int64(disable_write_wait_timeout_us);
+
+
 struct RegionResource {
     pb::RegionInfo region_info;
 };
@@ -241,6 +244,17 @@ public:
         _region_control.add_peer(add_peer, region, queue);
     }
 
+    int64_t get_split_wait_time() {
+        int64_t wait_time = FLAGS_disable_write_wait_timeout_us;
+        if (wait_time < _split_param.split_slow_down_cost * 10) {
+            wait_time = _split_param.split_slow_down_cost * 10;
+        }
+        if (wait_time > 30 * 1000 * 1000LL) {
+            wait_time = 30 * 1000 * 1000LL;
+        }
+        return wait_time;
+    }
+
     // public
     void compact_data_in_queue();
     int init(bool new_region, int32_t snapshot_times);
@@ -295,7 +309,61 @@ private:
             pb::StoreRes*       response,
             google::protobuf::Closure* done);
 
+
 private:
+    struct SplitParam {
+        int64_t     split_start_index = INT_FAST64_MAX;
+        int64_t     split_end_index = 0;
+        int64_t     split_term = 0;
+        int64_t     new_region_id = 0;
+        int64_t     reduce_num_lines = 0;
+        bool        split_slow_down = false;
+        int64_t     split_slow_down_cost = 0;
+        int         err_code = 0;
+        std::string split_key;
+        std::string instance;
+        std::vector<std::string> add_peer_instances;
+        TimeCost    total_cost;
+        TimeCost    no_write_time_cost;
+        int64_t     new_region_cost;
+
+        TimeCost    op_start_split;
+        int64_t     op_start_split_cost;
+        TimeCost    op_start_split_for_tail;
+        int64_t     op_start_split_for_tail_cost;
+        TimeCost    op_snapshot;
+        TimeCost    op_add_peer;
+        int64_t     op_snapshot_cost; 
+        int64_t     write_sst_cost;
+        int64_t     send_second_log_entry_cost;
+        int64_t     send_complete_to_new_region_cost;
+        TimeCost    op_add_version;
+        int64_t     op_add_version_cost;
+        const rocksdb::Snapshot* snapshot = nullptr;
+
+        bool        tail_split = false;
+        std::unordered_map<int64_t, pb::TransactionInfo> applied_txn;
+
+
+        /* reset splitparam */
+        void reset_status() {
+            split_start_index = INT_FAST64_MAX;
+            split_end_index = 0;
+            split_term = 0;
+            new_region_id = 0;
+            split_slow_down = false;
+            split_slow_down_cost = 0;
+            err_code = 0;
+            split_key = "";
+            instance = "";
+            reduce_num_lines = 0;
+            tail_split = false;
+            snapshot = nullptr;
+            applied_txn.clear();
+            add_peer_instances.clear();
+        }
+    };
+
     RocksWrapper*           _rocksdb;
     SchemaFactory*          _factory;
     rocksdb::ColumnFamilyHandle* _data_cf;
@@ -323,6 +391,7 @@ private:
     // BthreadCond
     BthreadCond             _disable_write_cond;
     BthreadCond             _real_writing_cond;
+    SplitParam              _split_param;
     
     // Legal 
     bthread::Mutex          _legal_mutex;
