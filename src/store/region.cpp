@@ -89,6 +89,8 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
 void Region::on_apply(braft::Iterator& iter) {
     for (; iter.valid(); iter.next()) {
         braft::Closure* done =  iter.done();
+        brpc::ClosureGuard done_guard(done);
+
         butil::IOBuf data = iter.data();
         butil::IOBufAsZeroCopyInputStream wrapper(data);
         auto request = std::make_shared<pb::StoreReq>();
@@ -102,7 +104,7 @@ void Region::on_apply(braft::Iterator& iter) {
             continue;
         }
 
-        // 重置计时器
+        /* 重置计时器 */
         reset_timecost(); 
         int64_t term = iter.term();
         int64_t index = iter.index();
@@ -112,7 +114,7 @@ void Region::on_apply(braft::Iterator& iter) {
         
         do_apply(term, index, *request, done);
         if (done) {
-            done->Run();
+            braft::run_closure_in_bthread(done_guard.release());
         } 
     }
 } 
@@ -547,12 +549,13 @@ void Region::query(::google::protobuf::RpcController* controller,
     }
     
     switch(request->op_type()) {
-        case pb::OP_NONE: 
+        case pb::OP_NONE: {
             apply(request, response, cntl, done_guard.release());
             break;
+        }
         case pb::OP_KV_BATCH:
-        case pb::OP_PUT_KV:
         case pb::OP_DELETE_KV:
+        case pb::OP_PUT_KV:
         case pb::OP_GET_KV: {
             uint64_t txn_id = 0;
             if (request->txn_infos_size() > 0) {
@@ -648,7 +651,36 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
     _applied_index = index;
     pb::StoreRes res;
     switch(request.op_type()) {
-        case pb::OP_NONE:
+        case pb::OP_PREPARE:
+        case pb::OP_COMMIT:
+        case pb::OP_ROLLBACK: {
+            _data_index = _applied_index;
+
+            apply_txn_request(request, done, _applied_index, term);
+            break;
+        }
+        case pb::OP_DELETE_KV: {
+            _data_index = _applied_index;
+
+            rocksdb::WriteBatch batch;
+            for (auto& op: request.kv_ops()) {
+                batch.Delete(op.key());
+            }
+            commit_raft_msg(&batch);
+            break;
+        }                     
+        case pb::OP_KV_BATCH:
+        case pb::OP_PUT_KV: {
+            _data_index = _applied_index;
+
+            rocksdb::WriteBatch batch;
+            for (auto& op: request.kv_ops()) {
+                batch.Put(op.key(), op.value());    
+            }
+            commit_raft_msg(&batch);
+            break;
+        }
+        case pb::OP_NONE: {
             _meta_writer->update_apply_index(_region_id, _applied_index, _data_index);
             if (done) {
                 ((DMLClosure*)done)->response->set_errcode(pb::SUCCESS);
@@ -656,6 +688,7 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
             DB_NOTICE("region_id: %ld OP_NONE sucess, applied_index: %ld, term: %ld",
                     _region_id, _applied_index,  term);
             break;
+        }
         default:
             _meta_writer->update_apply_index(_region_id, _applied_index, _data_index);
             DB_NOTICE("region_id: %ld OP_TYPE: %d ERROR, not support", _region_id, request.op_type());
@@ -666,6 +699,8 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
             break;
     }
 }
+
+
 
 void Region::on_shutdown() {
     DB_WARNING("region_id: %ld shutdown", _region_id);
@@ -697,14 +732,14 @@ void Region::on_leader_stop(const butil::Status& status) {
     // 只读事务清理
 }
 
-void Region::exec_out_txn_query(google::protobuf::RpcController* controller, 
+void Region::exec_in_txn_query(google::protobuf::RpcController* controller, 
         const pb::StoreReq* request, 
         pb::StoreRes*       response,
         google::protobuf::Closure* done) {
     /* Not impl */
 }
 
-void Region::exec_in_txn_query(google::protobuf::RpcController* controller, 
+void Region::exec_out_txn_query(google::protobuf::RpcController* controller, 
         const pb::StoreReq* request, 
         pb::StoreRes*       response,
         google::protobuf::Closure* done) {
@@ -740,12 +775,22 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
             _real_writing_cond.decrease_broadcast();
         });
 
-
-    } break;
+        /* apply to raft */
+        apply(request, response, cntl, done_guard.release());
+        break;
+    }
     default:
         DB_WARNING("region_id: %ld op_type: %d not support", _region_id, op_type);
         break;
     }
+}
+
+void Region::commit_raft_msg(rocksdb::WriteBatch* update) {
+    static rocksdb::WriteOptions write_option;
+    _rocksdb->write(write_option, update);
+} 
+
+void Region::apply_txn_request(const pb::StoreReq& request, braft::Closure* done, int64_t index, int64_t term) {
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

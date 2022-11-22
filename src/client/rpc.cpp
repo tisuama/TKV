@@ -23,8 +23,8 @@ void AsyncSendClosure::on_success() {
     CHECK(dones->size() == 1);
     auto raw_done = static_cast<RawClosure*>(dones->at(0));
     if (raw_done->has_result()) {
-        CHECK(response->kvpairs_size() == 1);
-        raw_done->set_result(response->kvpairs(0).value());
+        CHECK(response->kv_pairs_size() == 1);
+        raw_done->set_result(response->kv_pairs(0).value());
     }
     raw_done->Run();
 }

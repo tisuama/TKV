@@ -25,13 +25,9 @@ DEFINE_int32(store_port, 8110, "store port");
 DEFINE_int64(disable_write_wait_timeout_us, 1000 * 1000, "disable write wait timeout us");
 
 // Raft Service
-// raft log数据
 DEFINE_string(raftlog_uri, "raft_log://myraftlog?id=", "raft_log uri");
-// raft meta持久化数据
 DEFINE_string(stable_uri, "raft_meta://myraftmeta?id=", "raft stable path");
-// snapshot_last_log_id为后缀的文件
 DEFINE_string(snapshot_uri, "local://raft_data/snapshot", "raft snapshot uri");
-// rocksdb path
 DEFINE_string(db_path, "./rocks_db", "rocksdb db path of store data");
 
 // Concurrency
@@ -43,6 +39,8 @@ DEFINE_int64(store_heart_beat_interval, 30LL * 1000 * 1000, "store heart beat in
 DEFINE_int32(snapshot_interval_s, 180, "raft snapshot interval, default: 600s");
 DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms), default: 1s");
 
+// Transaction
+DEFINE_bool(disable_wal, false, "whether disable rocksdb wal, only use raft log for recover");
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
 

@@ -293,18 +293,22 @@ private:
             brpc::Controller* cntl, google::protobuf::Closure* done); 
 
     void do_apply(int64_t term, int64_t index, const pb::StoreReq& request, braft::Closure* done);
+    
+    void commit_raft_msg(rocksdb::WriteBatch* update); 
+    
+    void apply_txn_request(const pb::StoreReq& request, braft::Closure* done, int64_t index, int64_t term);
 
     // Leader切换时确保事务状态一致，提交OP_CLEAR_APPLYING_TXN指令清理不一致事务
     void apply_clear_transaction_log();
 
     void leader_start(int64_t term);
 
-    void exec_out_txn_query(google::protobuf::RpcController* controller, 
+    void exec_in_txn_query(google::protobuf::RpcController* controller, 
             const pb::StoreReq* request, 
             pb::StoreRes*       response,
             google::protobuf::Closure* done);
 
-    void exec_in_txn_query(google::protobuf::RpcController* controller, 
+    void exec_out_txn_query(google::protobuf::RpcController* controller, 
             const pb::StoreReq* request, 
             pb::StoreRes*       response,
             google::protobuf::Closure* done);
