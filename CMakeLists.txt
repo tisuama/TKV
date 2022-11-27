@@ -127,10 +127,9 @@ file(GLOB TKV_CLIENT
 	)
 add_library(tkv_client_src OBJECT ${TKV_CLIENT})
 
-file(GLOB TXN_SRC
-	src/txn/*.cpp
-	)
-add_library(txn_src_lib OBJECT ${TXN_SRC})
+#file(GLOB TXN_SRC
+#	)
+#add_library(txn_src_lib OBJECT ${TXN_SRC})
 
 SET(DEP_INC
 	${CMAKE_CURRENT_BINARY_DIR}/proto/

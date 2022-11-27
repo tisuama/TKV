@@ -19,6 +19,63 @@ public:
         bthread_mutex_init(&_txn_mutex, nullptr);
     }
 
+    int seq_id() {
+        return _seq_id;
+    }
+
+    void set_seq_id(int seq_id) {
+        if (seq_id < _seq_id) {
+            DB_WARNING("txn_id: %lu seq_id: %d fallback, _seq_id: %ld", _txn_id, seq_id, _seq_id);
+            return ;
+        }
+        _seq_id = seq_id;
+    }
+    
+    struct TxnOptions {
+        bool    dml_1pc {false};
+        bool    in_fsm {false};
+        int64_t lock_timeout {-1};
+    };
+    
+    rocksdb::Transaction* get_txn() {
+        return _txn;
+    }
+
+    void set_primary_region_id(int64_t region_id) {
+        _primary_region_id = region_id;
+    }
+
+    void set_txn_timeout(int64_t timeout) {
+        _txn_timeout = timeout;
+    }
+
+    void set_in_process(bool flag) {
+        _in_process = flag;
+    }
+
+    bool is_finished() const {
+        return _is_finished;
+    }
+
+    bool has_dml_executed() const {
+        return _has_dml_executed;
+    }
+    
+    int begin(const Transaction::TxnOptions& txn_opt);
+
+    int begin(const rocksdb::TransactionOptions& txn_opt);
+
+    rocksdb::status rollback();
+
+public:
+    int64_t     num_increase_rows {0};
+    int64_t     last_active_time {0};
+    int64_t     begin_time {0};
+    int         dml_num_affected_rows {0};
+    // batch txn
+    int64_t     batch_num_increase_rows {0};
+    pb::ErrCode {pb::SUCCESS};
+
 private:
     int         _seq_id {0};
     int         _applied_seq_id {0};
@@ -27,30 +84,48 @@ private:
     bool        _is_prepared {false};
     bool        _is_finished {false};
     bool        _is_rolledback {false};
-    std::atomic<bool>     _in_process {false};
+    std::atomic<bool>    _in_process {false};
     bool                 _write_begin_index {true};
     int64_t              _prepare_time_us{0};
+    bool                 _has_dml_executed {false};
+
+    // region在执行事务前会通过txn->SetSavePoint()设置保存点，
+    // 并且把当前的seq_id保存到栈save_point_seq中
     std::stack<int>      _save_point_seq;
     std::stack<uint64_t> _save_point_increase_rows;
     pb::StoreReq         _store_req;
     int64_t              _primary_region_id {-1};
     std::set<int>        _current_req_point_seq;
+
+    // 执行语句失败后会将失败的seq_id添加到need_rollback_seq中
     std::set<int>        _need_rollback_seq;
     // store query cmd
-    rocksdb::WriteOptions       _write_opt;
-    rocksdb::TransactionOptions _txn_opt;
-    const rocksdb::Snapshot*    _snapshot {nullptr};
-    pb::RegionInfo*             _region_info {nullptr};
-    TransactionPool*            _pool {nullptr};
+    rocksdb::WriteOptions        _write_opt;
+    rocksdb::TransactionOptions  _txn_opt;
+    rocksdb::ColumnFamilyHandle* _data_cf {nullptr};
+    rocksdb::ColumnFamilyHandle* _meta_cf {nullptr};
+    const rocksdb::Snapshot*     _snapshot {nullptr};
+    pb::RegionInfo*              _region_info {nullptr};
+    RocksWrapper*                _txn_db {nullptr};
+    rocksdb::Transaction*        _txn {nullptr};
+    TransactionPool*             _pool {nullptr};
 
-    bthread_mutex_t             _txn_mutex;
-    bool                        _use_ttl {false};
-    bool                        _is_seperate  {false};
-    int64_t                     _read_ttl_timestamp_us {0};
-    int64_t                     _write_ttl_timestamp_us {0};
-    int64_t                     _online_ttl_base_expire_time_us {0};
-    int64_t                     _txn_timeout {0};
-    int64_t                     _txn_time_cost {0};
+    bthread_mutex_t              _txn_mutex;
+    bool                         _use_ttl {false};
+    bool                         _is_seperate  {false};
+
+    // TTL读取时间
+    int64_t                      _read_ttl_timestamp_us {0};
+    // TTL写入时间
+    int64_t                      _write_ttl_timestamp_us {0};
+    // 存量数据过期时间, online TTL 使用
+    int64_t                      _online_ttl_base_expire_time_us {0};
+    int64_t                      _txn_timeout {0};
+    // 实行的累计时间
+    int64_t                      _txn_time_cost {0};
 };
+
+
+typedef std::shared_ptr<Transaction> SmartTransaction;
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

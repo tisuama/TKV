@@ -12,7 +12,6 @@
 #include <rocksdb/utilities/transaction_db.h>
 
 
-
 namespace TKV {
 using rocksdb::Status;
 class RocksWrapper {
@@ -100,6 +99,13 @@ public:
         return _db;
     }
 
+    // Transaction
+    rocksdb::Transaction* begin_transaction(
+            const rocksdb::WriteOptions& write_options,
+            const rocksdb::TransactionOptions& txn_options) {
+        return _txn_db->BeginTransaction(write_options, txn_options);
+    }
+
     int32_t create_column_family(const std::string& cf_name);
     int32_t delete_column_family(const std::string& cf_name);
 
@@ -137,8 +143,8 @@ private:
     std::string _db_path;
     bool _is_init {false};
 
-    rocksdb::DB* _db {nullptr};
-    rocksdb::Cache* _cache {nullptr};
+    rocksdb::TransactionDB* _db    {nullptr};
+    rocksdb::Cache*         _cache {nullptr};
 
     std::map<std::string, rocksdb::ColumnFamilyHandle*> _column_families;
     

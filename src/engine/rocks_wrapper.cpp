@@ -31,8 +31,10 @@ DEFINE_int32(rocks_max_bytes_for_level_base, 1024 * 1024 * 1024, "level1's total
 DEFINE_int32(rocks_target_file_size_base, 128 * 1024 * 1024, "rocks_target_file_size_base");
 DEFINE_int32(addpeer_rate_limit_level, 1, "0: no limit, 1: limit when stall, 2: limit when compaction pending, default: 1");
 DEFINE_bool(rocks_delete_files_in_range, true, "delete files in range");
-DEFINE_bool(rocks_enable_bottommost_compression, false, "rocks_enable_bottommost_compression");
-DEFINE_bool(rocks_kSkipAnyCorruptedRecords, false, "rocks_kSkipAnyCorruptedRecords");
+DEFINE_bool(rocks_enable_bottommost_compression, false, "rocks enable bottommost compression");
+DEFINE_bool(rocks_kSkipAnyCorruptedRecords, false, "rocks kSkipAnyCorruptedRecords");
+DEFINE_int32(rocks_transaction_lock_timeout_ms, 20000, "rocksdb lock timeout, real timeout is time + rand_less(ms)");
+DEFINE_int32(rocks_default_lock_timeout_ms, 30000, "rocksdb default lock timeout(ms)");
 
 const std::string RocksWrapper::RAFT_LOG_CF = "raft_log";
 const std::string RocksWrapper::DATA_CF = "data_cf";
@@ -83,6 +85,11 @@ int32_t RocksWrapper::init(const std::string& path) {
     db_options.max_background_flushes = 2;
     db_options.env->SetBackgroundThreads(2, rocksdb::Env::HIGH);
 
+    // transaction option
+    rocksdb::TransactionDBOptions txn_db_options;
+    txn_db_options.transaction_lock_timeout = FLAGS_rocks_transaction_lock_timeout_ms;
+    txn_db_options.default_lock_timeout = FLAGS_rocks_default_lock_timeout_ms;
+
     // log cf
     // prefix_extractor need to cal again
     _log_cf_option.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(sizeof(uint64_t) + 1));
@@ -130,7 +137,6 @@ int32_t RocksWrapper::init(const std::string& path) {
         _data_cf_option.bottommost_compression_opts.zstd_max_train_bytes = 1 << 18;
     }
 
-
     // meta cf
     _meta_cf_option.prefix_extractor.reset(rocksdb::NewFixedPrefixTransform(1));
     _meta_cf_option.OptimizeLevelStyleCompaction();
@@ -146,7 +152,7 @@ int32_t RocksWrapper::init(const std::string& path) {
     s = rocksdb::DB::ListColumnFamilies(db_options, path, &column_family_names);
     if (!s.ok()) {
         // new db
-        s = rocksdb::DB::Open(db_options, path, &_db);
+        s = rocksdb::TransactionDB::Open(db_options, txn_db_options, path, &_db);
         if (s.ok()) {
             DB_WARNING("open db: %s sucess", path.data());
         } else {
@@ -168,7 +174,7 @@ int32_t RocksWrapper::init(const std::string& path) {
                 DB_WARNING("column_family_desc push column_family_name: %s for default", c.data());
             }
         }
-        s = rocksdb::DB::Open(db_options, path, column_family_desc, &handles, &_db);
+        s = rocksdb::TransactionDB::Open(db_options, txn_db_options, path, column_family_desc, &handles, &_db);
         if (s.ok()) {
             DB_WARNING("reopen db: %s sucess", path.data());
             for (auto& h : handles) {

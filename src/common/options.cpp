@@ -41,6 +41,7 @@ DEFINE_int32(election_timeout_ms, 1000, "raft election timeout(ms), default: 1s"
 
 // Transaction
 DEFINE_bool(disable_wal, false, "whether disable rocksdb wal, only use raft log for recover");
+DEFINE_int64(exec_1pc_in_fsm_timeout_ms, 100, "exec 1pc in fsm timeout ms");
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
 

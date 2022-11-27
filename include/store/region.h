@@ -200,7 +200,8 @@ public:
     void join() {
         _real_writing_cond.wait();
         _disable_write_cond.wait(); 
-        DB_WARNING("region_id: %ld raft node join finish", _region_id);
+        DB_WARNING("[JOIN] region_id: %ld finish", _region_id);
+        _txn_pool.close();
     }
 
     void shutdown() {
@@ -253,6 +254,18 @@ public:
             wait_time = 30 * 1000 * 1000LL;
         }
         return wait_time;
+    }
+
+    int32_t num_prepared() {
+        return _txn_pool.num_prepared();
+    }
+
+    int32_t num_began() {
+        return _txn_pool.num_began();
+    }
+
+    TransactionPool& get_txn_pool() {
+        return _txn_pool;
     }
 
     // public
@@ -452,6 +465,8 @@ private:
     TimeCost                _snapshot_time_cost;
     
     TimeCost                _time_cost;                    // 上次收到请求的时间
+    
+    TransactionPool         _txn_pool;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

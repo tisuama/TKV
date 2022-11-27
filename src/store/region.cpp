@@ -196,6 +196,8 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     options.raft_meta_uri = FLAGS_stable_uri + region_str;
     options.snapshot_uri = FLAGS_snapshot_uri + region_str;
     options.snapshot_file_system_adaptor = &_snapshot_adaptor;
+
+    _txn_pool.init(_region_id, _use_ttl, _online_ttl_base_expire_time_us);
     
     bool is_restart = _restart;
     if (_is_learner) {
@@ -553,6 +555,9 @@ void Region::query(::google::protobuf::RpcController* controller,
             apply(request, response, cntl, done_guard.release());
             break;
         }
+        case pb::OP_PREPARE:
+        case pb::OP_COMMIT:
+        case pb::OP_ROLLBACK:
         case pb::OP_KV_BATCH:
         case pb::OP_DELETE_KV:
         case pb::OP_PUT_KV:
@@ -655,29 +660,18 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
         case pb::OP_COMMIT:
         case pb::OP_ROLLBACK: {
             _data_index = _applied_index;
-
             apply_txn_request(request, done, _applied_index, term);
             break;
         }
         case pb::OP_DELETE_KV: {
             _data_index = _applied_index;
-
-            rocksdb::WriteBatch batch;
-            for (auto& op: request.kv_ops()) {
-                batch.Delete(op.key());
-            }
-            commit_raft_msg(&batch);
+            commit_raft_msg(request);
             break;
         }                     
         case pb::OP_KV_BATCH:
         case pb::OP_PUT_KV: {
             _data_index = _applied_index;
-
-            rocksdb::WriteBatch batch;
-            for (auto& op: request.kv_ops()) {
-                batch.Put(op.key(), op.value());    
-            }
-            commit_raft_msg(&batch);
+            commit_raft_msg(request);
             break;
         }
         case pb::OP_NONE: {
@@ -736,7 +730,96 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
         const pb::StoreReq* request, 
         pb::StoreRes*       response,
         google::protobuf::Closure* done) {
-    /* Not impl */
+    brcp::ClosureGuard done_guard(done);
+    brpc::Controller*  cntl = (brpc::Controller*)controller;
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->log_id();
+    }
+    int ret = 0;
+    const auto& remote_side_tmp = butil::endpoint2str(cntl->remote_side());
+    const char* remote_side = remote_side_tmp.c_str();
+
+    pb::OpType op_type = request->op_type();
+    const pb::TransactionInfo& txn_info = request->txn_infos();
+    uint64_t txn_id = txn_info.txn_id();
+    int seq_id = txn_info.seq_id();
+    SmartTransaction txn = _txn_pool.get_txn(txn_id);
+    int last_seq = (txn == nullptr ? 0: txn->seq_id());
+    
+    if (txn_info.need_update_primary_ts()) {
+        // TODO: update primary ts
+        // _txn_pool.update_primary_ts(txn_info);
+    }
+    if (txn == nullptr) {
+        ret = _meta_writer->read_transaction_rollbacked_tag(_region_id, txn_id); 
+        if (!ret) { // 已经rollback，直接返回
+            DB_FATAL("Transaction Error: txn has been rollback due to timeout, remote_side: %s, "
+                    "region_id: %ld, txn_id: %lu, log_id: %lu, op_type: %s",
+                    remote_side, _region_id, txn_id, log_id, pb::OpType_Name(op_type).c_str());
+            response->set_errcode(pb::TXN_IS_ROLLBACK);
+            response->set_affected_rows(0);
+            return ;
+        }
+        // 幂等处理: 由于core、切主、超时等原因重发请求
+        int finish_affected_rows = _txn_pool.get_finished_txn_affected_rows(txn_id);
+        if (finish_affected_rows != -1) {
+            DB_FATAL("Transaction Error: txn has been exec before, remote side: %s, region_id: %ld, "
+                    "txn_id: %lu, log_id: %lu, op_type: %s",
+                    remote_side, _region_id, txn_id, log_id, pb::OpType_Name(op_type).c_str());
+            response->set_affected_rows(finish_affected_rows);
+            response->set_errcode(pb::SUCCESS);
+            return ;
+        }
+        if (op_type == pb::OP_ROLLBACK) {
+            // 状态机外执行失败后切主
+            DB_WARNING("Transaction Warn: txn not exist, remote_side: %s, "
+                    "txn_id: %lu, log_id: %lu, op_type: %s",
+                    remote_side, _region_id, txn_id, log_id, pb::OpType_Name(op_type).c_str());
+            response->set_affected_rows(0);
+            response->set_errcode(pb::SUCCESS);
+            return ;
+        }
+    } else if (txn_info.start_seq_id() != 1 && last_seq >= seq_id) {
+        // 超时导致事务重发, Leader切换会重放最后一条DML
+        DB_WARNING("Transaction Warn: txn has exec before, remote_side: %s"
+                "region_id: %ld, txn_id: %lu, op_type: %s, last_seq: %d, seq_id: %d, log_id: %lu",
+                remote_side, _region_id, txn_id, pb::OpType_Name(op_type).c_str(), last_seq, seq_id, log_id);
+        response->set_affected_rows(txn->dml_num_affected_rows);
+        response->set_errcode(txn->error_code);
+        return ;
+    }
+
+    if (txn != nullptr) {
+        if (!txn->is_finished() && txn->in_process()) {
+            DB_WARNING("Transaction Note: txn in process, remote_side: %s"
+                    "region_id: %ld, txn_id: %lu, op_type: %s, log_id: %lu",
+                    remote_side, _region_id, txn_id, pb::OpType_Name(op_type).c_str(), log_id);
+            response->set_affected_rows(0);
+            response->set_errcode(pb::IN_PROCESS);
+            return ;
+        }
+        txn->set_in_process(true);
+    }
+    // ReadOnly事务不提交raft，直接prepare/commit/rollback
+    // Region第一次执行事务时，start_seq_id = 1 (seq_id = 1 => BEGIN)
+    if (txn_info.start_seq_id() != 1 && !txn_info.has_from_store() && 
+            (op_type == pb::OP_PREPARE || 
+             op_type == pb::OP_COMMIT  || 
+             op_type == pb::OP_ROLLBACK)) {
+        if (txn != nullptr && !txn->has_dml_executed()) {
+            // ReadOnly
+            bool optimize_1pc = txn_info.optimize_1pc();
+            _txn_pool.read_only_txn_process(_region_id, txn, op_type, optimize_1pc);
+            txn->set_in_process(false);
+            response->set_affected_rows(0);
+            response->set_errcode(pb::SUCCESS);
+            return ;
+        }
+    }
+
+    bool apply_success = true;
+
 }
 
 void Region::exec_out_txn_query(google::protobuf::RpcController* controller, 
@@ -785,8 +868,16 @@ void Region::exec_out_txn_query(google::protobuf::RpcController* controller,
     }
 }
 
-void Region::commit_raft_msg(rocksdb::WriteBatch* update) {
+void Region::commit_raft_msg(const pb::StoreReq& request) {
     static rocksdb::WriteOptions write_option;
+    rocksdb::WriteBatch batch;
+    for (auto& op: request.kv_ops()) {
+        if (!op.has_value()) {
+            batch.Delete(op.key());
+        } else {
+            batch.Put(op.key(), op.value());    
+        }
+    }
     _rocksdb->write(write_option, update);
 } 
 
