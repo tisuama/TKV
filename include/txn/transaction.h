@@ -65,7 +65,9 @@ public:
 
     int begin(const rocksdb::TransactionOptions& txn_opt);
 
-    rocksdb::status rollback();
+    rocksdb::Status rollback();
+
+    void rollback_current_request();
 
 public:
     int64_t     num_increase_rows {0};
@@ -87,6 +89,7 @@ private:
     std::atomic<bool>    _in_process {false};
     bool                 _write_begin_index {true};
     int64_t              _prepare_time_us{0};
+    // put_cmd_to_cache时会设置成true
     bool                 _has_dml_executed {false};
 
     // region在执行事务前会通过txn->SetSavePoint()设置保存点，

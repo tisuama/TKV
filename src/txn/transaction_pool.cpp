@@ -50,6 +50,7 @@ int TransactionPool::begin_txn(uint64_t txn_id, SmartTransaction& txn, int64_t p
 
 void TransactionPool::read_only_txn_process(int64_t region_id, SmartTransaction txn, pb::OpType op_type, bool optimize_1pc) {
     uint64_t txn_id = txn->txn_id();
+    /* rocksdb rollback性能更好 */
     switch(op_type) {
         case pb::OP_PREPARE: {
             if (optimize_1pc) {

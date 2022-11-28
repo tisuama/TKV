@@ -51,7 +51,7 @@ int Transaction::begin(const rocksdb::TransactionOptions& txn_opt) {
     return 0;
 }
 
-rocksdb::status Transaction::rollback() {
+rocksdb::Status Transaction::rollback() {
     BAIDU_SCOPED_LOCK(_txn_mutex);
     last_active_time = butil::gettimeofday_us();
     if (_is_finished) {
@@ -64,6 +64,16 @@ rocksdb::status Transaction::rollback() {
         _is_rollbacked = true;
     }
     return s;
+}
+
+void Transaction::rollback_current_request() {
+    BAIDU_SCOPED_LOCK(_txn_mutex);
+    last_active_time = butil::gettimeofday_us();
+    if (_current_req_point_req.size() == 1) {
+        DB_WARNING("txn_id: %lu, seq_id: %d no need rollback", _txn_id, _seq_id);
+        return ;
+    }
+
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

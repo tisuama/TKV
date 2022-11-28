@@ -801,16 +801,17 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
         }
         txn->set_in_process(true);
     }
-    // ReadOnly事务不提交raft，直接prepare/commit/rollback
+    // read only事务不提交raft，直接prepare/commit/rollback
     // Region第一次执行事务时，start_seq_id = 1 (seq_id = 1 => BEGIN)
     if (txn_info.start_seq_id() != 1 && !txn_info.has_from_store() && 
             (op_type == pb::OP_PREPARE || 
              op_type == pb::OP_COMMIT  || 
              op_type == pb::OP_ROLLBACK)) {
         if (txn != nullptr && !txn->has_dml_executed()) {
-            // ReadOnly
+            // read only事务
             bool optimize_1pc = txn_info.optimize_1pc();
             _txn_pool.read_only_txn_process(_region_id, txn, op_type, optimize_1pc);
+            // 在prepare/commit/rollback是没有dml语句需要执行
             txn->set_in_process(false);
             response->set_affected_rows(0);
             response->set_errcode(pb::SUCCESS);
@@ -819,7 +820,12 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
     }
 
     bool apply_success = true;
-
+    ON_SCOPED_EXIT([this, &txn, txn_id, &apply_success]() {
+        if (txn != nullptr && !apply_success) {
+            txn->rollback_current_request();
+            txn->set_in_process(false);
+        }
+    });
 }
 
 void Region::exec_out_txn_query(google::protobuf::RpcController* controller, 
