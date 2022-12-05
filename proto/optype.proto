@@ -30,11 +30,9 @@ enum OpType {
     OP_START_DDL_FOR_DROP_INDEX             = 18;
     OP_UPDATE_STORE_DDLWORK                 = 19; //更新store ddl状态
 
-	// RawKVClient
+	// KV_OP
     OP_KV_BATCH                             = 20;
-    OP_PUT_KV                               = 21;  
-    OP_DELETE_KV                            = 22;
-    OP_GET_KV 								= 23;
+	OP_TXN_KV								= 21;	
 
     OP_TXN_QUERY_PRIMARY_REGION             = 24; // Percolator反查primary region
     OP_TXN_QUERY_STATE                      = 25; // 查询事务状态
@@ -151,4 +149,10 @@ enum QueryOpType {
     QUERY_NETWORK_SEGMENT                         = 307;
     QUERY_RESOURCE_TAG_SWITCH                     = 308;
     QUERY_SHOW_VIRINDX_INFO_SQL                   = 309;//展示虚拟索引的影响   
+};
+
+enum BatchOpType {
+	KV_PUT = 1;
+	KV_GET = 2;
+	KV_DELETE = 3;
 };

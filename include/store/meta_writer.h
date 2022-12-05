@@ -12,6 +12,7 @@ public:
     static const std::string APPLIED_INDEX_IDENTIFY;
     static const std::string NUM_TABLE_LINE_IDENTIFY;
     static const std::string REGION_INFO_IDENTIFY;
+    static const std::string PRE_COMMIT_IDENTIFY;
     static const std::string DOING_SNAPSHOT_IDENTIFY; 
     static const std::string LEARNER_IDENTIFY;
     static const std::string LOCAL_STORAGE_IDENTIFY;
@@ -76,8 +77,12 @@ public:
 
     // decode
     uint64_t decode_log_index_key(const rocksdb::Slice& key);
-    
+
     std::string meta_info_prefix(int64_t region_id);
+
+    // txn
+    std::string pre_commit_key(int64_t region_id, uint64_t txn_id) const;
+    int write_pre_commit(int64_t region_id, uint64_t txn_id, int64_t num_table_lines, int64_t applied_index);
 
 private:
     MetaWriter() {}

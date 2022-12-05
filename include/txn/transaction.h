@@ -60,7 +60,24 @@ public:
     bool has_dml_executed() const {
         return _has_dml_executed;
     }
-    
+
+    bool need_write_rollback(pb::OpType op_type) {
+        if (op_type == pb::OP_ROOLBACK && (_primary_region_id != -1)) {
+            return true;
+        }
+        return false;
+    }
+
+    uint64_t rocksdb_txn_id() const {
+        return _txn->GetID();
+    }
+
+    pb::StoreReq* get_raft_req() {
+        return &_store_req;
+    }
+
+    void push_cmd_to_cache(int seq_id, pb::CachePlan plan_item);
+
     int begin(const Transaction::TxnOptions& txn_opt);
 
     int begin(const rocksdb::TransactionOptions& txn_opt);
@@ -68,6 +85,16 @@ public:
     rocksdb::Status rollback();
 
     void rollback_current_request();
+
+    rocksdb::Status prepare();
+
+    void rollback_to_point(int seq_id);
+
+    int set_save_point();
+    
+    void add_kvop_put(std::string& key, std::string& value, int64_t ttl_timestamp_us, bool is_primary_key);
+
+    void add_kvop_delete(std::string& key, bool is_primary_key);
 
 public:
     int64_t     num_increase_rows {0};
@@ -79,6 +106,8 @@ public:
     pb::ErrCode {pb::SUCCESS};
 
 private:
+    using CacheKVMap = std::map<int, pb::CachePlan>;
+
     int         _seq_id {0};
     int         _applied_seq_id {0};
     uint64_t    _txn_id {0};
@@ -86,6 +115,7 @@ private:
     bool        _is_prepared {false};
     bool        _is_finished {false};
     bool        _is_rolledback {false};
+    // 正在处理该事务相关语句，事务内应该是串行，事务间并行
     std::atomic<bool>    _in_process {false};
     bool                 _write_begin_index {true};
     int64_t              _prepare_time_us{0};
@@ -115,17 +145,24 @@ private:
 
     bthread_mutex_t              _txn_mutex;
     bool                         _use_ttl {false};
-    bool                         _is_seperate  {false};
+    // 默认情况下设为seperate模式
+    bool                         _is_seperate  {true};
 
     // TTL读取时间
     int64_t                      _read_ttl_timestamp_us {0};
     // TTL写入时间
     int64_t                      _write_ttl_timestamp_us {0};
     // 存量数据过期时间, online TTL 使用
-    int64_t                      _online_ttl_base_expire_time_us {0};
+    int64_t                      _online_ttl_us {0};
     int64_t                      _txn_timeout {0};
     // 实行的累计时间
     int64_t                      _txn_time_cost {0};
+    // 缓存的命令
+    bthread_mutex_t              _cache_kv_mutex;
+    // seq_id => KvOp
+    
+    // Cache缓存OP_BEGIN/OP_INSERT/OP_UPDATE/OP_DELETE/OP_SELECT_FOR_UPDATE
+    CacheKVMap                   _cache_kv_map;
 };
 
 

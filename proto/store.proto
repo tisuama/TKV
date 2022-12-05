@@ -41,9 +41,10 @@ message StoreRes {
 };
 
 message KvOp {
-    optional string  key = 1;
-    optional string  value = 2;
-    optional int64   ttl_timestamp_us = 3;
+    optional string      key = 1;
+    optional string      value = 2;
+    optional BatchOpType op_type = 3;
+    optional int64       ttl_timestamp_us = 4;
 };
 
 enum TxnState {
@@ -52,6 +53,14 @@ enum TxnState {
     TXN_PREPARED   = 2;
     TXN_COMMITTED  = 3;
     TXN_ROLLBACKED = 4;
+};
+
+message CachePlan {
+    required OpType      op_type = 1;
+    required int32       seq_id  = 2;
+    repeated KvOp        kv_ops  = 3;
+    // store哪些region用来commit，用来txn的恢复
+    repeated RegionInfo  regions = 4;
 };
 
 message TransactionInfo {
@@ -69,6 +78,7 @@ message TransactionInfo {
     optional int64      commit_ts = 12;
     optional int64      txn_timeout = 13;
     optional bool       need_update_primary_ts = 14;
+    repeated CachePlan  cache_plans = 15;
 };
 
 message StoreReq {

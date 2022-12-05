@@ -31,8 +31,8 @@ public:
         return _use_ttl;
     }
 
-    int64_t online_ttl_base_expire_time_us() const {
-        return _online_ttl_base_expire_time_us;
+    int64_t online_ttl_us() const {
+        return _online_ttl_us;
     }
     
     int init(int64_t region_id, bool use_ttl, int64_t online_ttl_base_expire_time_us);
@@ -47,7 +47,7 @@ private:
     int64_t     _region_id;
     int64_t     _latest_active_txn_ts {0};
     bool        _use_ttl {false};
-    int64_t     _online_ttl_base_expire_time_us {0};
+    int64_t     _online_ttl_us {0};
 
     // txn_id => txn hander
     ThreadSafeMap<uint64_t, SmartTransaction>  _txn_map;

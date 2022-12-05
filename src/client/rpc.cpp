@@ -3,21 +3,19 @@
 
 namespace TKV {
 
-void AsyncSendClosure::Run() {
+void OnRPCDone::Run() {
     on_success();
     delete this;
 }
 
 /* request 请求成功 */
-void AsyncSendClosure::on_success() {
-    auto batch = meta->batch_data;
-    auto region_id = meta->region_id;
-    auto response = batch->get_response(region_id);
-    auto dones = batch->get_closure(region_id);
+void OnRPCDone::on_success() {
+    auto response = batch_data->get_response(region_id);
+    auto dones    = batch_data->get_closure(region_id);
 
-    if (meta->controller.Failed()) {
+    if (controller.Failed()) {
         DB_WARNING("region_id: %ld send rpc faild, msg: %s", 
-                region_id, meta->controller.ErrorText().c_str());
+                region_id, controller.ErrorText().c_str());
     }
     
     CHECK(dones->size() == 1);
@@ -30,7 +28,7 @@ void AsyncSendClosure::on_success() {
 }
 
 /* request 请求失败 */
-void AsyncSendClosure::on_failed() {
+void OnRPCDone::on_failed() {
 }
 
 brpc::Channel* RpcClient::get_conn(const std::string& addr) {
@@ -58,26 +56,26 @@ brpc::Channel* RpcClient::create_conn(const std::string& addr) {
     return channel;
 }
 
-void RpcClient::send_request(const std::string& addr, AsyncSendMeta* meta, AsyncSendClosure* done) {
+void RpcClient::send_request(const std::string& addr, OnRPCDone* done) {
     auto channel = get_conn(addr);
     if (channel == nullptr) {
         DB_FATAL("Get addr: %s failed", addr.c_str());
         return ;
     }
 
-    auto& cntl = meta->controller;
-    uint64_t log_id =  butil::fast_rand();
+    auto& cntl = done->controller;
+    uint64_t log_id = butil::fast_rand();
     cntl.set_log_id(log_id);
     
-    auto batch_data = meta->batch_data;
-    auto region_id =  meta->region_id;
-    auto request =  batch_data->get_request(region_id);
-    auto response = batch_data->get_response(region_id);
+    auto batch_data = done->batch_data;
+    auto region_id  = done->region_id;
+    auto request    = batch_data->get_request(region_id);
+    auto response   = batch_data->get_response(region_id);
 
     pb::StoreService_Stub stub(channel);    
     DB_DEBUG("log_id: %lu region_id: %ld request: %s", 
             log_id, region_id, request->ShortDebugString().c_str());
-    stub.query(&cntl, request, response, new AsyncSendClosure(meta));
+    stub.query(&cntl, request, response, done);
 }
 
 } // namespace TKV

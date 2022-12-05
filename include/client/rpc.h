@@ -46,43 +46,28 @@ struct RawClosure: public braft::Closure {
     }
 };
 
-/* 请求超时、失败、重试等情况 */
-struct AsyncSendMeta {
-    int64_t region_id;
-    std::shared_ptr<BatchData> batch_data;
-
-
-    int64_t start_time_us;
-    int64_t retry_time;
-    brpc::Controller controller;
-
-
-    AsyncSendMeta(int64_t region_id, std::shared_ptr<BatchData> batch_data)
-        : region_id(region_id), batch_data(batch_data)
-    {}
-
-};
-
-struct AsyncSendClosure: public braft::Closure {
-   AsyncSendMeta* meta;
-   braft::Closure* done;
+struct OnRPCDone: public braft::Closure {
+public:
    
-   AsyncSendClosure(AsyncSendMeta* meta)
-       : meta(meta)
+   OnRPCDone(int64_t region_id, std::shared_ptr<BatchData> batch_data)
+       : region_id(region_id), batch_data(batch_data)
    {}
    
-   ~AsyncSendClosure() {
-       if (meta) {
-           delete meta;
-       }
-   }
-
    /* request 请求成功 */
    void on_success();
    /* request 请求失败 */
    void on_failed();
     
    virtual void Run() override;
+
+public:
+   int64_t region_id;
+   std::shared_ptr<BatchData> batch_data;
+
+   int64_t               start_ts;
+   int64_t               reatry_times;
+   brpc::Controller      controller; 
+   braft::Closure*       done;
 };
 
 class RpcClient {
@@ -99,9 +84,7 @@ public:
     brpc::Channel* create_conn(const std::string& addr);
 
     // TKVStore
-    void send_request(const std::string& addr,  
-                      AsyncSendMeta* meta,
-                      AsyncSendClosure* done);
+    void send_request(const std::string& addr,  OnRPCDone* done);
     
 private:
     bthread_mutex_t _mutex;

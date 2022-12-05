@@ -12,6 +12,7 @@ const std::string MetaWriter::APPLIED_INDEX_IDENTIFY(1, 0x01);
 const std::string MetaWriter::NUM_TABLE_LINE_IDENTIFY(1, 0x02);
 // ...
 const std::string MetaWriter::REGION_INFO_IDENTIFY(1, 0x05);
+const std::string MetaWriter::PRE_COMMIT_IDENTIFY(1, 0x06);
 const std::string MetaWriter::DOING_SNAPSHOT_IDENTIFY(1, 0x07); 
 const std::string MetaWriter::LEARNER_IDENTIFY(1, 0x0C);
 const std::string MetaWriter::LOCAL_STORAGE_IDENTIFY(1, 0x0D);
@@ -391,6 +392,32 @@ int MetaWriter::update_apply_index(int64_t region_id, int64_t applied_index, int
     }
     DB_FATAL("region_id: %ld write applied_index: %ld success",
             region_id, applied_index);
+    return 0;
+}
+
+std::string MetaWriter::pre_commit_key(int64_t region_id, uint64_t txn_id) const {
+    MutableKey key;
+    key.append_char(MetaWriter::META_IDENTIFY.c_str(), 1);
+    key.append_i64(region_id);
+    key.append_char(MetaWriter::PRE_COMMIT_IDENTIFY.c_str(), 1);
+    key.append_u64(txn_id);
+    return key.data();
+}
+
+int MetaWriter::write_pre_commit(int64_t region_id, uint64_t txn_id, int64_t num_table_lines, int64_t applied_index) {
+    if (applied_index == 0) {
+        return 0;
+    }
+    MutableKey line_value;
+    line_value.append_i64(num_table_lines).append_i64(applied_index);
+    auto s = _rocksdb->put(MetaWriter::write_options, _meta_cf, 
+            rocksdb::Slice(pre_commit_key(region_id, txn_id)),
+            rocksdb::Slice(line_value.data()));
+    if (!s.ok()) {
+        DB_FATAL("region_id: %ld write pre commit failed, err_msg: %s",
+                region_id, s.ToString().c_str());
+        return -1;
+    }
     return 0;
 }
 } // namespace TKV

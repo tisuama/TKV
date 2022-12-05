@@ -21,9 +21,13 @@ DECLARE_string(snapshot_uri);
 DEFINE_int64(compact_delete_lines, 200000, "compact when num_deleted_lines > compact_delete_lines");
 DEFINE_int64(split_duration_us, 3600 * 1000 * 1000LL, "split duration, default: 3600s");
 
+static bool is_dml_op(const pb::OpType& op_type) {
+    // 当前还不支持INSERT/DELETE/UPDATE/SELETE_FOR_UPDATE
+    if (op_type == pb::OP_TXN_KV) return true;
+    return false;
+}
 
 void Region::compact_data_in_queue() {
-    // 删除数据太多，开始compact
     _num_delete_lines = 0;
     RegionControl::compact_data_in_queue(_region_id);
 }
@@ -39,7 +43,6 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
         compact_data_in_queue();
     }
     
-    // RegionInfo 
     pb::RegionInfo copy_region_info;
     copy_region(&copy_region_info);
     // Learner 在版本0时可以上报心跳
@@ -104,7 +107,7 @@ void Region::on_apply(braft::Iterator& iter) {
             continue;
         }
 
-        /* 重置计时器 */
+        // 重置计时器
         reset_timecost(); 
         int64_t term = iter.term();
         int64_t index = iter.index();
@@ -191,7 +194,7 @@ int Region::init(bool new_region, int32_t snapshot_times) {
     options.election_timeout_ms = FLAGS_election_timeout_ms;
     options.fsm = this;
     options.initial_conf = braft::Configuration(peers);
-    options.snapshot_interval_s = 0; // 自己设置？
+    options.snapshot_interval_s = 0;
     options.log_uri = FLAGS_raftlog_uri + region_str;
     options.raft_meta_uri = FLAGS_stable_uri + region_str;
     options.snapshot_uri = FLAGS_snapshot_uri + region_str;
@@ -555,10 +558,10 @@ void Region::query(::google::protobuf::RpcController* controller,
             apply(request, response, cntl, done_guard.release());
             break;
         }
+        case pb::OP_KV_BATCH: 
         case pb::OP_PREPARE:
         case pb::OP_COMMIT:
         case pb::OP_ROLLBACK:
-        case pb::OP_KV_BATCH:
         case pb::OP_DELETE_KV:
         case pb::OP_PUT_KV:
         case pb::OP_GET_KV: {
@@ -618,8 +621,11 @@ bool Region::valid_version(const pb::StoreReq* request, pb::StoreRes* response) 
     return true;
 }
 
-void Region::apply(const pb::StoreReq* request, pb::StoreRes* response, 
-        brpc::Controller* cntl, google::protobuf::Closure* done) {
+void Region::apply(const pb::StoreReq* request, 
+        pb::StoreRes* response, 
+        brpc::Controller* cntl, 
+        google::protobuf::Closure* done) {
+
     uint64_t log_id = 0;
     if (cntl->has_log_id()) {
         log_id = cntl->log_id();
@@ -646,7 +652,11 @@ void Region::apply(const pb::StoreReq* request, pb::StoreRes* response,
     _node.apply(task);
 } 
 
-void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, braft::Closure* done) {
+void Region::do_apply(int64_t term, 
+        int64_t index, 
+        const pb::StoreReq& request, 
+        braft::Closure* done) {
+
     if (index <= _applied_index) {
         DB_WARNING("region_id: %ld, log_index: %ld, applied_index: %ld has been exexuted", 
                 _region_id, index, _applied_index);
@@ -741,7 +751,7 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
     const char* remote_side = remote_side_tmp.c_str();
 
     pb::OpType op_type = request->op_type();
-    const pb::TransactionInfo& txn_info = request->txn_infos();
+    const pb::TransactionInfo& txn_info = request->txn_infos(0);
     uint64_t txn_id = txn_info.txn_id();
     int seq_id = txn_info.seq_id();
     SmartTransaction txn = _txn_pool.get_txn(txn_id);
@@ -781,7 +791,7 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
             return ;
         }
     } else if (txn_info.start_seq_id() != 1 && last_seq >= seq_id) {
-        // 超时导致事务重发, Leader切换会重放最后一条DML
+        // 超时等原因重发，该事务已经执行过了
         DB_WARNING("Transaction Warn: txn has exec before, remote_side: %s"
                 "region_id: %ld, txn_id: %lu, op_type: %s, last_seq: %d, seq_id: %d, log_id: %lu",
                 remote_side, _region_id, txn_id, pb::OpType_Name(op_type).c_str(), last_seq, seq_id, log_id);
@@ -799,6 +809,7 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
             response->set_errcode(pb::IN_PROCESS);
             return ;
         }
+        // 这个事务语句正在处理，线性
         txn->set_in_process(true);
     }
     // read only事务不提交raft，直接prepare/commit/rollback
@@ -811,7 +822,7 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
             // read only事务
             bool optimize_1pc = txn_info.optimize_1pc();
             _txn_pool.read_only_txn_process(_region_id, txn, op_type, optimize_1pc);
-            // 在prepare/commit/rollback是没有dml语句需要执行
+            // 在[prepare/commit/rollback]是没有dml语句需要执行
             txn->set_in_process(false);
             response->set_affected_rows(0);
             response->set_errcode(pb::SUCCESS);
@@ -826,6 +837,12 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
             txn->set_in_process(false);
         }
     });
+
+    // op != pb::OP_PREPARE
+    // 有些op在cache中没有execute
+    if (last_seq < seq_id - 1) {
+        ret = exec_cached_cmd(*request, *response, txn_id, txn, 0, 0, log_id);
+    }
 }
 
 void Region::exec_out_txn_query(google::protobuf::RpcController* controller, 
@@ -887,7 +904,176 @@ void Region::commit_raft_msg(const pb::StoreReq& request) {
     _rocksdb->write(write_option, update);
 } 
 
-void Region::apply_txn_request(const pb::StoreReq& request, braft::Closure* done, int64_t index, int64_t term) {
+void Region::apply_txn_request(const pb::StoreReq& request, 
+        braft::Closure* done, 
+        int64_t index, 
+        int64_t term) {
+}
+
+int Region::execute_cached_cmd(const pb::StoreReq& request, 
+        pb::StoreRes& response,
+        uint64_t txn_id,
+        SmartTransaction& txn,
+        int64_t applied_index,
+        int64_t term,
+        uint64_t log_id) {
+
+    if (request.txn_infos_size() == 0) {
+        return 0;
+    }
+    const pb::TransactionInfo& txn_info = request.txn_infos(0);
+    int last_seq = (txn == nullptr ? 0 : txn->seq_id());
+
+    // 从last_seq + 1开始执行到seq_id - 1
+    for (auto& cache_item: txn_info.cache_plans()) {
+        const pb::OpType op_type = cache_item.op_type();
+        int seq_id = cache_item.seq_id();
+        if (seq_id <= last_seq) {
+            continue;
+        }
+    }
+}
+
+void Region::dml_2pc(const pb::StoreReq& request, 
+        const pb::OpType op_type,
+        const pb::KvOp& plan,
+        pb::StoreRes& response,
+        int64_t applied_index,
+        int64_t term, 
+        int32_t seq_id,
+        bool need_txn_limit) {
+    if (applied_index == 0 || term == 0 || !is_leader()) {
+        response.set_leader(butil::endpoint2str(get_leader()).c_str());
+        response.set_errcode(pb::NOT_LEADER);
+        response.set_errmgs("Not Leader");
+        DB_WARNING("region_id: %ld, log_id: %lu, not leader and not in raft", _region_id, log_id);
+        return ;
+    }    
+
+    TimeCost cost;
+    std::set<int> need_rollback_seq;
+    if (request.txn_infos_size() == 0) {
+        response.set_errcode(pb::EXEC_FAIL);
+        response.set_errmgs("request txn info empty");
+        DB_FATAL("region_id: %ld txn info empty", _region_id);
+        return ;
+    }
+    const pb::TransactionInfo& txn_info = request.txn_infos(0); 
+    for (int seq: txn_info.need_rollback_seq()) {
+        need_rollback_seq.insert(seq);
+    }
+    int64_t txn_num_increase_rows = 0;
+
+    uint64_t txn_id = txn_info.txn_id();
+    uint64_t rocksdb_txn_id = 0;
+    auto txn = _txn_pool.get_txn(txn_id);
+    // txn has been rollbacked by transfer leader thread 
+    if (op_type != pb::OP_BEGIN && (txn != nullptr || txn->is_rollback())) {
+        response.set_leader(butil::endpoint2str(get_leader()).c_str());
+        response.set_errcode(pb::NOT_LEADER);
+        response.set_errmgs("Not Leader, Maybe transfer leader");
+        DB_WARNING("region_id: %ld txn_id: %lu, seq_id: %d not found", _region_id, txn_id, seq_id);
+        return ;
+    }
+    bool need_write_rollback = false;
+    if (op_type != pb::OP_BEGIN && txn != nullptr) {
+        // rollback already execute cmds
+        for (auto it = need_rollback_seq.rbegin(); it != need_rollback_seq.rend(); it++) {
+            int seq = *it;
+            txn->rollback_to_point(seq);
+            DB_WARNING("region_id: %ld, txn_id: %lu, rollback back to seq: %d", 
+                    _region_id, txn_id, seq);
+        }
+        // current cmd need rollback also
+        if (need_rollback_seq.count(seq_id) != 0) {
+            DB_WARNING("region_id: %ld, txn_id: %lu, seq_id: %d, req sed_id: %d",
+                    _region_id, txn_id, _txn->seq_id(), seq_id);
+        }
+        // 此处更新seq_id
+        txn->seq_id(seq_id);
+        // 此处设置checkpoint
+        if (op_type != pb::OP_PREPARE && op_type != pb::OP_COMMIT && op_type != pb::OP_ROLLBACK) {
+            txn->set_save_point();
+        }
+        // 此处提前保存num_increase_rows
+        if (op_type == pb::OP_COMMIT) {
+            txn_num_increase_rows = txn->num_increase_rows;
+        }
+        // 此处更新primary_region_id
+        if (txn_info.has_primary_region_id()) {
+            txn->set_primary_region_id(txn_info.primary_region_id());
+        }
+        need_write_rollback = txn->need_write_rollback();
+        rocksdb_txn_id = txn->rocksdb_txn_id();
+    }
+
+    int ret = 0;
+    if (op_type == pb::OP_COMMIT || op_type == pb::OP_ROLLBACK) {
+        int64_t num_table_lines = _num_table_lines;
+        if (op_type == pb::OP_COMMIT) {
+            num_table_lines += txn_num_increase_rows;
+        }
+        _commit_meta_mutex.lock();
+        _meta_writer->write_pre_commit(_region_id, txn_id, num_table_lines, applied_index);
+    }
+
+    ON_SCOPED_EXIT([this, op_type, applied_index, txn_id, txn_info, need_write_rollback]() {
+        if (op_type == pb::OP_COMMIT || op_type == pb::OP_ROLLBACK) {
+            int ret = _meta_writer->write_meta_after_commit(_region_id, _num_table_lines, 
+                    applied_index, _data_index, txn_id, need_write_rollback);
+            if (ret < 0) {
+                DB_FATAL("region_id: %ld, txn_id: %lu, log_index: %ld write meta after commit failed",
+                        _region_id, txn_id, applied_index);
+            }
+            _commit_meta_mutex.unlock();
+        }
+    });
+
+    // Put KvOp to txn
+
+    if (txn != nullptr) {
+        txn->err_code = pb::SUCCESS;
+        txn->set_seq_id(seq_id);
+
+        // [NOTICE] commit/rollback命令不缓存
+        if (op_type != pb::OP_COMMIT && op_type != pb::OP_ROLLBACK) {
+            pb::CachePlan plan_item;
+            plan_item.set_op_type(op_type);
+            plan_item.set_seq_id(seq_id);
+            // separate模式
+            if (is_dml_op(op_type) && txn->is_separate()) {
+                pb::StoreReq* raft_seq = txn->get_raft_req();
+                plan_item.set_op_type(pb::OP_KV_BATCH);
+                for (auto& kv_op: raft_seq->kv_ops()) {
+                    plan_item.add_kv_ops()->CopyFrom(kv_op);
+                }
+            } else {
+                // TODO: 非separate模式
+                abort();
+            }
+            txn->push_cmd_to_cache(seq_id, plan_item);
+        }
+    } else if (op_type != pb::OP_COMMIT || op_type != pb::OP_ROLLBACK) { // 还未创建txn
+        response.set_leader(butil::endpoint2str(get_leader()).c_str());
+        response.set_errcode(pb::NOT_LEADER);
+        response.set_errmgs("Not Leader, Maybe transfer leader");
+        DB_WARNING("region_id: %ld txn_id: %lu, seq_id: %d not found", _region_id, txn_id, seq_id);
+        return ;
+    }
+
+    response.set_errcode(pb::SUCCESS);
+    if (op_type != pb::OP_COMMIT && op_type != pb::OP_ROLLBACK) {
+        // dml_2pc暂时只增加一个rows
+        txn->num_increase_rows += 1;
+    } else if (op_type == pb::OP_COMMIT) {
+        // 事务commit/rollback更新num_table_lines
+        _num_table_lines += txn_num_increase_rows;
+        if (txn_num_increase_rows < 0) {
+            _num_delete_lines -= txn_num_increase_rows;
+        }
+    }
+    
+   int64_t dml_cost = cost.get_time(); 
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

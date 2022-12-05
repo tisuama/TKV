@@ -37,7 +37,7 @@ int Transaction::begin(const rocksdb::TransactionOptions& txn_opt) {
     }
     if (_pool != nullptr) {
         _use_ttl = _pool->use_ttl();
-        _online_ttl_base_expire_time_us = _pool->online_ttl_base_expire_time_us();
+        _online_ttl_us = _pool->online_ttl_us();
     }
     _last_active_time = butil::gettimeofday_us();
     _txn = txn;
@@ -60,6 +60,7 @@ rocksdb::Status Transaction::rollback() {
     }
     auto s = _txn->Rollback();
     if (s.ok()) {
+        // 设置rollbacked并结束
         _is_finished = true;
         _is_rollbacked = true;
     }
@@ -73,7 +74,92 @@ void Transaction::rollback_current_request() {
         DB_WARNING("txn_id: %lu, seq_id: %d no need rollback", _txn_id, _seq_id);
         return ;
     }
+    int first_seq_id = *_current_req_point_req.begin(); 
+    for (auto& it  = _current_req_point_req.rbegin(); 
+               it != _read_ttl_timestamp_us.rend(); it++) {
+        int seq_id = *it;
+        if (first_seq_id == seq_id) {
+            break;
+        }
+        {
+            BAIDU_SCOPED_LOCK(_cache_kv_mutex);
+            _cache_kv_map.erase(seq_id);
+        }
+        if (!_save_point_seq.empty() && _save_point_seq.top() == seq_id) {
+            num_increase_rows = _save_point_increase_rows.top();
+            _save_point_seq.pop();
+            _txn->RollbackToSavePoint();
+            DB_WARNING("txn_name: %s txn_id: %lu, first_seq_id: %d rollback cmd seq_id: %d, num_increase_rows: %ld",
+                    _txn->GetName().c_str(), first_seq_id, seq_id, num_increase_rows);
+        }
+    }
+    _seq_id = first_seq_id;
+    _store_req.Clear();
+    _is_applying = false;
+    _current_req_point_req.clear();
+    _current_req_point_req.insert(_seq_id);
+}
 
+rocksdb::Status Transaction::prepare() {
+    BAIDU_SCOPED_LOCK(_txn_mutex);
+    if (_is_prepared) {
+        return rocksdb::Status::OK();
+    }
+    if (_is_rollbacked) {
+        DB_WARNING("txn_name: %s txn_id: %lu prepared a rollbacked txn", _txn->GetName().c_str(), _txn_id);
+        return rocksdb::Status::Expired();
+    }
+    last_active_time = butil::gettimeofday_us();
+    auto s = _txn->Prepare();
+    if (s.ok()) {
+        _is_prepared = true;
+        _prepare_time_us = butil::gettimeofday_us();
+    }
+    return s;
+}
+
+void Transaction::rollback_to_point(int seq_id) {
+    BAIDU_SCOPED_LOCK(_txn_mutex);
+    last_active_time = butil::gettimeofday_us();
+    // cached_plan中的东西需要清除，因为cache_plan需要发送给follow
+    if (_save_point_seq.empty()) {
+        DB_WARNING("txn_id: %s, seq_id: %d, top_seq empty", _txn->GetName().c_str(), seq_id);
+    }
+    _need_rollback_seq.insert(seq_id);
+    {
+        BAIDU_SCOPED_LOCK(_cache_kv_mutex);
+        _cache_kv_map.erase(seq_id);
+    }
+    if (!_save_point_seq.empty() && _save_point_seq.top() == seq_id) {
+        num_increase_rows = _save_point_increase_rows.top();
+        _save_point_seq.pop();
+        _save_point_increase_rows.pop();
+        _txn->RollbackToSavePoint();
+    }
+}
+
+int  Transaction::set_save_point() {
+    BAIDU_SCOPED_LOCK(_txn_mutex);
+    last_active_time = butil::gettimeofday_us();
+    if (_save_point_seq.empty() || _save_point_seq.top() < _seq_id) {
+        _txn->SetSavePoint();
+        _save_point_seq.push(_seq_id);
+        _save_point_increase_rows.push(num_increase_rows);
+        _current_req_point_req.insert(_seq_id);
+    }
+    return _seq_id;
+}
+
+void Transaction::push_cmd_to_cache(int seq_id, pb::CachePlan plan_item) {
+    BAIDU_SCOPED_LOCK(_txn_mutex);
+    _seq_id = seq_id;
+    if (_cache_kv_map.count(seq_id) > 0) {
+        return ;
+    }
+    if (plan_item.op_type() != pb::OP_BEGIN) {
+        _has_dml_executed = true;
+    }
+    _cache_kv_map.insert({seq_id, plan_item});
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

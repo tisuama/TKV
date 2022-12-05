@@ -270,17 +270,26 @@ public:
 
     // public
     void compact_data_in_queue();
+
     int init(bool new_region, int32_t snapshot_times);
+
     void reset_snapshot_status();
+
     bool check_region_legal_complete();
 
     // override virtual functions from braft::StateMachine
     virtual void on_apply(braft::Iterator& iter) override; 
+
     virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) override;
+
     virtual int  on_snapshot_load(braft::SnapshotReader* reader) override;
+
     virtual void on_shutdown();
+
     virtual void on_leader_start(int64_t term);
+
     virtual void on_leader_stop();
+
     virtual void on_leader_stop(const butil::Status& status);
 
     // rpc function called by Store
@@ -305,11 +314,17 @@ private:
     void apply(const pb::StoreReq* request, pb::StoreRes* response, 
             brpc::Controller* cntl, google::protobuf::Closure* done); 
 
-    void do_apply(int64_t term, int64_t index, const pb::StoreReq& request, braft::Closure* done);
+    void do_apply(int64_t term, 
+            int64_t index, 
+            const pb::StoreReq& request, 
+            braft::Closure* done);
     
     void commit_raft_msg(rocksdb::WriteBatch* update); 
     
-    void apply_txn_request(const pb::StoreReq& request, braft::Closure* done, int64_t index, int64_t term);
+    void apply_txn_request(const pb::StoreReq& request, 
+            braft::Closure* done, 
+            int64_t index, 
+            int64_t term);
 
     // Leader切换时确保事务状态一致，提交OP_CLEAR_APPLYING_TXN指令清理不一致事务
     void apply_clear_transaction_log();
@@ -326,6 +341,22 @@ private:
             pb::StoreRes*       response,
             google::protobuf::Closure* done);
 
+    int execute_cached_cmd(const pb::StoreReq& request, 
+            pb::StoreRes& response,
+            uint64_t txn_id,
+            SmartTransaction& txn,
+            int64_t applied_index,
+            int64_t term,
+            uint64_t log_id);
+
+    // 在raft流程外执行
+    void dml_2pc(const pb::StoreReq& request, 
+            const pb::OpType op_type,
+            pb::StoreRes& response,
+            int64_t applied_index,
+            int64_t term, 
+            int32_t seq_id,
+            bool need_txn_limit);
 
 private:
     struct SplitParam {
@@ -426,7 +457,7 @@ private:
     
     // on_apply的时候更新，可以用来判断快照
     int64_t                 _applied_index = 0;
-    // _applied_index
+    // 数据版本，conf_change、noop等不影响数据版本
     int64_t                 _data_index = 0;
     int64_t                 _expect_term = -1; 
     
@@ -450,11 +481,12 @@ private:
     bool                    _is_learner = false;
     bool                    _learner_ready_for_read = false;
     TimeCost                _learner_time;
-    
     MetaWriter*             _meta_writer = nullptr;
-    bthread::Mutex                  _resource_lock;
-    std::shared_ptr<RegionResource> _resource;
-    RegionControl           _region_control;
+    bthread::Mutex          _commit_meta_mutex;
+
+    bthread::Mutex                          _resource_lock;
+    std::shared_ptr<RegionResource>         _resource;
+    RegionControl                           _region_control;
     scoped_refptr<braft::FileSystemAdaptor> _snapshot_adaptor = nullptr;
     
     // 异步执行队列
@@ -467,6 +499,7 @@ private:
     TimeCost                _time_cost;                    // 上次收到请求的时间
     
     TransactionPool         _txn_pool;
+
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
