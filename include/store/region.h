@@ -497,6 +497,7 @@ private:
     TimeCost                _snapshot_time_cost;
     
     TimeCost                _time_cost;                    // 上次收到请求的时间
+    bvar::LatencyRecord     _dml_time_cost;
     
     TransactionPool         _txn_pool;
 

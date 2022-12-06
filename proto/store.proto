@@ -36,7 +36,7 @@ message StoreRes {
     optional bool            is_merge = 9;
     optional PeerStatus      region_status = 10;
     optional RegionRaftStats region_raft_stat = 11;
-    repeated KvOp            kv_pairs= 12;
+    repeated KvOp            kv_pairs = 12;
     repeated TransactionInfo txn_infos = 16;
 };
 
@@ -94,9 +94,9 @@ message StoreReq {
     optional bool   force = 10;
     optional bool   not_check_region = 11;      // 不判断数据与region的匹配性
     optional RegionInfo new_region_info = 12;
-    optional bool  select_without_leader = 13;  // selcet 不判断Leader
-    optional int64 num_increase_rows = 14;
-    repeated KvOp  kv_ops = 15;
+    optional bool   select_without_leader = 13;  // selcet 不判断Leader
+    optional int64  num_increase_rows = 14;
+    repeated KvOp   kv_ops = 15;
     repeated TransactionInfo txn_infos = 16;
 };
 

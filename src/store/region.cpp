@@ -841,7 +841,7 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
     // op != pb::OP_PREPARE
     // 有些op在cache中没有execute
     if (last_seq < seq_id - 1) {
-        ret = exec_cached_cmd(*request, *response, txn_id, txn, 0, 0, log_id);
+        ret = execute_cached_cmd(*request, *response, txn_id, txn, 0, 0, log_id);
     }
 }
 
@@ -910,6 +910,7 @@ void Region::apply_txn_request(const pb::StoreReq& request,
         int64_t term) {
 }
 
+// 执行在客户端缓存的命令
 int Region::execute_cached_cmd(const pb::StoreReq& request, 
         pb::StoreRes& response,
         uint64_t txn_id,
@@ -929,19 +930,36 @@ int Region::execute_cached_cmd(const pb::StoreReq& request,
         const pb::OpType op_type = cache_item.op_type();
         int seq_id = cache_item.seq_id();
         if (seq_id <= last_seq) {
+            DB_WARNING("Transaction Error, region_id: %ld, txn_id: %lu has been executed", _region_id, txn_id);
             continue;
         }
+        // 应该执行成功，可能在其他peer已经执行过了
+        pb::StoreRes res;
+        dml_2pc(request, op_type, cache_item, res, applied_index, term, seq_id); 
+        
+        if (res.has_errcode() && res.errcode() != pb::SUCCESS) {
+            response.set_errcode(res.errcode());
+            response.set_errmsg(res.errmsg());
+            return -1;
+        }
+
+        if (op_type == pb::OP_BEGIN && ((txn = _txn_pool.get_txn(txn_id)) == nullptr)) {
+            DB_FATAL("Transaction Error, region_id: %ld, txn_id: %lu, get txn failed after pb::OP_BEGIN", _region_id, txn_id);
+            response.set_errcode(pb::EXEC_FAIL);
+            response.set_errmsg("Txn not found");
+            return -1;
+        }
     }
+    return 0;
 }
 
 void Region::dml_2pc(const pb::StoreReq& request, 
         const pb::OpType op_type,
-        const pb::KvOp& plan,
+        const pb::CachePlan& plan,
         pb::StoreRes& response,
         int64_t applied_index,
         int64_t term, 
-        int32_t seq_id,
-        bool need_txn_limit) {
+        int32_t seq_id) {
     if (applied_index == 0 || term == 0 || !is_leader()) {
         response.set_leader(butil::endpoint2str(get_leader()).c_str());
         response.set_errcode(pb::NOT_LEADER);
@@ -967,7 +985,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
     uint64_t txn_id = txn_info.txn_id();
     uint64_t rocksdb_txn_id = 0;
     auto txn = _txn_pool.get_txn(txn_id);
-    // txn has been rollbacked by transfer leader thread 
+    // 事务在Leader切换后已经rollback了
     if (op_type != pb::OP_BEGIN && (txn != nullptr || txn->is_rollback())) {
         response.set_leader(butil::endpoint2str(get_leader()).c_str());
         response.set_errcode(pb::NOT_LEADER);
@@ -977,29 +995,29 @@ void Region::dml_2pc(const pb::StoreReq& request,
     }
     bool need_write_rollback = false;
     if (op_type != pb::OP_BEGIN && txn != nullptr) {
-        // rollback already execute cmds
+        // 语句已经执行过了
         for (auto it = need_rollback_seq.rbegin(); it != need_rollback_seq.rend(); it++) {
             int seq = *it;
             txn->rollback_to_point(seq);
             DB_WARNING("region_id: %ld, txn_id: %lu, rollback back to seq: %d", 
                     _region_id, txn_id, seq);
         }
-        // current cmd need rollback also
+        // 该语句需要回滚
         if (need_rollback_seq.count(seq_id) != 0) {
             DB_WARNING("region_id: %ld, txn_id: %lu, seq_id: %d, req sed_id: %d",
                     _region_id, txn_id, _txn->seq_id(), seq_id);
         }
-        // 此处更新seq_id
+        // 更新事务seq_id
         txn->seq_id(seq_id);
-        // 此处设置checkpoint
+        // 设置事务checkpoint
         if (op_type != pb::OP_PREPARE && op_type != pb::OP_COMMIT && op_type != pb::OP_ROLLBACK) {
             txn->set_save_point();
         }
-        // 此处提前保存num_increase_rows
+        // 提前保存num_increase_rows
         if (op_type == pb::OP_COMMIT) {
             txn_num_increase_rows = txn->num_increase_rows;
         }
-        // 此处更新primary_region_id
+        // 更新primary_region_id
         if (txn_info.has_primary_region_id()) {
             txn->set_primary_region_id(txn_info.primary_region_id());
         }
@@ -1008,16 +1026,20 @@ void Region::dml_2pc(const pb::StoreReq& request,
     }
 
     int ret = 0;
+    
+    // commit/rollback step1: 第一步
     if (op_type == pb::OP_COMMIT || op_type == pb::OP_ROLLBACK) {
         int64_t num_table_lines = _num_table_lines;
         if (op_type == pb::OP_COMMIT) {
             num_table_lines += txn_num_increase_rows;
         }
         _commit_meta_mutex.lock();
+        // 事务commit前持久化
         _meta_writer->write_pre_commit(_region_id, txn_id, num_table_lines, applied_index);
     }
 
     ON_SCOPED_EXIT([this, op_type, applied_index, txn_id, txn_info, need_write_rollback]() {
+        // commit/rollback step2: 第二步
         if (op_type == pb::OP_COMMIT || op_type == pb::OP_ROLLBACK) {
             int ret = _meta_writer->write_meta_after_commit(_region_id, _num_table_lines, 
                     applied_index, _data_index, txn_id, need_write_rollback);
@@ -1028,19 +1050,24 @@ void Region::dml_2pc(const pb::StoreReq& request,
             _commit_meta_mutex.unlock();
         }
     });
-
-    // Put KvOp to txn
+    
+    if (txn != nullptr) {
+        // 暂时只实现了key-value对的操作，没有其他op
+        for(auto& kv_op: plan->kv_ops) {
+            txn->add_kv_op(kv_op);
+        }
+    }
 
     if (txn != nullptr) {
         txn->err_code = pb::SUCCESS;
         txn->set_seq_id(seq_id);
 
-        // [NOTICE] commit/rollback命令不缓存
+        // commit/rollback命令不缓存
         if (op_type != pb::OP_COMMIT && op_type != pb::OP_ROLLBACK) {
             pb::CachePlan plan_item;
             plan_item.set_op_type(op_type);
             plan_item.set_seq_id(seq_id);
-            // separate模式
+            // CASE1: separate模式
             if (is_dml_op(op_type) && txn->is_separate()) {
                 pb::StoreReq* raft_seq = txn->get_raft_req();
                 plan_item.set_op_type(pb::OP_KV_BATCH);
@@ -1048,12 +1075,13 @@ void Region::dml_2pc(const pb::StoreReq& request,
                     plan_item.add_kv_ops()->CopyFrom(kv_op);
                 }
             } else {
-                // TODO: 非separate模式
+                // TODO: CASE2: 非separate模式
                 abort();
             }
             txn->push_cmd_to_cache(seq_id, plan_item);
         }
-    } else if (op_type != pb::OP_COMMIT || op_type != pb::OP_ROLLBACK) { // 还未创建txn
+    } else if (op_type != pb::OP_COMMIT || op_type != pb::OP_ROLLBACK) { 
+        // 错误处理，事务还未创建
         response.set_leader(butil::endpoint2str(get_leader()).c_str());
         response.set_errcode(pb::NOT_LEADER);
         response.set_errmgs("Not Leader, Maybe transfer leader");
@@ -1063,7 +1091,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
 
     response.set_errcode(pb::SUCCESS);
     if (op_type != pb::OP_COMMIT && op_type != pb::OP_ROLLBACK) {
-        // dml_2pc暂时只增加一个rows
+        // dml_2pc暂时只++
         txn->num_increase_rows += 1;
     } else if (op_type == pb::OP_COMMIT) {
         // 事务commit/rollback更新num_table_lines
@@ -1074,6 +1102,11 @@ void Region::dml_2pc(const pb::StoreReq& request,
     }
     
    int64_t dml_cost = cost.get_time(); 
+   if (op_type == pb::OP_PREPARE && txn != nullptr) {
+        _dml_time_cost << (dml_cost + txn->get_exec_time_cost());        
+   } else if (txn != nullptr) {
+       txn->add_exec_time_cost(dml_cost);
+   }
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

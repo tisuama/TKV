@@ -92,9 +92,7 @@ public:
 
     int set_save_point();
     
-    void add_kvop_put(std::string& key, std::string& value, int64_t ttl_timestamp_us, bool is_primary_key);
-
-    void add_kvop_delete(std::string& key, bool is_primary_key);
+    void add_kv_op(const pb::KvOp& cached_kv_op);
 
 public:
     int64_t     num_increase_rows {0};

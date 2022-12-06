@@ -161,5 +161,10 @@ void Transaction::push_cmd_to_cache(int seq_id, pb::CachePlan plan_item) {
     }
     _cache_kv_map.insert({seq_id, plan_item});
 }
+
+void Transaction::add_kv_op(const pb::KvOp& cached_kv_op) {
+    pb::KvOp* kv_op = _store_req.add_kv_ops();
+    kv_op->CopyFrom(cached_kv_op);
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
