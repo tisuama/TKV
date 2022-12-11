@@ -1,10 +1,11 @@
 #include "txn/transaction_pool.h"
+#include "store/meta_writer.h"
 
 namespace TKV {
-int TransactionPool::init(int64_t region_id, bool use_ttl, int64_t online_ttl_base_expire_time_us) {
+int TransactionPool::init(int64_t region_id, bool use_ttl, int64_t online_ttl_us) {
 	_region_id = region_id;
 	_use_ttl = use_ttl;
-	_oneline_ttl_base_expire_time_us = online_ttl_base_expire_time_us;
+	_online_ttl_us = online_ttl_us;
 	_meta_writer = MetaWriter::get_instance();
 	return 0;
 }
@@ -23,7 +24,7 @@ int TransactionPool::begin_txn(uint64_t txn_id, SmartTransaction& txn, int64_t p
             return -1;
         }
         /* txn_name: region_id_txn_id */
-        std::string name = std::to_string(_region_id) + "_" + std::string(txn_id);
+        std::string txn_name = std::to_string(_region_id) + "_" + std::to_string(txn_id);
         auto s = txn->get_txn()->SetName(txn_name);
         if (!s.ok()) {
             DB_FATAL("region_id: %ld set txn name failed, txn_id: %lu", _region_id, txn_id);
@@ -61,11 +62,11 @@ void TransactionPool::read_only_txn_process(int64_t region_id, SmartTransaction 
             }
             break;
         }
-        case pb::ROLLBACK: 
+        case pb::OP_ROLLBACK: 
             txn->rollback();
             remove_txn(txn_id, true);
             break;
-        case pb::COMMIT:
+        case pb::OP_COMMIT:
             txn->rollback();
             remove_txn(txn_id, true);
             break;

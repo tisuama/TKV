@@ -2,6 +2,7 @@
 #include "common/common.h"
 #include "engine/rocks_wrapper.h"
 #include "proto/store.pb.h"
+#include "txn/transaction.h"
 
 namespace TKV {
 class MetaWriter {
@@ -83,6 +84,8 @@ public:
     // txn
     std::string pre_commit_key(int64_t region_id, uint64_t txn_id) const;
     int write_pre_commit(int64_t region_id, uint64_t txn_id, int64_t num_table_lines, int64_t applied_index);
+    int write_meta_index_and_num_table_lines(int64_t region_id, int64_t log_index, int64_t data_index,
+            int64_t num_table_lines, SmartTransaction txn);
 
 private:
     MetaWriter() {}

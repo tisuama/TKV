@@ -1,9 +1,11 @@
 #pragma once
 #include "common/common.h"
+#include "txn/transaction.h"
 
 #include <atomic>
 
 namespace TKV {
+class MetaWriter;
 class TransactionPool {
 public:
     TransactionPool(): _num_prepared_txn(0), _txn_count(0) {}
@@ -35,7 +37,7 @@ public:
         return _online_ttl_us;
     }
     
-    int init(int64_t region_id, bool use_ttl, int64_t online_ttl_base_expire_time_us);
+    int init(int64_t region_id, bool use_ttl, int64_t online_ttl_us);
 
     int begin_txn(uint64_t txn_id, SmartTransaction& txn, int64_t primary_region_id, int64_t txn_timeout);
 

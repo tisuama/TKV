@@ -38,12 +38,13 @@ message StoreRes {
     optional RegionRaftStats region_raft_stat = 11;
     repeated KvOp            kv_pairs = 12;
     repeated TransactionInfo txn_infos = 16;
+    optional int64           affected_rows = 17;
 };
 
 message KvOp {
     optional string      key = 1;
     optional string      value = 2;
-    optional BatchOpType op_type = 3;
+    optional BatchOpType batch_type = 3;
     optional int64       ttl_timestamp_us = 4;
 };
 
@@ -66,9 +67,9 @@ message CachePlan {
 message TransactionInfo {
     required uint64     txn_id = 1;
     required int32      seq_id = 2;
-    optional int32      start_req_id = 3;
+    optional int32      start_seq_id = 3;
     optional bool       optimize_1pc = 4;
-    optional int32      need_rollback_seq = 5;
+    repeated int32      need_rollback_seq = 5;
     optional int64      num_rows = 6;
     optional bool       autocommit = 7;
     optional int64      primary_region_id = 8;
@@ -98,6 +99,7 @@ message StoreReq {
     optional int64  num_increase_rows = 14;
     repeated KvOp   kv_ops = 15;
     repeated TransactionInfo txn_infos = 16;
+    optional uint64 client_id = 17;
 };
 
 message InitRegion {

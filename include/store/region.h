@@ -17,6 +17,7 @@
 #include "store/region_control.h"
 #include "raft/rocksdb_file_system_adaptor.h"
 #include "common/concurrency.h"
+#include "txn/transaction_pool.h"
 
 namespace TKV {
 DECLARE_int64(disable_write_wait_timeout_us);
@@ -268,6 +269,14 @@ public:
         return _txn_pool;
     }
 
+    void commit_meta_lock() {
+        _commit_meta_mutex.lock();
+    }
+
+    void commit_meta_unlock() {
+        _commit_meta_mutex.unlock();
+    }
+    
     // public
     void compact_data_in_queue();
 
@@ -319,7 +328,7 @@ private:
             const pb::StoreReq& request, 
             braft::Closure* done);
     
-    void commit_raft_msg(rocksdb::WriteBatch* update); 
+    void commit_raft_msg(const pb::StoreReq& request); 
     
     void apply_txn_request(const pb::StoreReq& request, 
             braft::Closure* done, 
@@ -331,6 +340,7 @@ private:
 
     void leader_start(int64_t term);
 
+    // Pessimistic Transaction
     void exec_in_txn_query(google::protobuf::RpcController* controller, 
             const pb::StoreReq* request, 
             pb::StoreRes*       response,
@@ -350,13 +360,23 @@ private:
             uint64_t log_id);
 
     // 在raft流程外执行
+    void dml_1pc(const pb::StoreReq& request,
+            const pb::OpType op_type,
+            const pb::CachePlan& plan,
+            pb::StoreRes& response,
+            int64_t applied_index, 
+            int64_t term,
+            braft::Closure* done);
+
     void dml_2pc(const pb::StoreReq& request, 
             const pb::OpType op_type,
+            const pb::CachePlan& plan,
             pb::StoreRes& response,
             int64_t applied_index,
             int64_t term, 
-            int32_t seq_id,
-            bool need_txn_limit);
+            int32_t seq_id);
+
+    // Optimistic Transaction
 
 private:
     struct SplitParam {
@@ -482,6 +502,7 @@ private:
     bool                    _learner_ready_for_read = false;
     TimeCost                _learner_time;
     MetaWriter*             _meta_writer = nullptr;
+    // 在open_snapshot时调用，防止在pre_commit和commit之间open_snapshot
     bthread::Mutex          _commit_meta_mutex;
 
     bthread::Mutex                          _resource_lock;
@@ -497,10 +518,10 @@ private:
     TimeCost                _snapshot_time_cost;
     
     TimeCost                _time_cost;                    // 上次收到请求的时间
-    bvar::LatencyRecord     _dml_time_cost;
     
     TransactionPool         _txn_pool;
-
+    bool                    _use_ttl       {false};
+    int64_t                 _online_ttl_us {0};
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

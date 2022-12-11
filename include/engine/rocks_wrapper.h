@@ -103,7 +103,7 @@ public:
     rocksdb::Transaction* begin_transaction(
             const rocksdb::WriteOptions& write_options,
             const rocksdb::TransactionOptions& txn_options) {
-        return _txn_db->BeginTransaction(write_options, txn_options);
+        return _db->BeginTransaction(write_options, txn_options);
     }
 
     int32_t create_column_family(const std::string& cf_name);

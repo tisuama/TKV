@@ -65,6 +65,11 @@ file(GLOB COMMON_SRC
 	)
 add_library(common_src_lib OBJECT ${COMMON_SRC})
 
+file(GLOB TXN_SRC
+	src/txn/*.cpp
+	)
+add_library(txn_src_lib OBJECT ${TXN_SRC})
+
 file(GLOB META_INTERACT 
 	src/meta/meta_server_interact.cpp
 	)
@@ -188,6 +193,7 @@ add_executable(TKVStore
 	$<TARGET_OBJECTS:meta_interact_lib>
 	$<TARGET_OBJECTS:store_interact_lib>
 	$<TARGET_OBJECTS:raft_store_src_lib>
+	$<TARGET_OBJECTS:txn_src_lib>
 	)
 target_link_libraries(TKVStore ${DEP_LIB})
 

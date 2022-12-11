@@ -464,10 +464,13 @@ bool RocksdbFileSystemAdaptor::open_snapshot(const std::string& path) {
     _snapshot_cond.increase();
     // Create new snapshot
     auto region = Store::get_instance()->get_region(_region_id);
-    // TODO: lock commit meta index
+    
+    region->commit_meta_lock();
     _snapshot[path].ptr.reset(new SnapshotContext);
     int64_t data_index = region->get_data_index();
     _snapshot[path].ptr->data_index = data_index;
+    region->commit_meta_unlock();
+
     _snapshot[path].count++;
     _snapshot[path].cost.reset();
     DB_WARNING("region_id: %ld data_index: %ld, open snapshot path: %s",

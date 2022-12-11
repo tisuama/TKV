@@ -420,5 +420,15 @@ int MetaWriter::write_pre_commit(int64_t region_id, uint64_t txn_id, int64_t num
     }
     return 0;
 }
+
+int MetaWriter::write_meta_index_and_num_table_lines(int64_t region_id, int64_t log_index, int64_t data_index,
+        int64_t num_table_lines, SmartTransaction txn) {
+    if (log_index == 0) {
+        return 0;
+    }
+    txn->put_meta_info(applied_index_key(region_id), encode_applied_index(log_index, data_index));
+    txn->put_meta_info(num_table_lines_key(region_id), encode_num_table_lines(num_table_lines));
+    return 0;
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

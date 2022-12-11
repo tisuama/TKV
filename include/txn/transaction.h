@@ -7,7 +7,7 @@
 
 namespace TKV {
 DECLARE_bool(disable_wal);
-
+struct RegionResource;
 class TransactionPool;
 class Transaction {
 public:
@@ -53,8 +53,20 @@ public:
         _in_process = flag;
     }
 
+    void set_separate(bool flag) {
+        _is_separate = flag; 
+    }
+
     bool is_finished() const {
         return _is_finished;
+    }
+    
+    bool is_separate() const {
+        return _is_separate;
+    }
+    
+    bool is_rollbacked() const {
+        return  _is_rollbacked;
     }
 
     bool has_dml_executed() const {
@@ -62,7 +74,7 @@ public:
     }
 
     bool need_write_rollback(pb::OpType op_type) {
-        if (op_type == pb::OP_ROOLBACK && (_primary_region_id != -1)) {
+        if (op_type == pb::OP_ROLLBACK && (_primary_region_id != -1)) {
             return true;
         }
         return false;
@@ -76,23 +88,47 @@ public:
         return &_store_req;
     }
 
+    uint64_t txn_id() const {
+        return _txn->GetID();
+    }
+
+    bool in_process() const {
+        return _in_process;
+    }
+    
+    bool is_primary_region() {
+        BAIDU_SCOPED_LOCK(_txn_mutex);
+        if (_region_info != nullptr) {
+            return (_region_info->region_id() == _primary_region_id);
+        }
+        return false;
+    }
+
+    void set_resource(const std::shared_ptr<RegionResource>& resource);
+
     void push_cmd_to_cache(int seq_id, pb::CachePlan plan_item);
 
     int begin(const Transaction::TxnOptions& txn_opt);
 
     int begin(const rocksdb::TransactionOptions& txn_opt);
 
-    rocksdb::Status rollback();
+    int rollback();
+
+    int prepare();
+
+    int commit();
 
     void rollback_current_request();
-
-    rocksdb::Status prepare();
 
     void rollback_to_point(int seq_id);
 
     int set_save_point();
     
     void add_kv_op(const pb::KvOp& cached_kv_op);
+
+    int put_meta_info(const std::string& key, const std::string& value);
+
+    int remove_meta_info(const std::string& key);
 
 public:
     int64_t     num_increase_rows {0};
@@ -101,7 +137,7 @@ public:
     int         dml_num_affected_rows {0};
     // batch txn
     int64_t     batch_num_increase_rows {0};
-    pb::ErrCode {pb::SUCCESS};
+    pb::ErrorCode err_code {pb::SUCCESS};
 
 private:
     using CacheKVMap = std::map<int, pb::CachePlan>;
@@ -112,7 +148,7 @@ private:
     bool        _is_applying {false};
     bool        _is_prepared {false};
     bool        _is_finished {false};
-    bool        _is_rolledback {false};
+    bool        _is_rollbacked {false};
     // 正在处理该事务相关语句，事务内应该是串行，事务间并行
     std::atomic<bool>    _in_process {false};
     bool                 _write_begin_index {true};
@@ -144,7 +180,7 @@ private:
     bthread_mutex_t              _txn_mutex;
     bool                         _use_ttl {false};
     // 默认情况下设为seperate模式
-    bool                         _is_seperate  {true};
+    bool                         _is_separate  {true};
 
     // TTL读取时间
     int64_t                      _read_ttl_timestamp_us {0};

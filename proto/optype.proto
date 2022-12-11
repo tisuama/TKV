@@ -1,5 +1,4 @@
 syntax="proto2";
-import "common.proto";
 package TKV.pb;
 option cc_generic_services = true;
 
@@ -31,8 +30,9 @@ enum OpType {
     OP_UPDATE_STORE_DDLWORK                 = 19; //更新store ddl状态
 
 	// KV_OP
-    OP_KV_BATCH                             = 20;
-	OP_TXN_KV								= 21;	
+    OP_KV_BATCH                             = 20; // txn kv type
+	OP_TXN_KV								= 21; // txn kv type	
+	OP_RAW_KV								= 22; // raw kv type
 
     OP_TXN_QUERY_PRIMARY_REGION             = 24; // Percolator反查primary region
     OP_TXN_QUERY_STATE                      = 25; // 查询事务状态
@@ -152,7 +152,7 @@ enum QueryOpType {
 };
 
 enum BatchOpType {
-	KV_PUT = 1;
-	KV_GET = 2;
-	KV_DELETE = 3;
+	RAW_KV_PUT = 1;
+	RAW_KV_GET = 2;
+	RAW_KV_DELETE = 3;
 };
