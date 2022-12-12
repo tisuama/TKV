@@ -42,7 +42,6 @@ void Region::construct_heart_beat_request(pb::StoreHBRequest& request, bool need
     if (_shutdown || !_can_heartbeat || _removed) {
         return ;
     }
-    // TODO: multi-thread cond
     if (_num_delete_lines > FLAGS_compact_delete_lines) {
         DB_WARNING("region_id: %ld, delete %ld rows, do compact in queue",
                 _region_id, _num_delete_lines.load());
@@ -329,7 +328,8 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
             _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
             // SST生成的data_cf的SST文件是从idx = 0开始，meta_cf没有idx
             butil::FilePath file_path(data_sst_file + "0");                  
-            // 两种情况：1) 此次快照的data_index更大，包含数据更多
+            // 两种情况：
+            // 1) 此次快照的data_index更大，包含数据更多
             // 2) restart时有快照没有安装完成，因为data_sst_file还存在
             if (_data_index > old_data_index || 
                     (_restart && butil::PathExists(file_path))) {
@@ -888,16 +888,42 @@ void Region::exec_out_txn_query(google::protobuf::RpcController* controller,
         if (is_dml_op_type(op_type) && _storage_compute_separate) {
             exec_kv_out_txn(request, response, remote_side, done_guard.release());
         } else {
-            // 默认使用1pc
-            dml_1pc(*request, response->op_type(), request->plan(), *respone, 0, 0, done_guard.release());
-            if (respone.errcode() != pb::SUCCESS) {
-                DB_FATAL("region_id: %ld, log_id: %lu exec dml_1pc failed", _region_id, log_id);
+            // Try apply raft log
+            butil::IOBuf data;
+            butil::IOBufAsZeroCopyOutputStream wrapper(&data);
+            if (!request->SerializeToZeroCopyStream(&wrapper)) {
+                cntl->SetFailed(brpc::EREQUEST, "Fail to serialze request");
                 return ;
             }
-        }
-        /* apply to raft */
-        apply(request, response, cntl, done_guard.release());
 
+            DMLClosure* c = new DMLClosure;
+            c->op_type = op_type;
+            c->log_id = log_id;
+            c->response = response;
+            c->region = this;
+            c->remote_side = remote_side;
+            int64_t expected_term = _expect_term;
+
+            // 默认使用1pc，成功后c->transaction = txn
+            // 可以走1pc，也可以不走，等到on_apply的时候再做
+            if (is_dml_op_type(op_type) && _txn_pool.exec_1pc_out_fsm()) {
+                dml_1pc(*request, response->op_type(), request->plan(), *respone, 0, 0, done_guard.release());
+                if (respone.errcode() != pb::SUCCESS) {
+                    DB_FATAL("region_id: %ld, log_id: %lu exec dml_1pc failed", _region_id, log_id);
+                    return ;
+                }
+            }
+            c->cost.reset();
+            c->done = done_guard.release();
+
+            braft::Task task;
+            task.data = &data;
+            task.done = c;
+            if (is_dml_op_type(op_type)) {
+                task.expected_term = expected_term;
+            }
+            _node.apply(task);
+        }
         break;
     }
     default:
@@ -1214,7 +1240,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
     }));
     
     if (txn != nullptr) {
-        // 开始一个事务，原始版本在state.init中初始化
+        // 开始一个事务
         if (op_type  == pb::OP_BEGIN && txn_info.has_primary_region_id()) {
             _txn_pool.begin_txn(txn_id, txn, txn_info.primary_region_id(), 300 * 1000 /* 事务超时时间(ms) */);
         }
