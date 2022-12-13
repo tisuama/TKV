@@ -277,6 +277,11 @@ public:
         _commit_meta_mutex.unlock();
     }
     
+    std::shared_ptr<RegionResource> get_resource() {
+        BAIDU_SCOPED_LOCK(_resource_lock);
+        return _resource;
+    }
+
     // public
     void compact_data_in_queue();
 
@@ -319,6 +324,8 @@ private:
     void set_region_with_update_range(const pb::RegionInfo& region_info);
 
     bool valid_version(const pb::StoreReq* request, pb::StoreRes* response);
+
+    void leader_start(int64_t term);
     
     void apply(const pb::StoreReq* request, pb::StoreRes* response, 
             brpc::Controller* cntl, google::protobuf::Closure* done); 
@@ -337,8 +344,6 @@ private:
 
     // Leader切换时确保事务状态一致，提交OP_CLEAR_APPLYING_TXN指令清理不一致事务
     void apply_clear_transaction_log();
-
-    void leader_start(int64_t term);
 
     // Pessimistic Transaction
     void exec_in_txn_query(google::protobuf::RpcController* controller, 
@@ -376,6 +381,21 @@ private:
             int64_t term, 
             int32_t seq_id);
 
+    void apply_kv_out_txn(const pb::StoreReq& request, 
+            braft::Closure* done,
+            int64_t index, 
+            int64_t term);
+
+    void apply_kv_in_txn(const pb::StoreReq& request,
+            braft::Closure* done,
+            int64_t index,
+            int64_t term);
+
+    void dml(const pb::StoreReq& request, 
+            pb::StoreRes& response,
+            int64_t applied_index, 
+            int64_t term);
+    
     // Optimistic Transaction
 
 private:

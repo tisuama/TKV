@@ -30,15 +30,21 @@ enum OpType {
     OP_UPDATE_STORE_DDLWORK                 = 19; //更新store ddl状态
 
 	// KV_OP
-    OP_KV_BATCH                             = 20; // txn kv type
-	OP_TXN_KV								= 21; // txn kv type	
-	OP_RAW_KV								= 22; // raw kv type
+    OP_KV_BATCH                             = 20; // Txn KV 
 
-    OP_TXN_QUERY_PRIMARY_REGION             = 24; // Percolator反查primary region
-    OP_TXN_QUERY_STATE                      = 25; // 查询事务状态
-    OP_TXN_COMPLETE                         = 26; // 手动完成特定事务处理
-    OP_CLEAR_APPLYING_TXN                   = 27; // 清理未apply的事务
-    OP_SELECT_FOR_UPDATE                    = 28;
+	OP_TXN_KV_PUT							= 22;
+	OP_TXN_KV_GET							= 23;
+	OP_TXN_KV_DELETE						= 24;
+
+	OP_RAW_KV_PUT							= 30; // Raw KV
+	OP_RAW_KV_GET 							= 31;
+	OP_RAW_KV_DELETE						= 32;
+
+    OP_TXN_QUERY_PRIMARY_REGION             = 40; // Percolator反查primary region
+    OP_TXN_QUERY_STATE                      = 41; // 查询事务状态
+    OP_TXN_COMPLETE                         = 42; // 手动完成特定事务处理
+    OP_CLEAR_APPLYING_TXN                   = 43; // 清理未apply的事务
+    OP_SELECT_FOR_UPDATE                    = 44;
     // Fake op
     OP_UNION                                = 51;
     OP_LOAD                                 = 52;
@@ -151,8 +157,3 @@ enum QueryOpType {
     QUERY_SHOW_VIRINDX_INFO_SQL                   = 309;//展示虚拟索引的影响   
 };
 
-enum BatchOpType {
-	RAW_KV_PUT = 1;
-	RAW_KV_GET = 2;
-	RAW_KV_DELETE = 3;
-};

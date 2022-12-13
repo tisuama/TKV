@@ -26,8 +26,12 @@ DEFINE_int64(split_duration_us, 3600 * 1000 * 1000LL, "split duration, default: 
 
 static bool is_dml_op_type(const pb::OpType& op_type) {
     // 当前还不支持INSERT/DELETE/UPDATE/SELETE_FOR_UPDATE等DML语句
-    if (op_type == pb::OP_TXN_KV || 
-        op_type == pb::OP_RAW_KV) {
+    if (op_type == pb::OP_TXN_KV_PUT || 
+        op_type == pb::OP_TXN_KV_GET ||
+        op_type == pb::OP_TXN_KV_DELETE || 
+        op_type == pb::OP_RAW_KV_PUT || 
+        op_type == pb::OP_RAW_KV_GET ||
+        op_type == pb::OP_RAW_KV_DELETE) {
         return true;
     }
     return false;
@@ -565,9 +569,9 @@ void Region::query(::google::protobuf::RpcController* controller,
         case pb::OP_PREPARE:
         case pb::OP_COMMIT:
         case pb::OP_ROLLBACK:
-        case pb::RAW_KV_PUT:
-        case pb::RAW_KV_GET:
-        case pb::RAW_KV_DELETE: {
+        case pb::OP_RAW_KV_PUT:
+        case pb::OP_RAW_KV_GET:
+        case pb::OP_RAW_KV_DELETE: {
             uint64_t txn_id = 0;
             if (request->txn_infos_size() > 0) {
                 txn_id = request->txn_infos(0).txn_id();
@@ -677,11 +681,19 @@ void Region::do_apply(int64_t term,
             break;
         }
         case pb::OP_KV_BATCH: {
-            // 走separate模式
+            // 存储计算分离时使用，走separate模式
+            _data_index = _applied_index;
+            uint64_t txn_id = request.txn_infos_size() > 0 ? request.txn_infos(0).txn_id(): 0;
+            if (txn_id == 0) {
+                apply_kv_out_txn(request, done, _applied_index, term);
+            } else {
+                apply_kv_in_txn(request, done, _applied_index, term);
+            }
             break;
         }
-        case pb::OP_TXN_KV:
-        case pb::OP_RAW_KV: {
+        case pb::OP_RAW_KV_PUT:
+        case pb::OP_RAW_KV_GET:
+        case pb::OP_RAW_KV_DELETE: {
             // 无事务或者single-transaction没有走separate模式
             break;
         }
@@ -734,7 +746,7 @@ void Region::on_leader_stop(const butil::Status& status) {
     DB_WARNING("region_id: %ld Leader stop, err_code: %d, err_msg: %s",
             _region_id, status.error_code(), status.error_cstr());
     _is_leader.store(false);
-    // 只读事务清理
+    // TODO: 只读事务清理
 }
 
 void Region::exec_in_txn_query(google::protobuf::RpcController* controller, 
@@ -846,6 +858,60 @@ void Region::exec_in_txn_query(google::protobuf::RpcController* controller,
     if (last_seq < seq_id - 1) {
         ret = execute_cached_cmd(*request, *response, txn_id, txn, 0, 0, log_id);
     }
+
+    switch(op_type) {
+        case pb::OP_TXN_KV_PUT:
+        case pb::OP_TXN_KV_GET:
+        case pb::OP_TXN_KV_DELETE: {
+            if (_split_param.split_slow_down) {
+                /* split 处于slow down阶段，需要sleep */
+                DB_WARNING("region_id: %ld is spliting, slow down time: %ld, remote_side: %s",
+                        _region_id, _split_param.split_slow_down_cost, remote_side);
+                bthread_usleep(_split_param.split_slow_down_cost);
+            }
+            /* 最长30s */
+            int64_t disable_write_wait = get_split_wait_time();
+            int ret = _disable_write_cond.timed_wait(disable_write_wait);
+            if (ret != 0) {
+                DB_WARNING("region_id: %ld disable write timeout: %ld", _region_id, disable_write_wait);
+                ERROR_SET_RESPONSE_FAST(response, pb::DISABLE_WRITE_TIMEOUT, "disable write timeout", log_id);
+                return ;
+            }
+
+            _real_writing_cond.increase();
+            ON_SCOPED_EXIT([this]() {
+                _real_writing_cond.decrease_broadcast();
+            });
+
+            int64_t expected_term = _expect_term;
+            pb::StoreReq* req = nullptr;
+            if (is_dml_op_type(op_type)) {
+                dml(*request, *response, 0LL, 0LL);
+                if (response->errcode() != pb::SUCCESS) {
+                    apply_success = false;
+                    DB_WARNING("[DML FAILED] regin_id: %ld, txn_id: %lu, log_id: %lu, remote_side: %s",
+                            _region_id, txn_id, log_id, remote_side.c_str());
+                    return ;
+                }
+                if (txn != nullptr && txn->is_separate()) {
+                    req = txn->get_raft_req();
+                    req->clear_txn_infos();
+                    auto req_txn_info = req->add_txn_infos();
+                    req_txn_info->CopyFrom(txn_info);
+                    req_txn_info->set_op_type(pb::OP_KV_BATCH);
+                    req_txn_info->set_region_id(_region_id);
+                    req_txn_info->set_region_version(_version);
+                    req_txn_info->set_num_increase_rows(txn->num_increase_rows);
+                }
+            }
+        }
+        case default: {
+            response->set_errcode(pb::UNSUPPORT_REQ_TYPE);
+            response->set_errmsg("Not support");
+            DB_FATAL("region_id: %ld, log_id: %lu, txn_id: %lu, op_type: %d not support",
+                    _region_id, log_id, txn_id, op_type);
+        }
+    }
 }
 
 void Region::exec_out_txn_query(google::protobuf::RpcController* controller, 
@@ -888,7 +954,7 @@ void Region::exec_out_txn_query(google::protobuf::RpcController* controller,
         if (is_dml_op_type(op_type) && _storage_compute_separate) {
             exec_kv_out_txn(request, response, remote_side, done_guard.release());
         } else {
-            // Try apply raft log
+            // 非存算分离模式
             butil::IOBuf data;
             butil::IOBufAsZeroCopyOutputStream wrapper(&data);
             if (!request->SerializeToZeroCopyStream(&wrapper)) {
@@ -1004,6 +1070,7 @@ void Region::dml_1pc(const pb::StoreReq& request,
     TimeCost cost; 
     // for out txn dml query, create new txn
     // for single-region 2pc query, simply fetch the txn create before
+    
     // 兼容无事务功能的log entry，以及强制1pc DML query(用来灌数据)
     bool is_new_txn = !((request.op_type() == pb::OP_PREPARE) && request.txn_infos(0).optimize_1pc());
     bool single_region_txn = (request.op_type() == pb::OP_BEGIN) && request.txn_infos(0).optimize_1pc();
@@ -1141,7 +1208,7 @@ void Region::dml_1pc(const pb::StoreReq& request,
     }
     
     int64_t dml_cost = cost.get_time();
-    DB_DEBUG("[FINISH] dml_1pc region_id: %ld, txn_id: %lu, op_type: %s, time cost: %ld", 
+    DB_DEBUG("[FINISH DML_1PC] region_id: %ld, txn_id: %lu, op_type: %s, time cost: %ld", 
             _region_id, txn_id, pb::OpType_Name(op_type).c_str(), dml_cost);
 }
 
@@ -1239,7 +1306,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
         }
     }));
     
-    if (txn != nullptr) {
+    if (txn == nullptr) {
         // 开始一个事务
         if (op_type  == pb::OP_BEGIN && txn_info.has_primary_region_id()) {
             _txn_pool.begin_txn(txn_id, txn, txn_info.primary_region_id(), 300 * 1000 /* 事务超时时间(ms) */);
@@ -1262,6 +1329,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
             plan_item.set_seq_id(seq_id);
             // CASE1: separate模式
             if (is_dml_op_type(op_type) && txn->is_separate()) {
+                // separate模式模式下仅添加kv
                 pb::StoreReq* raft_seq = txn->get_raft_req();
                 plan_item.set_op_type(pb::OP_KV_BATCH);
                 for (auto& kv_op: raft_seq->kv_ops()) {
@@ -1282,7 +1350,7 @@ void Region::dml_2pc(const pb::StoreReq& request,
         return ;
     }
 
-    // 维护dml_num_affected_rows
+    // TXN维护dml_num_affected_rows
 
     response.set_errcode(pb::SUCCESS);
     if (op_type == pb::OP_TRUNCATE_TABLE) {
@@ -1302,8 +1370,67 @@ void Region::dml_2pc(const pb::StoreReq& request,
     
     int64_t dml_cost = cost.get_time();
 
-    DB_DEBUG("[FINISH] dml_2pc, region_id: %ld, txn_id: %lu, op_type: %s, time cost: %ld", 
+    DB_DEBUG("[FINISH DML_2PC] region_id: %ld, txn_id: %lu, op_type: %s, time cost: %ld", 
             _region_id, txn_id, pb::OpType_Name(op_type).c_str(), dml_cost);
+}
+
+void Region::apply_kv_out_txn(const pb::StoreReq& request, 
+        braft::Closure* done,
+        int64_t index, 
+        int64_t term) {
+    TimeCost cost;
+    SmartTransaction txn = nullptr;
+    bool commit_success = false;
+    int64_t num_table_lines = 0;
+    int64_t num_increase_rows = 0;    
+    auto resource = get_resource();
+    ON_SCOPED_EXIT(([this, &txn, &commit_success, done]() {
+        if (!commit_success) {
+            if (txn != nullptr) {
+                txn->rollback();
+            }
+            if (done != nullptr) {
+                ((DMLClosure*)done)->response->set_errcode(pb::EXEC_FAIL);
+                ((DMLClosure*)done)->response->set_errmsg("[COMMIT FAILED] in fsm");
+            }
+        } else {
+            if (done != nullptr) {
+                ((DMLClosure*)done)->response->set_errmsg(pb::SUCCESS);
+                ((DMLClosure*)done)->response->set_errmsg("SUCCESS");
+            }
+        }
+    }));
+    
+    if (done == nullptr) {
+        // follower
+        txn = SmartTransaction(new Transaction(0, &_txn_pool));
+        txn->set_resource(resource);
+        txn->begin(Transaction::TxnOptions());
+        int64_t table_id = get_table_id();
+        for (auto& kv_op: request.kv_ops()) {
+            pb::OpType op_type = kv_op.op_type();
+            int ret = 0;
+            if (get_version() != 0) {
+                if (op_type == pb::OP_TXN_KV_PUT) {
+                    ret = txn->put_kv(kv_op.key(), kv_op.value());
+                }
+            }
+        }
+    }
+}
+
+void Region::apply_kv_in_txn(const pb::StoreReq& request,
+        braft::Closure* done,
+        int64_t index,
+        int64_t term) {
+    // 
+}
+
+void Region::dml(const pb::StoreReq& request, 
+        pb::StoreRes& response,
+        int64_t applied_index, 
+        int64_t term) {
+    // 
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

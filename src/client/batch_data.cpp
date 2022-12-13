@@ -5,7 +5,6 @@
 namespace TKV {
 static inline void set_region_ver(pb::StoreReq* request, KeyLocation& key_location) {
     auto region_ver = key_location.region_ver;
-    request->set_op_type(pb::OP_RAW_KV);
     request->set_region_id(region_ver.region_id);
     request->set_region_version(region_ver.ver);
     request->set_start_key(key_location.start_key);
@@ -20,20 +19,18 @@ void BatchData::put(const std::string& key,
     int64_t region_id = region_ver.region_id;
 
     auto request = get_request(region_id);
+    request->set_op_type(pb::OP_RAW_KV_PUT);
 
     auto closure = get_closure(region_id);
     closure->push_back(done);
 
     auto version = get_version(region_id);
     *version = region_ver;
-
     set_region_ver(request, key_location);
-    
     
     auto op = request->add_kv_ops();
     op->set_key(key);
     op->set_value(value);
-    op->set_batch_type(pb::RAW_KV_PUT);
     
     DB_DEBUG("region_id: %ld put data, request: %s, version: %s, version point: %p", 
             region_id, 
@@ -50,18 +47,17 @@ void BatchData::get(const std::string& key,
     int64_t region_id =region_ver.region_id;
 
     auto request = get_request(region_id);
+    request->set_op_type(pb::OP_RAW_KV_GET);
 
     auto closure = get_closure(region_id);
     closure->push_back(done);
 
     auto version = get_version(region_id);
     *version = region_ver;
-
     set_region_ver(request, key_location);
 
     auto op = request->add_kv_ops();
     op->set_key(key);
-    op->set_batch_type(pb::RAW_KV_DELETE);
 
     DB_DEBUG("region_id: %ld get data, request: %s, version: %s, version point: %p", 
             region_id, 
