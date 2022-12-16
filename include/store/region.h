@@ -269,14 +269,6 @@ public:
         return _txn_pool;
     }
 
-    void commit_meta_lock() {
-        _commit_meta_mutex.lock();
-    }
-
-    void commit_meta_unlock() {
-        _commit_meta_mutex.unlock();
-    }
-    
     std::shared_ptr<RegionResource> get_resource() {
         BAIDU_SCOPED_LOCK(_resource_lock);
         return _resource;
@@ -395,6 +387,12 @@ private:
             pb::StoreRes& response,
             int64_t applied_index, 
             int64_t term);
+    
+    int  process_txn(SmartTransaction txn, 
+            uint64_t txn_id, 
+            pb::CachePlan& plan, 
+            pb::OpType op_type);
+
     
     // Optimistic Transaction
 
