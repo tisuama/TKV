@@ -431,6 +431,30 @@ message MetaRes {
     repeated ResourceTagInfo    resource_tag_infos  = 16;    
 };
 
+message TSOTimestamp {
+    optional int64  physical = 1;
+    optional int64  logical = 2;
+};
+
+message TSORequest {
+    required OpType         op_type = 1;
+    optional int64          count   = 2;
+    optional TSOTimestamp   current_timestamp = 3;
+    optional int64          save_physical = 4;
+    optional bool           force = 5;
+};
+
+message TSOResponse {
+    required OpType         op_type = 1;
+    optional ErrorCode      errcode = 2;
+    optional TSOTimestamp   start_timestamp = 3;
+    optional int64          count = 4;
+    optional string         errmsg = 5;
+    optional int64          save_physical = 6;
+    optional int64          system_time = 7;
+    optional string         leader =  8;
+};
+
 service MetaService {
     rpc store_heartbeat(StoreHBRequest) returns (StoreHBResponse);
     rpc meta_manager(MetaManagerRequest) returns (MetaManagerResponse);
