@@ -18,6 +18,24 @@ public:
     int64_t total_time_cost;
     TimeCost time_cost;
 };
+
+struct TSOClosure: public braft::Closure {
+    TSOClosure(): sync_cond(nullptr) {}
+    TSOClosure(BthreadCond* cond): sync_cond(cond) {}
+
+    virtual void Run();
+
+    brpc::Controller*           cntl;
+    CommonStateMachine*         common_state_machine;
+    google::protobuf::Closure*  done;
+    pb::TSOResponse*            response;
+    int64_t                     raft_time_cost;
+    int64_t                     total_time_cost;
+    TimeCost                    time_cost;
+    bool                        is_sync   {false};
+    BthreadCond*                sync_cond {nullptr};
+};
+
 // override by tso_state_machine、auto_incr_state_machine in BaiKalDB
 class CommonStateMachine: public braft::StateMachine {
 public:

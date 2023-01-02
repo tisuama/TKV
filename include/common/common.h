@@ -558,6 +558,16 @@ void bthread_usleep_fast_shutdown(int64_t interval_us, T& shutdown) {
         ++time;
     }
 }
-
 } // namespace TKV 
+namespace TSO {
+constexpr int64_t update_timestamp_interval_ms = 50; // 50ms
+constexpr int64_t update_timestamp_guard_ms = 1;     // 1ms
+constexpr int64_t save_interval_ms = 3000;           // 3000ms
+constexpr int logical_bits = 18;
+constexpr int64_t max_logical = 1 << logical_bits;
+
+inline int64_t clock_realtime_ms() {
+    return butil::gettimeofday_ms();
+}
+} // namespace TSO
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

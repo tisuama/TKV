@@ -37,13 +37,31 @@ void MetaServerClosure::Run() {
     }
     delete this;
 }
+
+void TSOClosure::Run() {
+    if (!status().ok()) {
+        if (response) {
+            response->set_errcode(pb::NOT_LEADER);
+            response->set_leader(butil::endpoint2str(common_state_machine->get_leader()).c_str());
+        }
+        DB_FATAL("meta server closure failed, error_code: %d, error_msg: %s",
+                status().error_code(), status().error_cstr());
+    }
+    if (sync_cond) {
+        sync_cond->decrease_signal();
+    }
+    if (done) {
+        done->Run();
+    }
+    delete this;
+}
     
 int CommonStateMachine::init(const std::vector<braft::PeerId>& peers) {
     braft::NodeOptions options;
     options.election_timeout_ms = FLAGS_election_timeout_ms;
     options.fsm = this;
     // Can get replica num from peers
-    std::string region_str = "id=" + std::to_string(0);
+    std::string region_str = "id=" + std::to_string(_dummy_region_id);
     options.initial_conf = braft::Configuration(peers);
     options.snapshot_interval_s = FLAGS_snapshot_interval_s;
     options.log_uri = FLAGS_raftlog_uri + region_str;
@@ -51,10 +69,10 @@ int CommonStateMachine::init(const std::vector<braft::PeerId>& peers) {
     options.snapshot_uri = FLAGS_snapshot_uri + region_str;
     int ret = _node.init(options);
     if (ret < 0) {
-        DB_FATAL("raft node init fail");
+        DB_FATAL("region_id: %ld raft node init fail", _dummy_region_id);
         return ret;
     }
-    DB_WARNING("raft init sucess, meta state machine init sucess");
+    DB_WARNING("region_id: %ld raft init sucess, meta state machine init sucess", _dummy_region_id);
     return 0;
 }
 

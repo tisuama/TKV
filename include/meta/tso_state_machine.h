@@ -1,6 +1,7 @@
 #pragma once
 #include <time.h>
 #include <braft/repeated_timer_task.h>
+#include "meta/common_state_machine.h"
 
 namespace TKV {
 class TSOStateMachine;
@@ -33,7 +34,7 @@ public:
 				"/tso" /* file_path */, 
 				peer_id)
 	{
-		bthread_mutex_t(&_tso_mutex, nullptr);
+		bthread_mutex_init(&_tso_mutex, nullptr);
 	}
 
 	virtual ~TSOStateMachine() {
@@ -42,7 +43,7 @@ public:
 		bthread_mutex_destroy(&_tso_mutex);
 	}
 
-	virtual int  init(const std::vector<braft::PeerId>& peers);
+	virtual int init(const std::vector<braft::PeerId>& peers);
 
 	virtual void on_apply(braft::Iterator& iter);
 
@@ -53,8 +54,6 @@ public:
 
 	void gen_tso(const pb::TSORequest* request, pb::TSOResponse* response);
 
-	void reset_tso(const pb::TSORequest& request, braft::Closure* done);
-
 	void update_tso(const pb::TSORequest& request, braft::Closure* done);
 
 	int load_tso(const std::string& tso_file);
@@ -63,13 +62,15 @@ public:
 
 	void update_timestamp();
 
-	void save_snapshot(braft::Closure* done, braft::SnapshotWriter* writer, std::stirng& tso_str);
+	virtual void on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done);
+
+	void save_snapshot(braft::Closure* done, braft::SnapshotWriter* writer, std::string tso_str);
 
 	virtual int on_snapshot_load(braft::SnapshotReader* reader);
 
-	virtual void on_snapshot_start();
+	virtual void on_leader_start();
 
-	virtual void on_snapshot_stop();
+	virtual void on_leader_stop();
 
 	static const std::string SNAPSHOT_TSO_FILE;
 	static const std::string SNAPSHOT_TSO_FILE_WITH_SLASH;

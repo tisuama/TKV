@@ -7,6 +7,8 @@
 #include "meta/namespace_manager.h"
 #include "meta/table_manager.h"
 #include "meta/database_manager.h"
+#include "meta/meta_state_machine.h"
+#include "meta/tso_state_machine.h"
 
 #include "meta/query_region_manager.h"
 
@@ -124,6 +126,14 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
         return -1;
     }
     DB_WARNING("meta state machine init sucess");
+
+    ret = _tso_state_machine->init(peer);
+    if (ret != 0) {
+        DB_WARNING("tso state machine init failed");
+        return -1;
+    }
+    DB_WARNING("tso state machine init sucess");
+
     _init_sucess = true;
 
     // set state machine for all kind of manager
@@ -165,6 +175,22 @@ void MetaServer::query(::google::protobuf::RpcController* controller,
             pb::QueryOpType_Name(request->op_type()).c_str(),
             time_cost.get_time(), log_id, remote_side, 
             request->ShortDebugString().c_str());
+}
+
+void MetaServer::tso_service(::google::protobuf::RpcController* controller,
+           const ::TKV::pb::TSORequest* request,
+           ::TKV::pb::TSOResponse* response,
+           ::google::protobuf::Closure* done) {
+    brpc::ClosureGuard done_guard(done);
+    brpc::Controller* cntl = static_cast<brpc::Controller*>(controller);
+    uint64_t log_id = 0;
+    if (cntl->has_log_id()) {
+        log_id = cntl->has_log_id();
+    }
+    RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
+    if (_tso_state_machine != nullptr) {
+        _tso_state_machine->process(controller, request, response, done_guard.rlease());
+    }
 }
 } //namespace of TKV
 

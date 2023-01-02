@@ -460,5 +460,6 @@ service MetaService {
     rpc meta_manager(MetaManagerRequest) returns (MetaManagerResponse);
     rpc raft_control(RaftControlRequest) returns (RaftControlResponse);
     rpc query(MetaReq) returns (MetaRes);
+    rpc tso_service(TSORequest) returns (TSOResponse);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

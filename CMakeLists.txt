@@ -98,6 +98,7 @@ file(GLOB META_SERVER
 	src/meta/table_manager.cpp
 	src/meta/region_manager.cpp
 	src/meta/query_region_manager.cpp
+	src/meta/tso_state_machine.cpp
 	)
 add_library(meta_server_lib OBJECT ${META_SERVER})
 

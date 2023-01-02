@@ -1,12 +1,12 @@
 #pragma once
 #include <braft/raft.h>
 #include "proto/meta.pb.h"
-#include "meta/meta_state_machine.h"
 #include "meta/meta_server_interact.h"
 #include "common/common.h"
 
 namespace TKV {
-
+class MetaStateMachine;
+class TSOStateMachine;
 class MetaServer: public pb::MetaService {
 public:
     
@@ -47,6 +47,11 @@ public:
                        ::TKV::pb::MetaRes* response,
                        ::google::protobuf::Closure* done) override;
 
+    virtual void tso_service(::google::protobuf::RpcController* controller,
+                       const ::TKV::pb::TSORequest* request,
+                       ::TKV::pb::TSOResponse* response,
+                       ::google::protobuf::Closure* done) override;
+
     static MetaServer* get_instance() {
         static MetaServer meta_server;
         return &meta_server;
@@ -56,6 +61,7 @@ private:
     bthread::Mutex _meta_interact_mutex;
     // std::map<std::string, MetaServerInteract*> _meta_interact_map;
     MetaStateMachine* _meta_state_machine = nullptr;
+    TSOStateMachine*  _tso_state_machine = nullptr;
     Bthread _flush_bth;
     Bthread _apply_region_bth;
     
