@@ -29,7 +29,7 @@ struct TSOObj {
 class TSOStateMachine: public TKV::CommonStateMachine {
 public:
 	TSOStateMachine(const braft::PeerId& peer_id)
-		: CommonStateMachine(2 /* region_id */, 
+		: CommonStateMachine(1 /* region_id */, 
 				"tso_raft" /* identify */, 
 				"/tso" /* file_path */, 
 				peer_id)
@@ -83,4 +83,4 @@ private:
 };
 	
 } // namespace TKV
-
+/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

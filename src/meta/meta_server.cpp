@@ -127,7 +127,12 @@ int MetaServer::init(const std::vector<braft::PeerId>& peers) {
     }
     DB_WARNING("meta state machine init sucess");
 
-    ret = _tso_state_machine->init(peer);
+    _tso_state_machine = new (std::nothrow)TSOStateMachine(peer_id);
+    if (_tso_state_machine == NULL) {
+        DB_FATAL("new tso state machine failed");
+        return -1;
+    }
+    ret = _tso_state_machine->init(peers);
     if (ret != 0) {
         DB_WARNING("tso state machine init failed");
         return -1;
@@ -189,7 +194,7 @@ void MetaServer::tso_service(::google::protobuf::RpcController* controller,
     }
     RETURN_IF_NOT_INIT(_init_sucess, response, log_id);
     if (_tso_state_machine != nullptr) {
-        _tso_state_machine->process(controller, request, response, done_guard.rlease());
+        _tso_state_machine->process(controller, request, response, done_guard.release());
     }
 }
 } //namespace of TKV

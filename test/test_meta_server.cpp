@@ -123,6 +123,21 @@ void add_table() {
     std::cout << "send request: " << r << std::endl;
 }
 
+void gen_tso() {
+    pb::TSORequest request;
+    pb::TSOResponse response;
+    request.set_op_type(pb::OP_GEN_TSO);
+    request.set_count(10);
+    
+    auto meta = MetaServerInteract::get_instance();
+    int r = meta->init_internal(meta_bns);
+    std::cout << "meta interact init: " << r << std::endl;
+    r = meta->send_request("tso_service", request, response);
+    std::cout << "send request: " << r << std::endl;
+    std::cout << "TSO request: " << request.ShortDebugString() << std::endl;
+    std::cout << "TSO response: " << response.ShortDebugString() << std::endl;
+}
+
 int main(int argc, char** argv) {
     google::ParseCommandLineFlags(&argc, &argv, true); 
     if (FLAGS_cmd == "prepare") {
@@ -145,6 +160,8 @@ int main(int argc, char** argv) {
         add_physical();
     } else if (FLAGS_cmd == "add_user") {
         add_user();
+    } else if (FLAGS_cmd == "gen_tso") {
+        gen_tso();
     } else {
         assert(0);
     }

@@ -98,6 +98,5 @@ private:
     // region_id -> region_ver_id
     std::map<int64_t, RegionVerId>  _batch_ver;
 };
-	
 } // namespace TKV 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

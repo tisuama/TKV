@@ -125,7 +125,7 @@ void TSOStateMachine::process(google::protobuf::RpcController* controller,
 }
 
 void TSOStateMachine::gen_tso(const pb::TSORequest* request, pb::TSOResponse* response) {
-	int64_t count = response->count();
+	int64_t count = request->count();
 	response->set_op_type(request->op_type());
 	if (count == 0) {
 		response->set_errcode(pb::INPUT_PARAM_ERROR);
@@ -142,21 +142,28 @@ void TSOStateMachine::gen_tso(const pb::TSORequest* request, pb::TSOResponse* re
 	pb::TSOTimestamp current;
 	bool need_retry = false;
 	for (size_t i = 0; i < 50; i++) {
-		BAIDU_SCOPED_LOCK(_tso_mutex);
-		int64_t physical = _tso_obj.current_timestamp.physical();
-		if (physical != 0) {
-			int64_t new_logical = _tso_obj.current_timestamp.logical() + count;
-			if (new_logical < TSO::max_logical) {
-				current.CopyFrom(_tso_obj.current_timestamp);
-				_tso_obj.current_timestamp.set_logical(new_logical);
-				need_retry = false;
+		{
+			BAIDU_SCOPED_LOCK(_tso_mutex);
+			int64_t physical = _tso_obj.current_timestamp.physical();
+			if (physical != 0) {
+				int64_t new_logical = _tso_obj.current_timestamp.logical() + count;
+				if (new_logical < TSO::max_logical) {
+					current.CopyFrom(_tso_obj.current_timestamp);
+					_tso_obj.current_timestamp.set_logical(new_logical);
+					need_retry = false;
+				} else {
+					DB_WARNING("TSO logical part outside of max logical interval, retry later, check ntp time");
+					need_retry = true;
+				}
 			} else {
-				DB_WARNING("TSO logical part outside of max logical interval, retry later, check ntp time");
+				DB_WARNING("TSO not ready, physical = 0, retry later");
 				need_retry = true;
 			}
+		}
+		if (!need_retry) {
+			break;
 		} else {
-			DB_WARNING("TSO not ready, physical = 0, retry later");
-			need_retry = true;
+			bthread_usleep(TSO::update_timestamp_interval_ms * 1000LL);
 		}
 	}
 	if (need_retry) {
@@ -184,7 +191,7 @@ void TSOStateMachine::update_tso(const pb::TSORequest& request, braft::Closure* 
 		if (done && ((TSOClosure*)done)->response) {
 			pb::TSOResponse* response = ((TSOClosure*)done)->response;
 			response->set_errcode(pb::INTERNAL_ERROR);
-			response->set_errmsg("Time can't fallback");
+			response->set_errmsg("Time can not fallback");
 		}
 		return ;
 	}
@@ -192,6 +199,8 @@ void TSOStateMachine::update_tso(const pb::TSORequest& request, braft::Closure* 
 		BAIDU_SCOPED_LOCK(_tso_mutex);
 		_tso_obj.last_save_physical = physical;
 		_tso_obj.current_timestamp.CopyFrom(current);
+        // DB_WARNING("region_id: %ld TSO obj update, physical: %ld, current: %s", 
+        //         _dummy_region_id, physical, current.ShortDebugString().c_str());
 	}
 	if (done && ((TSOClosure*)done)->response) {
 		pb::TSOResponse* response = ((TSOClosure*)done)->response;
@@ -275,7 +284,7 @@ void TSOStateMachine::update_timestamp() {
 		DB_WARNING("TSO no need to update timestamp, prev: %ld, now: %ld, save: %ld",
 				prev_physical, now, last_save);
 	}
-	int save = last_save;
+	int64_t save = last_save;
 	if (save - next <= TSO::update_timestamp_guard_ms) {
 		save = next + TSO::save_interval_ms;
 	}
@@ -350,6 +359,7 @@ void TSOStateMachine::on_leader_start() {
 				_dummy_region_id, last_save, current.physical(), current.logical());
 		int ret = sync_timestamp(current, last_save);
 		if (ret < 0) {
+            DB_WARNING("region_id: %ld tso health not OK", _dummy_region_id);
 			_is_health = false;
 		}
 		DB_WARNING("region_id: %ld sync timestamp success", _dummy_region_id);
@@ -367,3 +377,4 @@ void TSOStateMachine::on_leader_stop() {
 }
 
 } // namespace TKV
+/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
