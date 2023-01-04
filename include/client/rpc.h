@@ -9,7 +9,6 @@
 
 #include "proto/store.pb.h"
 #include "common/log.h"
-#include "client/batch_data.h"
 
 
 namespace TKV {
@@ -46,45 +45,6 @@ struct RawClosure: public braft::Closure {
     }
 };
 
-/* 请求超时、失败、重试等情况 */
-struct AsyncSendMeta {
-    int64_t region_id;
-    std::shared_ptr<BatchData> batch_data;
-
-
-    int64_t start_time_us;
-    int64_t retry_time;
-    brpc::Controller controller;
-
-
-    AsyncSendMeta(int64_t region_id, std::shared_ptr<BatchData> batch_data)
-        : region_id(region_id), batch_data(batch_data)
-    {}
-
-};
-
-struct AsyncSendClosure: public braft::Closure {
-   AsyncSendMeta* meta;
-   braft::Closure* done;
-   
-   AsyncSendClosure(AsyncSendMeta* meta)
-       : meta(meta)
-   {}
-   
-   ~AsyncSendClosure() {
-       if (meta) {
-           delete meta;
-       }
-   }
-
-   /* request 请求成功 */
-   void on_success();
-   /* request 请求失败 */
-   void on_failed();
-    
-   virtual void Run() override;
-};
-
 class RpcClient {
 public:
     RpcClient() {
@@ -99,9 +59,7 @@ public:
     brpc::Channel* create_conn(const std::string& addr);
 
     // TKVStore
-    void send_request(const std::string& addr,  
-                      AsyncSendMeta* meta,
-                      AsyncSendClosure* done);
+    // void send_request(const std::string& addr);  
     
 private:
     bthread_mutex_t _mutex;

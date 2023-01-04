@@ -9,19 +9,12 @@
 
 
 namespace TKV {
-struct RpcSendClosure {
-    braft::Closure*     done;
-    uint64_t            start_time;
-    int                 retry_time;
 
-    virtual void Run();
-}; 
-
-class ClientImpl {
+class Cluster {
 public:
     // meta_server_bns: meta_server地址
     // table_name: 请求的表的资源
-    ClientImpl(const std::string& meta_server_bns, const std::string& table_name)
+    Cluster(const std::string& meta_server_bns, const std::string& table_name)
         : _meta_client(std::make_shared<MetaClient>(meta_server_bns, table_name))
         , _region_cache(new RegionCache(_meta_client))
         , _rpc_client(new RpcClient)
@@ -29,8 +22,6 @@ public:
 
     int init();
 
-    void process_request(std::shared_ptr<BatchData> batch_data);
-    
     KeyLocation locate_key(const std::string& key);
     
 private: 
