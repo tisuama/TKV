@@ -7,12 +7,6 @@ int RawKVClient::init() {
         return -1;
     }
 
-    ret = _kv->init();
-    if (ret < 0) {
-        DB_WARNING("ClientImpl init failed");
-        return -1;
-    }
-    
     DB_WARNING("Raw KV Client init success");
     return 0;
 }

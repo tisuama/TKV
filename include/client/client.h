@@ -6,8 +6,11 @@
 
 namespace TKV {
 class Client;
-extern std::shared_ptr<Client> NewRawKVClient(const std::string& meta_server_bns, 
-                            const std::string& table_name);
+class Cluster;
+extern std::shared_ptr<Client>  NewRawKVClient(std::shared_ptr<Cluster> cluster); 
+
+extern std::shared_ptr<Cluster> NewCluster(const std::string& meta_server_bns,
+        const std::string& table_name);
 
 class Client {
 public:

@@ -17,6 +17,8 @@ public:
     
     int reload_region(std::vector<pb::RegionInfo>& region_infos);
 
+    int64_t gen_tso();
+
 private:
     std::string     _meta_server_bns;
     // TODO: namespace, database

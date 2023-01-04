@@ -20,11 +20,13 @@ public:
         , _rpc_client(new RpcClient)
     {}
 
-    int init();
+    int init(); 
 
     KeyLocation locate_key(const std::string& key);
     
-private: 
+    int64_t gen_tso();
+    
+private:
     // std::shared_ptr也行
     std::shared_ptr<MetaClient>  _meta_client;
     std::unique_ptr<RegionCache> _region_cache;

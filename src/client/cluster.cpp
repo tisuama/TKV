@@ -20,5 +20,9 @@ int Cluster::init() {
 KeyLocation Cluster::locate_key(const std::string& key) {
     return _region_cache->locate_key(key);
 }
+
+int64_t Cluster::gen_tso() {
+    return _meta_client->gen_tso();
+}
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
