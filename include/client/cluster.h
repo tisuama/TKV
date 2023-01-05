@@ -26,6 +26,12 @@ public:
     
     int64_t gen_tso();
     
+    int send_request(const pb::StoreReq* request, 
+                     pb::StoreRes* response,
+                     brpc::Controller* cntl,
+                     const std::string& addr,
+                     ::google::protobuf::Closure* done);
+
 private:
     // std::shared_ptr也行
     std::shared_ptr<MetaClient>  _meta_client;

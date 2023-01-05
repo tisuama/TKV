@@ -13,7 +13,7 @@ int RawKVClient::init() {
 
 int RawKVClient::put(const std::string& key,
          const std::string& value) {
-
+      
     return 0;
 }
 

@@ -59,7 +59,11 @@ public:
     brpc::Channel* create_conn(const std::string& addr);
 
     // TKVStore
-    // void send_request(const std::string& addr);  
+    int send_request(const pb::StoreReq* request, 
+                     pb::StoreRes* response,
+                     brpc::Controller* cntl,
+                     const std::string& addr,
+                     google::protobuf::Closure* done);
     
 private:
     bthread_mutex_t _mutex;
