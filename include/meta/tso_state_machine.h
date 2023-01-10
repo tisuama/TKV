@@ -77,7 +77,7 @@ public:
 
 private:
 	TSOTimer 	_tso_update_timer;
-	TSOObj 		_tso_obj;
+	TSOObj      _tso;
 	bthread_mutex_t 	_tso_mutex;
 	bool 				_is_health {true};
 };

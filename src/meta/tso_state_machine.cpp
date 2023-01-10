@@ -17,9 +17,9 @@ void TSOTimer::run() {
 
 int TSOStateMachine::init(const std::vector<braft::PeerId>& peers) {
 	_tso_update_timer.init(this, TSO::update_timestamp_interval_ms);
-	_tso_obj.current_timestamp.set_physical(0);
-	_tso_obj.current_timestamp.set_logical(0);
-	_tso_obj.last_save_physical = 0;
+	_tso.current_timestamp.set_physical(0);
+	_tso.current_timestamp.set_logical(0);
+	_tso.last_save_physical = 0;
 
 	return CommonStateMachine::init(peers);
 }
@@ -79,9 +79,9 @@ void TSOStateMachine::process(google::protobuf::RpcController* controller,
 		response->set_op_type(request->op_type());
 		response->set_leader(butil::endpoint2str(_node.leader_id().addr).c_str());
 		response->set_system_time(TSO::clock_realtime_ms());
-		response->set_save_physical(_tso_obj.last_save_physical);
+		response->set_save_physical(_tso.last_save_physical);
 		auto timestamp = response->mutable_start_timestamp();
-		timestamp->CopyFrom(_tso_obj.current_timestamp);
+		timestamp->CopyFrom(_tso.current_timestamp);
 		return ;
 	}
 
@@ -144,12 +144,12 @@ void TSOStateMachine::gen_tso(const pb::TSORequest* request, pb::TSOResponse* re
 	for (size_t i = 0; i < 50; i++) {
 		{
 			BAIDU_SCOPED_LOCK(_tso_mutex);
-			int64_t physical = _tso_obj.current_timestamp.physical();
+			int64_t physical = _tso.current_timestamp.physical();
 			if (physical != 0) {
-				int64_t new_logical = _tso_obj.current_timestamp.logical() + count;
+				int64_t new_logical = _tso.current_timestamp.logical() + count;
 				if (new_logical < TSO::max_logical) {
-					current.CopyFrom(_tso_obj.current_timestamp);
-					_tso_obj.current_timestamp.set_logical(new_logical);
+					current.CopyFrom(_tso.current_timestamp);
+					_tso.current_timestamp.set_logical(new_logical);
 					need_retry = false;
 				} else {
 					DB_WARNING("TSO logical part outside of max logical interval, retry later, check ntp time");
@@ -183,11 +183,11 @@ void TSOStateMachine::update_tso(const pb::TSORequest& request, braft::Closure* 
 	int64_t physical = request.save_physical();
 	pb::TSOTimestamp current = request.current_timestamp();
 	// 不能回退
-	if (physical < _tso_obj.last_save_physical || 
-	    current.physical() < _tso_obj.current_timestamp.physical()) {
+	if (physical < _tso.last_save_physical || 
+	    current.physical() < _tso.current_timestamp.physical()) {
 		DB_FATAL("TSO Time fallback save_physical: (%ld, %ld), physical: (%ld, %ld), logical: (%ld, %ld)",
-			physical, _tso_obj.last_save_physical, current.physical(), _tso_obj.current_timestamp.physical(), 
-			current.logical(), _tso_obj.current_timestamp.logical());	
+			physical, _tso.last_save_physical, current.physical(), _tso.current_timestamp.physical(), 
+			current.logical(), _tso.current_timestamp.logical());	
 		if (done && ((TSOClosure*)done)->response) {
 			pb::TSOResponse* response = ((TSOClosure*)done)->response;
 			response->set_errcode(pb::INTERNAL_ERROR);
@@ -197,8 +197,8 @@ void TSOStateMachine::update_tso(const pb::TSORequest& request, braft::Closure* 
 	}
 	{
 		BAIDU_SCOPED_LOCK(_tso_mutex);
-		_tso_obj.last_save_physical = physical;
-		_tso_obj.current_timestamp.CopyFrom(current);
+		_tso.last_save_physical = physical;
+		_tso.current_timestamp.CopyFrom(current);
         // DB_WARNING("region_id: %ld TSO obj update, physical: %ld, current: %s", 
         //         _dummy_region_id, physical, current.ShortDebugString().c_str());
 	}
@@ -213,7 +213,7 @@ int TSOStateMachine::load_tso(const std::string& tso_file) {
 	std::ifstream extra_fs(tso_file);
 	std::string extra((std::istreambuf_iterator<char>(extra_fs)),   
 			std::istreambuf_iterator<char>());
-	_tso_obj.last_save_physical = std::stol(extra);
+	_tso.last_save_physical = std::stol(extra);
 	return 0;
 }
 
@@ -264,9 +264,9 @@ void TSOStateMachine::update_timestamp() {
 	int64_t last_save = 0;
 	{
 		BAIDU_SCOPED_LOCK(_tso_mutex);
-		prev_physical = _tso_obj.current_timestamp.physical();
-		prev_logical =  _tso_obj.current_timestamp.logical();
-		last_save    =  _tso_obj.last_save_physical;
+		prev_physical = _tso.current_timestamp.physical();
+		prev_logical =  _tso.current_timestamp.logical();
+		last_save    =  _tso.last_save_physical;
 	}
 	int64_t delta = now - prev_physical;
 	if (delta < 0) {
@@ -274,31 +274,43 @@ void TSOStateMachine::update_timestamp() {
 		return ;
 	}
 
+    bool need_sync = false;
 	int64_t next = now;
+    // 正常情况下保持和物理时钟一致
 	if (delta > TSO::update_timestamp_guard_ms) {
 		next = now;
-	} else if (prev_logical > TSO::max_logical / 2) {
-		// 当请求tso数量过多的时候，需要稍微提升下物理时间
-		next = now + TSO::update_timestamp_guard_ms;
+    } else if (prev_logical > TSO::max_logical / 2) {
+        // 主要用于物理时间存在偏差，不能直接更新next时使用
+        next = prev_physical + TSO::update_timestamp_guard_ms;
 	} else {
 		DB_WARNING("TSO no need to update timestamp, prev: %ld, now: %ld, save: %ld",
 				prev_physical, now, last_save);
 	}
 	int64_t save = last_save;
+    // 上次申请的时间戳已经用完了，需要Raft同步[next, next + save_interval_ms]
 	if (save - next <= TSO::update_timestamp_guard_ms) {
-		save = next + TSO::save_interval_ms;
+        save = next + TSO::save_interval_ms;
+        need_sync = true;
 	}
+    
+    if (!need_sync) {
+        BAIDU_SCOPED_LOCK(_tso_mutex);
+        _tso.current_timestamp.set_physical(next);
+        _tso.current_timestamp.set_logical(0);
+        return ;
+    }
+    
+    // 同步时间戳
 	pb::TSOTimestamp tp;
 	tp.set_physical(next);
 	tp.set_logical(0);
-	// 走Raft 
 	sync_timestamp(tp, save);
 }
 
 void TSOStateMachine::on_snapshot_save(braft::SnapshotWriter* writer, braft::Closure* done) {
 	DB_WARNING("region_id: %ld start on snapshot save", _dummy_region_id);
 
-	std::string tso_str = std::to_string(_tso_obj.last_save_physical);
+	std::string tso_str = std::to_string(_tso.last_save_physical);
 	Bthread bth;
 	std::function<void()> save_snapshot_fn = [this, done, writer, tso_str]() {
 		save_snapshot(done, writer, tso_str);
@@ -346,13 +358,12 @@ void TSOStateMachine::on_leader_start() {
 	current.set_physical(now);
 	current.set_logical(0);
 
-	int64_t last_save = _tso_obj.last_save_physical;
-	// gen_tso时不走raft，update_timestamp_interval_ms时间内的时间戳可能已经被使用了
-	// 这里判断now这个时间戳是不是够新
-	if (last_save - now < TSO::update_timestamp_interval_ms) {
-		current.set_physical(last_save + TSO::update_timestamp_guard_ms);
-		last_save = now + TSO::save_interval_ms;
-	}
+	int64_t last_save = _tso.last_save_physical;
+    // 和上次分配的时间戳上限太近，可能存在风险
+    if (now - last_save < TSO::update_timestamp_guard_ms) {
+        current.set_physical(last_save + TSO::update_timestamp_guard_ms);
+        last_save =  last_save + TSO::update_timestamp_interval_ms;
+    }
 
 	auto fn = [this, last_save, current]() {
 		DB_WARNING("region_id: %ld leader start, save physical: %ld, current: (%ld, %ld)", 
