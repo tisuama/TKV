@@ -6,6 +6,18 @@
 #include <cmath>
 
 namespace TKV {
+constexpr uint64_t LockTTL = 20000; // 20s
+constexpr uint64_t BytesPerMB = 1024 * 1024;
+constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024;
+constexpr uint64_t PessimisticLockBackoff = 20000; // 20s
+
+int64_t send_txn_heart_beat(std::shared_ptr<Cluster> cluster, 
+                             const std::string& primary_key, 
+                             uint64_t start_ts, 
+                             uint64_t ttl);
+
+int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
+
 class TTLManager {
 public:
     TTLManager()
@@ -17,17 +29,28 @@ public:
         uint32_t expected = StateUninitizlized;
         if (!state.compare_exchanged_strong(expected, 
                     StateRunning, 
-                    std::memory_order_acquire, 
+                    std::memory_order_acquire, /* 后面访存指令 */
                     std::memory_order_relaxed)) {
             return ;
         }
         work_running = true;
+        auto keep_alive_fn = [&]() {
+            keep_alive(committer);
+        };
+        
+        bthread_start_background(&worker, NULL, keep_alive_fn); 
     }
 
     void close() {
-        // close
+        uint32_t expected = StateRunning;
+        state.compare_exchanged_strong(expected, StateClosed, std::memory_order_acq_rel);
+        if (work_running) {
+            bthread_join(worker);
+            work_running = false;
+        }
     }
 
+    void keep_alive(std::shared_ptr<TwoPhaseCommitter> committer);
 
 private:
     enum TTLManagerState {
@@ -38,7 +61,7 @@ private:
 
     std::atomic<uint32_t> state;
     bool work_running;
-
+    std::thread* worker;
 };
 
 class TwoPhaseCommitter: public std::enable_shared_from_this<TwoPhaseCommitter> {
@@ -78,6 +101,8 @@ private:
     bool use_async_commit {false};
 
     TTLManager  ttl_manager;
+
+    bthread     worker;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

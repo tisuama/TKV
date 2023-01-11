@@ -1,5 +1,4 @@
 syntax="proto2";
-import "common.proto";
 package TKV.pb;
 option cc_generic_services = true;
 

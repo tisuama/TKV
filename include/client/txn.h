@@ -17,7 +17,7 @@ struct Txn {
 
     explicit Txn(std::shared_ptr<Cluster> cluster)
         : cluster(cluster)
-        , start_ts(cluster->gen_tso())
+        , start_ts(cluster->meta_client->gen_tso())
         , start_time(butil::gettimeofday_ms())
     {}
     

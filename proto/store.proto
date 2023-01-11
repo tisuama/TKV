@@ -54,14 +54,14 @@ message StoreReq {
     required OpType op_type = 1;
     required int64  region_id = 2;
     required int64  region_version = 3;
-    optional int64  log_id = 4;           // For print log 
+    optional int64  log_id = 4;                // For print log 
     optional bytes  start_key = 5;
     optional bytes  end_key = 6;
     optional int64  split_term = 7;
     optional int64  split_end_index = 8;
-    optional int64  reduce_num_lines = 9; // split需要删除的行数
+    optional int64  reduce_num_lines = 9;      // split需要删除的行数
     optional bool   force = 10;
-    optional bool   not_check_region = 11; // 不判断数据与region的匹配性
+    optional bool   not_check_region = 11;     // 不判断数据与region的匹配性
     optional RegionInfo new_region_info = 12;
     optional bool  select_without_leader = 13; // selcet 不判断Leader
     optional int64 num_increase_rows = 14;
@@ -82,11 +82,24 @@ message GetAppliedIndex {
     required int64 region_id = 1;
 };
 
+message TxnHeartBeatRequest {
+    required int64      region_id       = 1;
+    required bytes      primary_lock    = 2;
+    optional uint64     start_version   = 3;
+    optional uint64     advise_lock_ttl = 4;
+};
+
+message TxnHeartBeatResponse {
+    required uint64     lock_ttl = 1;
+    required ErrorCode  errcode  = 2;    
+};
+
 service StoreService {
     rpc init_region(InitRegion) returns (StoreRes);
     // 1) 获取region的applied_index，用来分裂后优化选择transfer leader对象
     // 2) 获取region的snapshot数据大小，用作校验
     rpc get_applied_index(GetAppliedIndex) returns (StoreRes);
     rpc query(StoreReq) returns (StoreRes);
+    rpc txn_heartbeat(TxnHeartBeatRequest) returns (TxnHeartBeatResponse);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

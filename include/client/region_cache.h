@@ -122,7 +122,6 @@ public:
 
     SmartRegion get_region(const RegionVerId& id);
 
-
 private:
     // end_key -> SmartRegion
     // 普通请求是确定是哪个region

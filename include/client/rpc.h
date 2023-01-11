@@ -13,38 +13,6 @@
 
 namespace TKV {
 
-struct RawClosure: public braft::Closure {
-    std::string*    result {nullptr};
-    braft::Closure* done;
-    
-    RawClosure(std::string* result, braft::Closure* done)
-        : result(result), done(done)
-    {}
-
-    void set_result(const std::string& res) {
-        *result = res;
-    }
-
-    bool has_result() {
-        return result != nullptr;
-    }
-    
-    void set_status(butil::Status& s) {
-        status() = s;
-    }
-    
-    void Run() {
-        if (!status().ok()) {
-            DB_WARNING("KV request error, errmsg: %s", status().error_cstr());
-        }
-        if (done) {
-            done->status() = status();
-            done->Run();
-        }
-        delete this;
-    }
-};
-
 class RpcClient {
 public:
     RpcClient() {
@@ -59,12 +27,14 @@ public:
     brpc::Channel* create_conn(const std::string& addr);
 
     // TKVStore
-    int send_request(const pb::StoreReq* request, 
-                     pb::StoreRes* response,
-                     brpc::Controller* cntl,
-                     const std::string& addr,
-                     google::protobuf::Closure* done);
+    template<typename T1, typename T2>
+    int send_request(brpc::Controller* cntl,
+        const std::string& addr,
+        const T1* request,
+        T2* response, 
+        google::protobuf::Closure* done);
     
+
 private:
     bthread_mutex_t _mutex;
     // address -> channel

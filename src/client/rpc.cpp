@@ -28,26 +28,27 @@ brpc::Channel* RpcClient::create_conn(const std::string& addr) {
     return channel;
 }
 
-int RpcClient::send_request(const pb::StoreReq* request, 
-                 pb::StoreRes* response,
-                 brpc::Controller* cntl,
-                 const std::string& addr,
-                 google::protobuf::Closure* done) {
+template<typename T1, typename T2>
+int RpcClient::send_request(brpc::Controller* cntl,
+    const std::string& addr,
+    const T1* request,
+    T2* response,
+    google::protobuf::Closure* done) {
 
     auto channel = get_conn(addr);
     if (channel == nullptr) {
         DB_FATAL("Get channel for addr: %s failed", addr.c_str());
         return -1;
     }
-
     uint64_t log_id = butil::fast_rand();
     cntl->set_log_id(log_id);
-
-    DB_DEBUG("send reuqest: %s", request->ShortDebugString().c_str());
-    pb::StoreService_Stub stub(channel);
+    
+    DB_DEBUG("send txn %s", request.ShortDebugString().c_str());    
+    pb::StoreService_Stub stub(&channel);
     stub.query(cntl, request, response, done);
 
     return 0;
 }
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
