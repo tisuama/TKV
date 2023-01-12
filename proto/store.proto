@@ -50,6 +50,17 @@ message BatchData {
     optional int64   ttl_timestamp_us = 3;
 };
 
+message TXNHBReq {
+    required bytes      primary_lock    = 2;
+    optional uint64     start_version   = 3;
+    optional uint64     advise_lock_ttl = 4;
+};
+
+
+message TXNHBRes {
+    required uint64     lock_ttl = 1;
+};
+
 message StoreReq {
     required OpType op_type = 1;
     required int64  region_id = 2;
@@ -61,12 +72,13 @@ message StoreReq {
     optional int64  split_end_index = 8;
     optional int64  reduce_num_lines = 9;      // split需要删除的行数
     optional bool   force = 10;
-    optional bool   not_check_region = 11;     // 不判断数据与region的匹配性
-    optional RegionInfo new_region_info = 12;
+    optional bool   not_check_region     = 11; // 不判断数据与region的匹配性
+    optional RegionInfo new_region_info  = 12;
     optional bool  select_without_leader = 13; // selcet 不判断Leader
-    optional int64 num_increase_rows = 14;
-    repeated BatchData  batch_data = 15;
-    // SQL相关
+    optional int64 num_increase_rows     = 14;
+    repeated BatchData      batch_data   = 15;
+    optional TXNHBReq       txn_req      = 16;
+    optional TXNHBRes       txn_res      = 17;
 };
 
 message InitRegion {
@@ -80,18 +92,6 @@ message InitRegion {
 
 message GetAppliedIndex {
     required int64 region_id = 1;
-};
-
-message TxnHeartBeatRequest {
-    required int64      region_id       = 1;
-    required bytes      primary_lock    = 2;
-    optional uint64     start_version   = 3;
-    optional uint64     advise_lock_ttl = 4;
-};
-
-message TxnHeartBeatResponse {
-    required uint64     lock_ttl = 1;
-    required ErrorCode  errcode  = 2;    
 };
 
 service StoreService {

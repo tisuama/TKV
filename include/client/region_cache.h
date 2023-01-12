@@ -63,8 +63,14 @@ struct Region {
         };
     }
 
-    void switch_peer(const std::string& peer) {
-        leader = peer;
+    bool switch_peer(const std::string& new_leader) {
+        for (auto& peer: meta.peers()) {
+            if (peer == new_leader) {
+                leader = new_leader;
+                return true;
+            }
+        }  
+        return false;
     }
 };
 
@@ -121,6 +127,10 @@ public:
     void update_region(SmartRegion region);
 
     SmartRegion get_region(const RegionVerId& id);
+
+    void drop_region(const RegionVerId& id);
+    
+    bool update_leader(const RegionVerId& id, const std::string& leader);
 
 private:
     // end_key -> SmartRegion

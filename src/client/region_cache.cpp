@@ -64,6 +64,34 @@ SmartRegion RegionCache::get_region(const RegionVerId& id) {
     return it->second;
 }
 
+void RegionCache::drop_region(const RegionVerId& region_id) {
+    BAIDU_SCOPED_LOCK(_region_mutex);
+    auto it = _regions.find(id);
+    if (it != _regions.end()) {
+        auto iter_by_key = _regions_map.find(it->second->end_key());
+        if (iter_by_key != _regions_map.end()) {
+            _regions_map.erase(iter_by_key);
+        }
+        _regions.erase(it);
+        DB_DEBUG("drop region: %ld", region_id);
+    }
+}
+
+bool RegionCache::update_leader(const RegionVerId& id, const std::string& leader) {
+    {
+        BAIDU_SCOPED_LOCK(_region_mutex);
+        auto  it = _regions.find(id);
+        if (it == _regions.end()) {
+            return false;
+        }
+        if (it->second->switch_peer(leader)) {
+            return true;        
+        }
+    }
+    drop_region(id);
+    return false;
+
+}
 } //namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
 

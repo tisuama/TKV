@@ -42,4 +42,14 @@ enum ErrorCode {
     RETRY_LATER  = 28;
     LESS_THAN_OLDEST_TS  = 29;
     IN_PROCESS   = 30;
+
+	// 新增加的错误类型
+	DISK_IS_FULL   			 = 31;	
+	SERVER_IS_BUSY 			 = 32;
+	STALE_COMMAND  			 = 33;
+	RAFT_ENTRY_TOO_LARGE  	 = 34;
+	MAX_TIMESTAMP_NOT_SYNCED = 35;
+	READ_INDEX_NOT_READY 	 = 36;
+	DATA_NOT_READY 			 = 37;
 };
+
