@@ -158,7 +158,7 @@ SET(DEP_LIB
 	xxhash
 )
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++11 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -g -std=c++11 -Wall -W -fPIC -Wno-switch -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -g -std=c99 -Wall -W -fPIC -Wno-unused-parameter -Wno-strict-aliasing -Wno-parentheses -fno-omit-frame-pointer")
 
 add_executable(TKVMeta

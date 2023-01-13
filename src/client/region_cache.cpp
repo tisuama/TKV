@@ -64,7 +64,7 @@ SmartRegion RegionCache::get_region(const RegionVerId& id) {
     return it->second;
 }
 
-void RegionCache::drop_region(const RegionVerId& region_id) {
+void RegionCache::drop_region(const RegionVerId& id) {
     BAIDU_SCOPED_LOCK(_region_mutex);
     auto it = _regions.find(id);
     if (it != _regions.end()) {
@@ -73,7 +73,7 @@ void RegionCache::drop_region(const RegionVerId& region_id) {
             _regions_map.erase(iter_by_key);
         }
         _regions.erase(it);
-        DB_DEBUG("drop region: %ld", region_id);
+        DB_DEBUG("drop region: %ld", id.region_id);
     }
 }
 

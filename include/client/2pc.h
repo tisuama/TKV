@@ -2,8 +2,10 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
-#include <time>
 #include <cmath>
+#include <chrono>
+
+#include "client/cluster.h"
 
 namespace TKV {
 constexpr uint64_t LockTTL = 20000; // 20s
@@ -11,13 +13,10 @@ constexpr uint64_t BytesPerMB = 1024 * 1024;
 constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024;
 constexpr uint64_t PessimisticLockBackoff = 20000; // 20s
 
-int64_t send_txn_heart_beat(std::shared_ptr<Cluster> cluster, 
-                             const std::string& primary_key, 
-                             uint64_t start_ts, 
-                             uint64_t ttl);
-
 int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
 
+class Txn;
+class TwoPhaseCommitter;
 class TTLManager {
 public:
     TTLManager()
@@ -27,7 +26,7 @@ public:
     
     void run(std::shared_ptr<TwoPhaseCommitter> committer) {
         uint32_t expected = StateUninitizlized;
-        if (!state.compare_exchanged_strong(expected, 
+        if (!state.compare_exchange_strong(expected, 
                     StateRunning, 
                     std::memory_order_acquire, /* 后面访存指令 */
                     std::memory_order_relaxed)) {
@@ -38,14 +37,14 @@ public:
             keep_alive(committer);
         };
         
-        bthread_start_background(&worker, NULL, keep_alive_fn); 
+        worker.run(keep_alive_fn); 
     }
 
     void close() {
         uint32_t expected = StateRunning;
-        state.compare_exchanged_strong(expected, StateClosed, std::memory_order_acq_rel);
+        state.compare_exchange_strong(expected, StateClosed, std::memory_order_acq_rel);
         if (work_running) {
-            bthread_join(worker);
+            worker.join();
             work_running = false;
         }
     }
@@ -60,8 +59,8 @@ private:
     };
 
     std::atomic<uint32_t> state;
-    bool work_running;
-    std::thread* worker;
+    bool        work_running;
+    Bthread     worker;
 };
 
 class TwoPhaseCommitter: public std::enable_shared_from_this<TwoPhaseCommitter> {
@@ -85,9 +84,9 @@ private:
     uint64_t min_commit_ts {0};
     uint64_t max_commit_ts {0};
 
-    uint64_t start_ts;
+    std::chrono::milliseconds start_time;
 
-    std::shared<Cluster> cluster;
+    std::shared_ptr<Cluster> cluster;
 
     std::unordered_map<uint64_t, int> region_txn_size;
     uint64_t txn_size;
@@ -102,7 +101,7 @@ private:
 
     TTLManager  ttl_manager;
 
-    bthread     worker;
+    Bthread     worker;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

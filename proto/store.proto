@@ -100,6 +100,5 @@ service StoreService {
     // 2) 获取region的snapshot数据大小，用作校验
     rpc get_applied_index(GetAppliedIndex) returns (StoreRes);
     rpc query(StoreReq) returns (StoreRes);
-    rpc txn_heartbeat(TxnHeartBeatRequest) returns (TxnHeartBeatResponse);
 };
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

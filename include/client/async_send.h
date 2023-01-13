@@ -1,16 +1,19 @@
 #pragma once
+#include "client/backoff.h"
 #include "client/cluster.h"
+#include "client/region_cache.h"
 
 namespace TKV {
 
-struct AsynSendMeta {
-    AsynSendMeta(std::shared_ptr<Cluster> cluster, const RegionVerID& region_ver) 
+struct AsyncSendMeta {
+    AsyncSendMeta(std::shared_ptr<Cluster> cluster, const RegionVerId& region_ver) 
         : cluster(cluster)
         , region_ver(region_ver)
         , region_id(region_ver.region_id)
+        , bo(PessimisticLockMaxBackOff)
     {}
     
-    ~AsynSendMeta() {
+    ~AsyncSendMeta() {
         if (request) {
             delete request;
         }
@@ -20,18 +23,19 @@ struct AsynSendMeta {
     }
     
     void on_send_failed();
-    void on_region_error();
+    int  on_region_error();
 
     // 正常请求
     void send_request();
 
     std::shared_ptr<Cluster>    cluster;
     brpc::Controller            cntl;
-    RegionVerID                 region_ver;
+    RegionVerId                 region_ver;
     int64_t                     region_id;
-    pb::StoreRequest*           request     {nullptr};
-    pb::StoreResponse*          response    {nullptr};
+    pb::StoreReq*               request     {nullptr};
+    pb::StoreRes*               response    {nullptr};
     uint32_t                    retry_times {0};
+    BackOffer                   bo;
 };
 
 } // namespace TKV

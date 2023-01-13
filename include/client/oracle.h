@@ -1,4 +1,5 @@
 #pragma once
+#include "common/common.h"
 #include "client/meta_client.h"
 
 namespace TKV {
@@ -14,17 +15,18 @@ public:
         , update_interval(update_interval)
     {
         quit = false;
-        auto update_fn = [&]() { 
-            update_ts(update_interval); 
-        };
 
-        bthread_start_background(&worker, NULL, update_fn);
+        auto update_fn = [&]() {
+            update_ts(update_interval);
+        };
+        worker.run(update_fn);
+
         last_ts = 0;
     }
 
     ~Oracle() {
         quit = true;
-        bthread_join(worker);
+        worker.join();
     }
 
     int64_t util_expired(uint64_t lock_ts, uint64_t ttl) {
@@ -60,7 +62,7 @@ public:
     std::atomic_bool            quit;
     std::atomic<uint64_t>       last_ts;
     std::chrono::milliseconds   update_interval;
-    bthread                     worker;
+    Bthread                     worker;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
