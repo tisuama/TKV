@@ -6,6 +6,7 @@
 #include <chrono>
 
 #include "client/cluster.h"
+#include "client/backoff.h"
 
 namespace TKV {
 constexpr uint64_t LockTTL = 20000; // 20s
@@ -70,6 +71,36 @@ public:
     void execute();
 
 private:
+    enum Action {
+        TxnPwrite = 0,
+        TxnCommit,
+        TxnCleanUp
+    };
+
+    struct BatchKeys {
+        RegionVerId              region_ver;
+        std::vector<std::string> keys;
+        bool                     is_primary;
+        BatchKeys(const RegionVerId& region_ver, std::vector<std::string> keys, bool is_primary = false)
+            : region_ver(region_ver)
+            , keys(std::move(keys))
+            , is_primary(is_primary)
+        {}
+    };
+
+    void calculate_max_commit_ts();
+
+    void pwrite_keys(const std::vector<std::string>& keys, BackOffer& bo) {
+        do_action_on_keys(bo, keys, TxnPwrite);
+    }
+
+    void commit_keys(const std::vector<std::string>& keys, BackOffer& bo) {
+        do_action_on_keys(bo, keys, TxnCommit);
+    }
+
+    void do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action) {
+        // TODO: do_action_on keys;
+    }  
 
 private:
     friend class TTLManager;

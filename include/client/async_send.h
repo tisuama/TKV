@@ -10,7 +10,6 @@ struct AsyncSendMeta {
         : cluster(cluster)
         , region_ver(region_ver)
         , region_id(region_ver.region_id)
-        , bo(PessimisticLockMaxBackOff)
     {}
     
     ~AsyncSendMeta() {
@@ -22,7 +21,10 @@ struct AsyncSendMeta {
         }
     }
     
+    // 处理RPC send失败
     void on_send_failed();
+
+    // 处理Store错误码
     int  on_region_error();
 
     // 正常请求

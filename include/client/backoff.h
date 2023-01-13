@@ -57,6 +57,11 @@ struct BackOffer {
     int total_sleep; // ms
     int max_sleep;   // ms
     
+    explicit BackOffer()
+        : total_sleep(0)
+        , max_sleep(0)
+    {}
+
     explicit BackOffer(int max_sleep)
         : total_sleep(0)
         , max_sleep(max_sleep)
