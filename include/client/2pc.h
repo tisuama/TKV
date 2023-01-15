@@ -13,6 +13,8 @@ constexpr uint64_t LockTTL = 20000; // 20s
 constexpr uint64_t BytesPerMB = 1024 * 1024;
 constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024;
 constexpr uint64_t PessimisticLockBackoff = 20000; // 20s
+                                                   //
+typedef std::unordered_map<RegionVerId, std::pair<
 
 int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
 
@@ -98,9 +100,7 @@ private:
         do_action_on_keys(bo, keys, TxnCommit);
     }
 
-    void do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action) {
-        // TODO: do_action_on keys;
-    }  
+    void do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, action action);
 
 private:
     friend class TTLManager;
