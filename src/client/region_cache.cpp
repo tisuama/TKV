@@ -92,6 +92,19 @@ bool RegionCache::update_leader(const RegionVerId& id, const std::string& leader
     return false;
 
 }
+
+std::unordered_map<RegionVerId, std::vector<std::string>>
+RegionCache::group_keys_by_region(const std::vector<std::string>& keys) {
+    std::unordered_map<RegionVerId, std::vector<std::string>> result;
+    KeyLocation location;
+    for (auto& key: keys) {
+        if (!location.contains(key)) {
+            location = locate_key(key);
+        }
+        result[location.region].push_back(key);
+    }
+    return result;
+} 
 } //namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
 

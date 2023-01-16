@@ -132,6 +132,9 @@ public:
     
     bool update_leader(const RegionVerId& id, const std::string& leader);
 
+    std::unordered_map<RegionVerId, std::vector<std::string>>
+        group_keys_by_region(const std::vector<std::string>& keys); 
+
 private:
     // end_key -> SmartRegion
     // 普通请求是确定是哪个region
