@@ -13,7 +13,8 @@ constexpr uint64_t LockTTL = 20000; // 20s
 constexpr uint64_t BytesPerMB = 1024 * 1024;
 constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024;
 constexpr uint64_t PessimisticLockBackoff = 20000; // 20s
-                                                   //
+constexpr uint32_t TxnCommitBatchSize = 16 * 1024;
+
 typedef std::unordered_map<RegionVerId, std::pair<
 
 int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
@@ -102,6 +103,8 @@ private:
 
     void do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, action action);
 
+    void do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batch);
+
 private:
     friend class TTLManager;
 
@@ -134,5 +137,6 @@ private:
 
     Bthread     worker;
 };
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
