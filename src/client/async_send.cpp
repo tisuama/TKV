@@ -7,7 +7,7 @@ void AsyncSendMeta::on_send_failed() {
     cluster->region_cache->drop_region(region_ver);
 }
 
-int AsyncSendMeta::on_region_error() {
+int AsyncSendMeta::on_response_failed() {
     auto code = response->errcode();
     switch(code) {
         case pb::NOT_LEADER: {

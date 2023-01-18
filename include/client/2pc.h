@@ -101,9 +101,13 @@ private:
         do_action_on_keys(bo, keys, TxnCommit);
     }
 
-    void do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, action action);
+    void do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action);
 
-    void do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batch);
+    void do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action);
+
+    void pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action);
+
+    void commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action);
 
 private:
     friend class TTLManager;

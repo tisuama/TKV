@@ -42,6 +42,7 @@ message StoreRes {
     optional PeerStatus      region_status = 10;
     optional RegionRaftStats region_raft_stat = 11;
     repeated KVPair          kvpairs = 12;
+    optional TXNHBRes        txn_res = 13;
 };
 
 message BatchData {
@@ -78,7 +79,6 @@ message StoreReq {
     optional int64 num_increase_rows     = 14;
     repeated BatchData      batch_data   = 15;
     optional TXNHBReq       txn_req      = 16;
-    optional TXNHBRes       txn_res      = 17;
 };
 
 message InitRegion {
