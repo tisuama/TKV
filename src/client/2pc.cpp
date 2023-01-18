@@ -49,7 +49,8 @@ void do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, acti
 }
 
 void TwoPhaseCommitter::do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batch) {
-    // TODO: 
+    // batch data
+    
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
