@@ -42,7 +42,7 @@ message StoreRes {
     optional PeerStatus      region_status = 10;
     optional RegionRaftStats region_raft_stat = 11;
     repeated KVPair          kvpairs = 12;
-    optional TXNHBRes        txn_res = 13;
+    optional TxnHBResponse   txn_res = 13;
 };
 
 message BatchData {
@@ -51,22 +51,12 @@ message BatchData {
     optional int64   ttl_timestamp_us = 3;
 };
 
-message TXNHBReq {
-    required bytes      primary_lock    = 2;
-    optional uint64     start_version   = 3;
-    optional uint64     advise_lock_ttl = 4;
-};
-
-
-message TXNHBRes {
-    required uint64     lock_ttl = 1;
-};
 
 message StoreReq {
     required OpType op_type = 1;
     required int64  region_id = 2;
     required int64  region_version = 3;
-    optional int64  log_id = 4;                // For print log 
+    optional int64  log_id = 4;                // print log 
     optional bytes  start_key = 5;
     optional bytes  end_key = 6;
     optional int64  split_term = 7;
@@ -78,7 +68,7 @@ message StoreReq {
     optional bool  select_without_leader = 13; // selcet 不判断Leader
     optional int64 num_increase_rows     = 14;
     repeated BatchData      batch_data   = 15;
-    optional TXNHBReq       txn_req      = 16;
+    optional TxnHBRequest   txn_req      = 16;
 };
 
 message InitRegion {
@@ -90,15 +80,82 @@ message InitRegion {
     optional bool       is_learner = 5;
 };
 
-message GetAppliedIndex {
-    required int64 region_id = 1;
-};
-
 service StoreService {
     rpc init_region(InitRegion) returns (StoreRes);
     // 1) 获取region的applied_index，用来分裂后优化选择transfer leader对象
     // 2) 获取region的snapshot数据大小，用作校验
-    rpc get_applied_index(GetAppliedIndex) returns (StoreRes);
     rpc query(StoreReq) returns (StoreRes);
 };
+
+// 事务心跳相关
+message TxnHBRequest {
+    required bytes      primary_lock    = 1;
+    optional uint64     start_version   = 2;
+    optional uint64     advise_lock_ttl = 3;
+};
+
+message TxnHBResponse {
+    required uint64     lock_ttl = 1;
+};
+
+message Mutation {
+    required TxnOp  op   = 1;
+    required bytes key   = 2;
+    optional bytes value = 3;
+};
+
+// Pwrite相关
+message PwriteRequest {
+    repeated Mutation mutations         = 1;
+    optional bytes    primary_lock      = 2; 
+    optional uint64   start_version     = 3;
+    optional uint64   lock_ttl          = 4;
+    optional bool     skip_constraint_check = 5; // 加速data migration
+    optional uint64   txn_size          = 6;
+    optional uint64   for_update_ts     = 7;     // 仅对悲观事务有效，用来检测冲突
+    optional uint64   min_commit_ts     = 8;     // min_commit_ts > 0, 大事务
+    optional bool     use_async_commit  = 9;
+    repeated bytes    secondaries       = 10;
+    optional bool     try_one_pc        = 11;
+    optional uint64   max_commit_ts     = 12;   // 用在online ddl中防止不一致
+};
+
+message PwriteResponse {
+    optional ErrorCode errcode = 1;
+    required uint64    min_commit_ts    = 2;
+    optional uint64    one_pc_commit_ts = 3;
+};
+
+// 检查事务状态相关
+message CheckTxnStatusRequest {
+    required bytes    primary_key = 1;
+    optional uint64   lock_ts     = 2;
+    optional uint64   caller_start_ts = 3;
+    optional uint64   current_ts  = 4;
+    optional bool     rollback_if_not_exist = 5;
+    optional bool     force_sync_commit = 7;
+    optional bool     resolve_pessimistic_lock = 8;
+};
+
+message LockInfo {
+    required bytes  primary_lock = 1;
+    optional uint64 lock_version = 2;
+    optional bytes  key          = 3;
+    optional uint64 lock_ttl     = 4;
+    optional uint64 txn_size     = 5;
+    optional TxnOp  lock_type    = 6;
+    optional uint64 lock_for_update_ts = 7;
+    optional bool   use_async_commit = 8;
+    optional uint64 min_commit_ts = 9;
+    repeated bytes  secondaries = 10;
+};
+
+message CheckTxnStatusResponse {
+    optional ErrorCode errcode  = 1;
+    optional uint64    lock_ttl = 2;
+    optional uint64    commit_version = 3;
+    optional Action    action    = 5;
+    optional LockInfo  lock_info = 6;
+};
+
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
