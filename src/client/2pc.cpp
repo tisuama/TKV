@@ -82,11 +82,11 @@ void pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
             // TODO: 异步commit的逻辑
         } else {
             // TODO: pessimistic lock怎么处理
-            // start_ts + 1 读到最新值原则
+            // 同步commit，start_ts + 1 读到最新值原则
             request->set_min_commit_ts(start_ts + 1);
         }
         
-        
+        // sync do rpc
     }
 }
 
