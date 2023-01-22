@@ -29,8 +29,8 @@ brpc::Channel* RpcClient::create_conn(const std::string& addr) {
 }
 
 template<typename T1, typename T2>
-int RpcClient::send_request(brpc::Controller* cntl,
-    const std::string& addr,
+int RpcClient::send_request(const std::string& addr,
+    brpc::Controller* cntl,
     const T1* request,
     T2* response,
     google::protobuf::Closure* done) {
@@ -43,10 +43,13 @@ int RpcClient::send_request(brpc::Controller* cntl,
     uint64_t log_id = butil::fast_rand();
     cntl->set_log_id(log_id);
     
-    DB_DEBUG("send txn %s", request.ShortDebugString().c_str());    
+    DB_DEBUG("[send] request %s", request.ShortDebugString().c_str());    
     pb::StoreService_Stub stub(&channel);
     stub.query(cntl, request, response, done);
 
+    if (done == NULL && cntl.Failed()) {
+        return -1;
+    }
     return 0;
 }
 

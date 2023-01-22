@@ -154,23 +154,4 @@ enum QueryOpType {
     QUERY_SHOW_VIRINDX_INFO_SQL                   = 309;//展示虚拟索引的影响   
 };
 
-enum TxnOp {
-	PUT = 0;
-	DEL = 1;
-	LOCK = 2;
-	ROLLBACK = 3;
-	INSERT = 4;	
-	PESSIMISTICLOCK = 5;
-	CHECKNOTEXIST = 6;
-};
-
-enum Action {
-	NO_ACTION = 1;
-	TTL_EXPIRE_ROLLBACK = 2;
-	LOCK_NOT_EXIST_ROLLBACK = 3;	
-	MIN_COMMIT_TS_PUSHED = 4;
-	TTL_EXPIRE_PESSIMISTIC_ROLLBACK = 5;
-	LOCK_NOT_EXIST_DO_NOTHING = 6;
-};
-
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

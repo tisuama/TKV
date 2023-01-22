@@ -43,7 +43,7 @@ enum ErrorCode {
     LESS_THAN_OLDEST_TS  = 29;
     IN_PROCESS   = 30;
 
-	// 新增加的错误类型
+	// 新增加事务的错误类型
 	DISK_IS_FULL   			 = 31;	
 	SERVER_IS_BUSY 			 = 32;
 	STALE_COMMAND  			 = 33;
@@ -54,3 +54,4 @@ enum ErrorCode {
 	MAX_DATA_NOT_READY	 	 = 38;
 };
 
+/* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

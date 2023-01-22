@@ -15,7 +15,9 @@ struct Store {
 
 struct RegionVerId {
     int64_t  region_id;
+    // conf版本
     int64_t  conf_ver;
+    // region版本
     int64_t  ver;
 
     RegionVerId()

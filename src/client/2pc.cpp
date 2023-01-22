@@ -85,8 +85,19 @@ void pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
             // 同步commit，start_ts + 1 读到最新值原则
             request->set_min_commit_ts(start_ts + 1);
         }
+
+        // pwrite同步请求
+        auto region = cluster->region_cache->get_region(meta->region_ver);
+        int r = cluster->rpc_client->send_request(region->leader, &meta->cntl, &meta->request, &meta->response, NULL);   
+        if (r < 0) {
+            return -1;
+        }
+
+        // 处理pwrite结果
+        if (response->error_size() != 0) {
+
+        }
         
-        // sync do rpc
     }
 }
 

@@ -5,6 +5,8 @@ import "optype.proto";
 package TKV.pb;
 option cc_generic_services = true;
 
+/******************* Query请求相关 ******************/
+
 message RegionLeader {
     required int64 region_id = 1;
     required string leader = 2;
@@ -71,6 +73,8 @@ message StoreReq {
     optional TxnHBRequest   txn_req      = 16;
 };
 
+/******************* 初始化相关 ******************/
+
 message InitRegion {
     required RegionInfo region_info = 1;
     optional SchemaInfo schema_info = 2;
@@ -85,6 +89,42 @@ service StoreService {
     // 1) 获取region的applied_index，用来分裂后优化选择transfer leader对象
     // 2) 获取region的snapshot数据大小，用作校验
     rpc query(StoreReq) returns (StoreRes);
+};
+
+/******************* 事务相关 ******************/
+
+message AlreadyExist {
+    bytes   key = 1;
+};
+
+message KeyError {
+    optional LockInfo locked     = 1;
+    //  optional string   retryable  = 2;   // 停止使用
+    optional string   abort      = 3;
+    //  WriteConflict conflict      = 4;
+    optional AlreadyExist  already_exist = 5;
+    //  DeadLock      deadlock      = 6;
+    //  CommitTsExpired commit_ts_expired = 7;
+    //  TxnNotFound   txn_not_found = 8;
+    //  CommitTsTooLarge commit_ts_too_large = 9;
+};
+enum TxnOp {
+	PUT = 0;
+	DEL = 1;
+	LOCK = 2;
+	ROLLBACK = 3;
+	INSERT = 4;	
+	PESSIMISTICLOCK = 5;
+	CHECKNOTEXIST = 6;
+};
+
+enum Action {
+	NO_ACTION = 1;
+	TTL_EXPIRE_ROLLBACK = 2;
+	LOCK_NOT_EXIST_ROLLBACK = 3;	
+	MIN_COMMIT_TS_PUSHED = 4;
+	TTL_EXPIRE_PESSIMISTIC_ROLLBACK = 5;
+	LOCK_NOT_EXIST_DO_NOTHING = 6;
 };
 
 // 事务心跳相关
@@ -121,7 +161,7 @@ message PwriteRequest {
 };
 
 message PwriteResponse {
-    optional ErrorCode errcode = 1;
+    optional KeyError  key_error        = 1;
     required uint64    min_commit_ts    = 2;
     optional uint64    one_pc_commit_ts = 3;
 };
@@ -138,8 +178,8 @@ message CheckTxnStatusRequest {
 };
 
 message LockInfo {
-    required bytes  primary_lock = 1;
-    optional uint64 lock_version = 2;
+    required bytes  primary_lock = 1;   // primary_lock
+    optional uint64 lock_version = 2;   // txn_id
     optional bytes  key          = 3;
     optional uint64 lock_ttl     = 4;
     optional uint64 txn_size     = 5;
@@ -151,8 +191,8 @@ message LockInfo {
 };
 
 message CheckTxnStatusResponse {
-    optional ErrorCode errcode  = 1;
-    optional uint64    lock_ttl = 2;
+    optional KeyError  key_error = 1;
+    optional uint64    lock_ttl  = 2;
     optional uint64    commit_version = 3;
     optional Action    action    = 5;
     optional LockInfo  lock_info = 6;

@@ -28,8 +28,8 @@ public:
 
     // TKVStore
     template<typename T1, typename T2>
-    int send_request(brpc::Controller* cntl,
-        const std::string& addr,
+    int send_request(const std::string& addr,
+        brpc::Controller* cntl,
         const T1* request,
         T2* response, 
         google::protobuf::Closure* done);
