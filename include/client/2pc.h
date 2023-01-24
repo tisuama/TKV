@@ -11,8 +11,8 @@
 namespace TKV {
 constexpr uint64_t LockTTL = 20000; // 20s
 constexpr uint64_t BytesPerMB = 1024 * 1024;
-constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024;
-constexpr uint64_t PessimisticLockBackoff = 20000; // 20s
+constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024; // 32M
+constexpr uint64_t PessimisticLockBackoff = 20000;     // 20s
 constexpr uint32_t TxnCommitBatchSize = 16 * 1024;
 
 typedef std::unordered_map<RegionVerId, std::pair<
@@ -101,13 +101,13 @@ private:
         do_action_on_keys(bo, keys, TxnCommit);
     }
 
-    void do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action);
+    int do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action);
 
-    void do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action);
+    int do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action);
 
-    void pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action);
+    int pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action);
 
-    void commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action);
+    int commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action);
 
 private:
     friend class TTLManager;

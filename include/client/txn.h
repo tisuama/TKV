@@ -24,6 +24,12 @@ struct Txn {
     void commit() {
         auto committer = std::make_shared<TwoPhaseCommitter>(this);
     }    
+
+    void walk_buffer(std::function<void(const std::string&, const std::string&)> fn) {
+        for (auto& it: buffer) {
+            fn(it.first, it.second);
+        }
+    }
 };
 
 } // namespace TKV

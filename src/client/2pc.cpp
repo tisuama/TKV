@@ -1,17 +1,57 @@
 #include "client/2pc.h"
 #include "client/async_send_meat.h"
 
+
 namespace TKV {
+constexpr uint64_t ManagedLockTTL = 20000; // 20s
 
 int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size) {
     return 0;
 }
 
 void TTLManager::keep_alive(std::shared_ptr<TwoPhaseCommitter> committer) {
+    for (;;) {
+        if (state.load(std::memory_order_acquire) == StateClosed) {
+            return ;
+        }
+        
+        bthread_usleep(ManagedLockTTL / 2);
+
+        // 检查事务最大生命周期
+        BackOffer bo(PessimisticLockMaxBackOff);
+        uint64_t now = committer->cluster->oracle->get_low_resolution_ts();
+        uint64_t uptime = extract_physical(now) - extract_physical(committer->start_ts);
+        uint64_t new_ttl = uptime + ManagedLockTTL;
+        
+        // TODO: send txn heartbeat
+    }
+}
+
+TwoPhaseCommitter::TwoPhaseCommitter(Txn* txn, bool use_async_commit)
+    : start_time(txn->start_time)
+    , use_async_commit(use_async_commit) {
+
+    committed = false;
+    txn->walk_buffer([&](const std::string& key, const std::string& value) {
+            keys.push_back(key);
+            mutations.emplace(key, value);
+    });    
+
+    cluster = txn->cluster;
+    start_ts = txn->start_ts;
+    primary_lock = keys[0];
+    txn_size = mutations.size();
+
+    // 默认lock_ttl为3s
+    lock_ttl = DefaultLockTTL;    
+    // 事务大于32M时，lock_ttl变成20s
+    if (txn_size > TTLRunThreshold) {
+        lock_ttl = ManagedLockTTL;
+    }
 }
 
 
-void do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, Action action) {
+int TwoPhaseCommitter::do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, Action action) {
     // RegionVerId -> keys
     auto groups = cluster->region_cache->group_keys_by_region(keys);    
     
@@ -42,18 +82,19 @@ void do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, Acti
     }
 
     if constexpr (action == TxnCommit || action == TxnCleanUp) {
-        // primary key
+        // commit
         do_action_on_batchs(bo, std::vector<BatchKeys>(batchs.begin(), batchs.begin() + 1, action));
         batchs = std::vector<BatchKeys>(batchs.begin() + 1, batchs.end());
     }
-    if (action != TxnCommit) {
-        // secondary key
+    if constexpr (action != TxnCommit) {
+        // pwrite/rollback
         do_action_on_batchs(bo, batchs, action);
     }
 }
 
-void TwoPhaseCommitter::do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action) {
+int TwoPhaseCommitter::do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action) {
     for (const auto& batch : batchs) {
+        // 循环处理，primary_lock在batchs[0];
         if (action == TxnPwrite) {
             region_txn_size[batch.region_id] = batch.keys.size();
             pwrite_singl_batch(bo, batch);
@@ -65,7 +106,7 @@ void TwoPhaseCommitter::do_action_on_batch(BackOffer& bo, const std::vector<Batc
 }
 
 // 同步调用
-void pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
+int pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
     uint64_t batch_txn_size = region_txn_size[batch.region_ver.region_id];
 
     for (;;) {
@@ -86,22 +127,47 @@ void pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
             request->set_min_commit_ts(start_ts + 1);
         }
 
-        // pwrite同步请求
+        // pwrite同步发送
         auto region = cluster->region_cache->get_region(meta->region_ver);
         int r = cluster->rpc_client->send_request(region->leader, &meta->cntl, &meta->request, &meta->response, NULL);   
         if (r < 0) {
+            // rpc错误
             return -1;
         }
 
-        // 处理pwrite结果
-        if (response->error_size() != 0) {
-
+        // 处理pwrite结果：有key没有pwrite成功
+        if (response->key_errors_size() != 0) {
+            std::vector<std::shared_ptr<Lock>> locks;
+            int size = response->key_errors_size() 
+            for (int i = 0; i < size; i++) {
+                const auto& err = response->key_error(i);
+                if (err.has_already_exist()) {
+                    return -1;
+                }
+                auto lock = build_lock_from_key_error(err);
+                locks.push_back(lock);
+            }
+            auto ms_before_expired = cluster->lock_resolver->resolve_lock_for_write(bo, start_ts, locks);
+            if (ms_before_expired > 0) {
+                bo.backoff_with_max_sleep(BoTxnLock, ms_before_expired);
+            }
+            continue;
+        } else {
+            if (batch.keys[0] == primary_lock) {
+                // 在primary lock写入成功后， 如果事务大小大于32M
+                // 开启TTLManager，TTLManager在commit时关闭
+                if (txn_size > TTLRunThreshold) {
+                    ttl_manager.run(std::shared_from_this());
+                }
+            }
+            if (use_async_commit) {
+                // TODO: 异步commit的逻辑
+            }
         }
-        
     }
 }
 
-void commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
+int commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
 
 }
 

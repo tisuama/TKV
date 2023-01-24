@@ -50,7 +50,7 @@ struct Lock {
     {}
 };
 
-inline std::shared_ptr<TxnStatus> extract_lock_from_key_error(const TKV::pb::KeyError& key_error) {
+inline std::shared_ptr<TxnStatus> build_lock_from_key_error(const TKV::pb::KeyError& key_error) {
     CHECK(key_error.has_locked());
     return std::make_shared<Lock>(key_error.locked());
 }
@@ -81,8 +81,43 @@ struct TxnExpiredTime {
     }
 };
 
+// LockResolver resolve lock and cache txn status
 class LockResolver {
-    // TODO: LockResolver
+public:
+    explicit LockResolver(std::shared_ptr<Cluster> cluster)
+        : cluster(cluster)
+    {}
+
+    void update(std::shared_ptr<Cluster> cluster) {
+        cluster = cluster;
+    }
+
+    int64_t resolve_lock_for_write(BackOffer& bo, uint64_t caller_start_ts,
+            std::vector<std::shared_ptr<Lock>& locks) {
+        std::vector<uint64_t> ignored;
+        return resolve_locks(bo, caller_start_ts, locks, ignored, true);
+    }
+
+    // LockResolver 需要经历三个步骤：
+    // 1) 使用 LockTTL选择过期的key
+    // 2) 对于每一个key，通过primary_key确认事务提交状态
+    // 3) 发送`ResolveLock`命令给对应的region
+    // return: ms_before_expired
+    int64_t resolve_locks(BackOffer& bo, uint64_t caller_start_ts, 
+            std::vector<std::shared_ptr<Lock>>& locks, 
+            std::vector<uint64_t>& pushed);
+    
+    int64_t resolve_locks(BackOffer& bo, uint64_t caller_start_ts, 
+            std::vector<std::shared_ptr<Lock>>& locks);
+
+
+private:
+
+
+    std::shared_ptr<Cluster> cluster;
+    bthread_mutex_t          mu;
+    std::unordered_map<int64_t, TxnStatus> resolved;
+    std::deque<int64_t>                    cached;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
