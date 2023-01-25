@@ -43,11 +43,12 @@ int RpcClient::send_request(const std::string& addr,
     uint64_t log_id = butil::fast_rand();
     cntl->set_log_id(log_id);
     
-    DB_DEBUG("[send] request %s", request.ShortDebugString().c_str());    
+    DB_DEBUG("[send] request %s", request->ShortDebugString().c_str());    
     pb::StoreService_Stub stub(&channel);
     stub.query(cntl, request, response, done);
 
     if (done == NULL && cntl.Failed()) {
+        DB_FATAL("[resp] request %s cntl failed", request->ShortDebugString().c_str()); 
         return -1;
     }
     return 0;

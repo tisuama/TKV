@@ -31,6 +31,12 @@ message KVPair {
     optional string value = 2;
 };
 
+message BatchData {
+    optional string  key = 1;
+    optional string  value = 2;
+    optional int64   ttl_timestamp_us = 3;
+};
+
 message StoreRes {
     required ErrorCode       errcode = 1;
     optional bytes           errmsg  = 2;
@@ -44,15 +50,9 @@ message StoreRes {
     optional PeerStatus      region_status = 10;
     optional RegionRaftStats region_raft_stat = 11;
     repeated KVPair          kvpairs = 12;
-    optional TxnHBResponse   txn_res = 13;
+    optional TxnHBResponse   txn_hb_res = 13;
+    optional PwriteResponse  pwrite_res = 14;
 };
-
-message BatchData {
-    optional string  key = 1;
-    optional string  value = 2;
-    optional int64   ttl_timestamp_us = 3;
-};
-
 
 message StoreReq {
     required OpType op_type = 1;
@@ -70,7 +70,8 @@ message StoreReq {
     optional bool  select_without_leader = 13; // selcet 不判断Leader
     optional int64 num_increase_rows     = 14;
     repeated BatchData      batch_data   = 15;
-    optional TxnHBRequest   txn_req      = 16;
+    optional TxnHBRequest   txn_hb_req      = 16;
+    optional PwriteRequest  pwrite_req   = 17;
 };
 
 /******************* 初始化相关 ******************/
@@ -127,15 +128,15 @@ enum Action {
 	LOCK_NOT_EXIST_DO_NOTHING = 6;
 };
 
-// 事务心跳相关
+// 更新悲观事务和大事务的LOCK_TTL，防止被kill
 message TxnHBRequest {
     required bytes      primary_lock    = 1;
-    optional uint64     start_version   = 2;
-    optional uint64     advise_lock_ttl = 3;
+    optional uint64     start_version   = 2; // 大事务的start timestamp
+    optional uint64     advise_lock_ttl = 3; // sender建议的新的时间戳
 };
 
 message TxnHBResponse {
-    required uint64     lock_ttl = 1;
+    required uint64     lock_ttl = 1;        // 事务实际上更新的时间戳
 };
 
 message Mutation {

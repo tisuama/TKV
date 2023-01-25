@@ -6,7 +6,9 @@
 #include "common/common.h"
 
 namespace TKV {
-constexpr int PessimisticLockMaxBackOff = 20000; // ms
+constexpr int PessimisticLockMaxBackOff = 20000; // 20s
+constexpr int PwriteMaxBackOff = 20000;          // 20s
+constexpr int CommitMaxBackOff = 41000;          // 41s
 
 enum BackOffType {
     BoStoreRPC = 0,

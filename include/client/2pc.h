@@ -17,7 +17,10 @@ constexpr uint32_t TxnCommitBatchSize = 16 * 1024;
 
 typedef std::unordered_map<RegionVerId, std::pair<
 
-int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
+uint64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
+
+uint64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster, 
+        std::string& primary_lock, uint64_t start_ts, uint64_t new_ttl);
 
 class Txn;
 class TwoPhaseCommitter;
