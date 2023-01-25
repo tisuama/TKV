@@ -6,11 +6,12 @@
 #include "client/meta_client.h"
 #include "client/region_cache.h"
 #include "client/oracle.h"
+#include "client/lock_resolver.h"
 
 namespace TKV {
 constexpr int oracle_update_interval = 2000;
 
-class Cluster {
+class Cluster: public std::enable_shared_from_this<Cluster> {
 public:
     // meta_server_bns: meta_server地址
     // table_name: 请求的表的资源
@@ -20,6 +21,7 @@ public:
         , rpc_client(std::make_shared<RpcClient>())
         , oracle(std::make_shared<Oracle>(meta_client, 
                     std::chrono::milliseconds(oracle_update_interval)))
+	, lock_resolver(shared_from_this())
     {}
 
     int init(); 
@@ -36,6 +38,7 @@ public:
     std::shared_ptr<RegionCache> region_cache;
     std::shared_ptr<RpcClient>   rpc_client;
     std::shared_ptr<Oracle>      oracle;
+    std::shared_ptr<LockResolver> lock_resolver;
     bool                _is_inited { false };
 }; 
 } // namespace TKV

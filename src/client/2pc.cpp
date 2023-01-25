@@ -1,15 +1,17 @@
 #include "client/2pc.h"
-#include "client/async_send_meat.h"
+#include "client/async_send.h"
+#include "client/txn.h"
+#include "client/lock_resolver.h"
 
 
 namespace TKV {
 constexpr uint64_t ManagedLockTTL = 20000; // 20s
 
-uint64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size) {
+int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size) {
     return 0;
 }
 
-uint64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster, 
+int64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster, 
         std::string& primary_lock, uint64_t start_ts, uint64_t new_ttl) {
     for (;;) {
         auto loate = cluster->region_cache->locate_key(primary_lock);
@@ -33,8 +35,8 @@ uint64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster,
             bo.backoff(BoRegionMiss);
             continue;
         }
-        auto response = meta->response->mutable_txn_hb_res();
-        if (response->has_error()) {
+        auto response = meta->response.mutable_txn_hb_res();
+        if (response->has_key_error()) {
             DB_WARNING("txn heart beat error, request: %s, response: %s", 
                     request->ShortDebugString().c_str(),
                     response->ShortDebugString().c_str());
@@ -115,7 +117,7 @@ void TwoPhaseCommitter::execute() {
     ttl_manager.close();
 }
 
-int TwoPhaseCommitter::do_action_on_keys(backoffer& bo, const std::vector<std::string>& keys, Action action) {
+int TwoPhaseCommitter::do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action) {
     // RegionVerId -> keys
     auto groups = cluster->region_cache->group_keys_by_region(keys);    
     
@@ -145,37 +147,37 @@ int TwoPhaseCommitter::do_action_on_keys(backoffer& bo, const std::vector<std::s
         batchs[0].is_primary = true;
     }
 
-    if constexpr (action == TxnCommit || action == TxnCleanUp) {
+    if (action == TxnCommit || action == TxnCleanUp) {
         // commit
-        do_action_on_batchs(bo, std::vector<BatchKeys>(batchs.begin(), batchs.begin() + 1, action));
+        do_action_on_batchs(bo, std::vector<BatchKeys>(batchs.begin(), batchs.begin() + 1), action);
         batchs = std::vector<BatchKeys>(batchs.begin() + 1, batchs.end());
     }
-    if constexpr (action != TxnCommit) {
+    if (action != TxnCommit) {
         // pwrite/rollback
         do_action_on_batchs(bo, batchs, action);
     }
 }
 
-int TwoPhaseCommitter::do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action) {
+int TwoPhaseCommitter::do_action_on_batchs(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action) {
     // TODO: Pwrite和Commit是否可以并发？
     for (const auto& batch : batchs) {
         // 循环, primary_lock在batchs[0];
         if (action == TxnPwrite) {
-            region_txn_size[batch.region_id] = batch.keys.size();
-            pwrite_singl_batch(bo, batch);
+            region_txn_size[batch.region_ver.region_id] = batch.keys.size();
+            pwrite_single_batch(bo, batch, action);
         } else if (action == TxnCommit) {
-            commit_single_batch(bo, batch);
+            commit_single_batch(bo, batch, action);
         }
     }
 
 }
 
 // 同步调用
-int pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
+int TwoPhaseCommitter::pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
     uint64_t batch_txn_size = region_txn_size[batch.region_ver.region_id];
 
     for (;;) {
-        AsyncSendMeta* meta = new AsyncSendMeta(cluster, batch.region_ver);
+        AsyncSendMeta* meta = new AsyncSendMeta(Cluster, batch.region_ver);
         pb::PwriteRequest* request = meta->request.mutable_pwrite_req();         
         
         request->set_primary_lock(primary_lock);
@@ -204,10 +206,11 @@ int pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
             return -1;
         }
 
+	auto response = meta->response.mutable_pwrite_res();
         // 处理pwrite结果：有key没有pwrite成功
-        if (response->key_errors_size() != 0) {
+        if (response->key_error_size() != 0) {
             std::vector<std::shared_ptr<Lock>> locks;
-            int size = response->key_errors_size() 
+            int size = response->key_error_size();
             for (int i = 0; i < size; i++) {
                 const auto& err = response->key_error(i);
                 if (err.has_already_exist()) {
@@ -226,7 +229,7 @@ int pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
                 // 在primary lock写入成功后， 如果事务大小大于32M
                 // 开启TTLManager，TTLManager在commit时关闭
                 if (txn_size > TTLRunThreshold) {
-                    ttl_manager.run(std::shared_from_this());
+                    ttl_manager.run(shared_from_this());
                 }
             }
             if (use_async_commit) {
@@ -236,8 +239,7 @@ int pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
     }
 }
 
-int commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
-
+int TwoPhaseCommitter::commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
 }
 
 } // namespace TKV

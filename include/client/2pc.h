@@ -15,11 +15,9 @@ constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024; // 32M
 constexpr uint64_t PessimisticLockBackoff = 20000;     // 20s
 constexpr uint32_t TxnCommitBatchSize = 16 * 1024;
 
-typedef std::unordered_map<RegionVerId, std::pair<
+int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
 
-uint64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
-
-uint64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster, 
+int64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster, 
         std::string& primary_lock, uint64_t start_ts, uint64_t new_ttl);
 
 class Txn;
@@ -96,17 +94,17 @@ private:
 
     void calculate_max_commit_ts();
 
-    void pwrite_keys(const std::vector<std::string>& keys, BackOffer& bo) {
+    void pwrite_keys(BackOffer& bo, const std::vector<std::string>& keys) {
         do_action_on_keys(bo, keys, TxnPwrite);
     }
 
-    void commit_keys(const std::vector<std::string>& keys, BackOffer& bo) {
+    void commit_keys(BackOffer& bo, const std::vector<std::string>& keys) {
         do_action_on_keys(bo, keys, TxnCommit);
     }
 
     int do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action);
 
-    int do_action_on_batch(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action);
+    int do_action_on_batchs(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action);
 
     int pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action);
 

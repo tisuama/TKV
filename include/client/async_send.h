@@ -14,12 +14,6 @@ struct AsyncSendMeta {
     {}
     
     ~AsyncSendMeta() {
-        if (request) {
-            delete request;
-        }
-        if (response) {
-            delete response;
-        }
     }
     
     // 处理RPC send失败

@@ -95,7 +95,7 @@ service StoreService {
 /******************* 事务相关 ******************/
 
 message AlreadyExist {
-    bytes   key = 1;
+    required bytes   key = 1;
 };
 
 message KeyError {
@@ -137,6 +137,7 @@ message TxnHBRequest {
 
 message TxnHBResponse {
     required uint64     lock_ttl = 1;        // 事务实际上更新的时间戳
+    optional KeyError   key_error = 2;
 };
 
 message Mutation {
@@ -162,7 +163,7 @@ message PwriteRequest {
 };
 
 message PwriteResponse {
-    optional KeyError  key_error        = 1;
+    repeated KeyError  key_error        = 1;
     required uint64    min_commit_ts    = 2;
     optional uint64    one_pc_commit_ts = 3;
 };

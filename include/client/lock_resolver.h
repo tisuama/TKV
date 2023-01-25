@@ -1,5 +1,6 @@
 #pragma once
-#include <string>
+#include "common/common.h"
+#include "client/backoff.h"
 
 namespace TKV {
 constexpr size_t ResolvedCacheSize = 2048;
@@ -50,7 +51,7 @@ struct Lock {
     {}
 };
 
-inline std::shared_ptr<TxnStatus> build_lock_from_key_error(const TKV::pb::KeyError& key_error) {
+inline std::shared_ptr<TKV::Lock> build_lock_from_key_error(const TKV::pb::KeyError& key_error) {
     CHECK(key_error.has_locked());
     return std::make_shared<Lock>(key_error.locked());
 }
@@ -93,7 +94,7 @@ public:
     }
 
     int64_t resolve_lock_for_write(BackOffer& bo, uint64_t caller_start_ts,
-            std::vector<std::shared_ptr<Lock>& locks) {
+            std::vector<std::shared_ptr<Lock>>& locks) {
         std::vector<uint64_t> ignored;
         return resolve_locks(bo, caller_start_ts, locks, ignored, true);
     }

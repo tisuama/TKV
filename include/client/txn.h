@@ -3,7 +3,6 @@
 #include <string>
 
 namespace TKV {
-const uint32_t TxnCommitBatchSize = 16 * 1024;
 
 struct Txn {
     std::shared_ptr<Cluster> cluster;
