@@ -146,7 +146,7 @@ message Mutation {
     optional bytes value = 3;
 };
 
-// Pwrite相关
+// Pwrite Phase
 message PwriteRequest {
     repeated Mutation mutations         = 1;
     optional bytes    primary_lock      = 2; 
@@ -168,17 +168,6 @@ message PwriteResponse {
     optional uint64    one_pc_commit_ts = 3;
 };
 
-// 检查事务状态相关
-message CheckTxnStatusRequest {
-    required bytes    primary_key = 1;
-    optional uint64   lock_ts     = 2;
-    optional uint64   caller_start_ts = 3;
-    optional uint64   current_ts  = 4;
-    optional bool     rollback_if_not_exist = 5;
-    optional bool     force_sync_commit = 7;
-    optional bool     resolve_pessimistic_lock = 8;
-};
-
 message LockInfo {
     required bytes  primary_lock = 1;   // primary_lock
     optional uint64 lock_version = 2;   // txn_id
@@ -192,12 +181,35 @@ message LockInfo {
     repeated bytes  secondaries = 10;
 };
 
+// 检查事务状态相关
+message CheckTxnStatusRequest {
+    required bytes    primary_key = 1;
+    optional uint64   lock_ts     = 2;
+    optional uint64   caller_start_ts = 3;
+    optional uint64   current_ts  = 4;
+    optional bool     rollback_if_not_exist = 5;
+    optional bool     force_sync_commit = 7;
+    optional bool     resolve_pessimistic_lock = 8;
+};
+
 message CheckTxnStatusResponse {
     optional KeyError  key_error = 1;
     optional uint64    lock_ttl  = 2;
     optional uint64    commit_version = 3;
     optional Action    action    = 5;
     optional LockInfo  lock_info = 6;
+};
+
+// Commit Phase
+message CommitRequest {
+    required uint64   start_version = 1;
+    repeated bytes    keys = 2;
+    required uint64   commit_version = 3;  // greater than 'start_version'
+};
+
+message CommitResponse {
+    optional KeyError key_error = 1;    
+    optional uint64   commit_version = 2;
 };
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

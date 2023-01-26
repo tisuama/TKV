@@ -156,6 +156,8 @@ int TwoPhaseCommitter::do_action_on_keys(BackOffer& bo, const std::vector<std::s
         // pwrite/rollback
         do_action_on_batchs(bo, batchs, action);
     }
+    
+    return 0;
 }
 
 int TwoPhaseCommitter::do_action_on_batchs(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action) {
@@ -170,6 +172,7 @@ int TwoPhaseCommitter::do_action_on_batchs(BackOffer& bo, const std::vector<Batc
         }
     }
 
+    return 0;
 }
 
 // 同步调用
@@ -177,7 +180,7 @@ int TwoPhaseCommitter::pwrite_single_batch(BackOffer& bo, const BatchKeys& batch
     uint64_t batch_txn_size = region_txn_size[batch.region_ver.region_id];
 
     for (;;) {
-        AsyncSendMeta* meta = new AsyncSendMeta(Cluster, batch.region_ver);
+        AsyncSendMeta* meta = new AsyncSendMeta(cluster, batch.region_ver);
         pb::PwriteRequest* request = meta->request.mutable_pwrite_req();         
         
         request->set_primary_lock(primary_lock);

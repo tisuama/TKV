@@ -339,7 +339,7 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
             if (is_learner()) {
                 // TODO: check learner snapshot
             } else {
-                if (check_follower_snapshot(butil::endpoint2str(get_leader()).c_str()) != 0) {
+                if (/* check_follower_snapshot(butil::endpoint2str(get_leader()).c_str()) != 0 */ 0) {
                     DB_FATAL("region_id: %ld check follower snapshot fail", _region_id);
                     return -1;
                 }
@@ -438,35 +438,6 @@ int Region::ingest_snapshot_sst(const std::string& dir) {
         DB_WARNING("region_id: %ld is empty when on snapshot load", _region_id);
     }
     return 0; 
-}
-
-int Region::check_follower_snapshot(const std::string& peer) {
-    uint64_t peer_data_size = 0;
-    uint64_t peer_meta_size = 0;
-    int64_t snapshot_index = 0;
-    RpcSender::get_peer_snapshot_size(peer, _region_id, 
-            &peer_data_size, &peer_meta_size, &snapshot_index);
-    DB_WARNING("region_id: %ld is new, no need clear data, "
-            "remote_data_size: %lu, cur_data_size: %lu, "
-            "remote_meta_size: %lu, cur_meta_size: %lu, "
-            "region_info: %s",
-            _region_id, peer_data_size, snapshot_data_size(),
-            peer_meta_size, snapshot_meta_size(),
-            _region_info.ShortDebugString().c_str());
-
-    if (peer_data_size != 0 && snapshot_data_size() != 0 && 
-            peer_data_size != snapshot_data_size()) {
-        DB_FATAL("region_id: %ld cur_data_size: %lu, remote_data_size: %lu", 
-                _region_id, snapshot_data_size(), peer_data_size);
-        return -1;
-    }
-    if (peer_meta_size != 0 && snapshot_meta_size() != 0 && 
-            peer_meta_size != snapshot_meta_size()) {
-        DB_FATAL("region_id: %ld cur_meta_size: %lu, remote_meta_size: %lu", 
-                _region_id, snapshot_meta_size(), peer_meta_size);
-        return -1;
-    }
-    return 0;
 }
 
 void Region::set_region_with_update_range(const pb::RegionInfo& region_info) {

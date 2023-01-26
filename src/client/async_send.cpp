@@ -11,11 +11,11 @@ int AsyncSendMeta::on_response_failed() {
     auto code = response.errcode();
     switch(code) {
         case pb::NOT_LEADER: {
-            if (response->has_leader()) {
+            if (response.has_leader()) {
                 DB_DEBUG("region_id: %ld request: %s, NOT LEADER, redirect to: %s",
-                        region_id, request.ShortDebugString().c_str(), response->leader().c_str());
+                        region_id, request.ShortDebugString().c_str(), response.leader().c_str());
                 // 如果leader合法，则不等待
-                if (!cluster->region_cache->update_leader(region_ver, response->leader())) {
+                if (!cluster->region_cache->update_leader(region_ver, response.leader())) {
                     bo.backoff(BoRegionScheduling);
                 }
             } else {

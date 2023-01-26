@@ -48,10 +48,6 @@ public:
                          const ::TKV::pb::InitRegion* request,
                          ::TKV::pb::StoreRes* response,
                          ::google::protobuf::Closure* done) override;
-    virtual void get_applied_index(::google::protobuf::RpcController* controller,
-                         const ::TKV::pb::GetAppliedIndex* request,
-                         ::TKV::pb::StoreRes* response,
-                         ::google::protobuf::Closure* done) /* override */;
     virtual void query(::google::protobuf::RpcController* controller,
                         const ::TKV::pb::StoreReq* request, 
                         ::TKV::pb::StoreRes* response,

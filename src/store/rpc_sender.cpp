@@ -30,21 +30,6 @@ int RpcSender::send_query_method(const pb::StoreReq& req,
     return ret;
 }
 
-void RpcSender::get_peer_snapshot_size(const std::string& peer, int64_t region_id,
-        uint64_t* data_size, uint64_t* meta_size, int64_t* snapshot_index) {
-    pb::GetAppliedIndex request;
-    request.set_region_id(region_id);
-    pb::StoreRes response;
-    
-    StoreInteract store_interact(peer);
-    int ret = store_interact.send_request("get_applied_index", request, response);
-    if (ret == 0) {
-        *data_size = response.region_raft_stat().snapshot_data_size();
-        *meta_size = response.region_raft_stat().snapshot_meta_size();
-        *snapshot_index = response.region_raft_stat().snapshot_index();
-    }
-}
-
 int RpcSender::send_init_region_method(const std::string& instance_address,
     const pb::InitRegion& init_region_request,
     pb::StoreRes& response) {

@@ -96,7 +96,7 @@ public:
     int64_t resolve_lock_for_write(BackOffer& bo, uint64_t caller_start_ts,
             std::vector<std::shared_ptr<Lock>>& locks) {
         std::vector<uint64_t> ignored;
-        return resolve_locks(bo, caller_start_ts, locks, ignored, true);
+        return resolve_locks(bo, caller_start_ts, locks, ignored /* pushed */, true);
     }
 
     // LockResolver 需要经历三个步骤：
@@ -106,7 +106,8 @@ public:
     // return: ms_before_expired
     int64_t resolve_locks(BackOffer& bo, uint64_t caller_start_ts, 
             std::vector<std::shared_ptr<Lock>>& locks, 
-            std::vector<uint64_t>& pushed);
+            std::vector<uint64_t>& pushed,
+            bool for_write);
     
     int64_t resolve_locks(BackOffer& bo, uint64_t caller_start_ts, 
             std::vector<std::shared_ptr<Lock>>& locks);

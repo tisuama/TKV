@@ -47,7 +47,7 @@ int RpcClient::send_request(const std::string& addr,
     pb::StoreService_Stub stub(&channel);
     stub.query(cntl, request, response, done);
 
-    if (done == NULL && cntl.Failed()) {
+    if (done == NULL && cntl->Failed()) {
         DB_FATAL("[resp] request %s cntl failed", request->ShortDebugString().c_str()); 
         return -1;
     }

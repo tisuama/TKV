@@ -101,7 +101,7 @@ RegionCache::group_keys_by_region(const std::vector<std::string>& keys) {
         if (!location.contains(key)) {
             location = locate_key(key);
         }
-        result[location.region].push_back(key);
+        result[location.region_ver].push_back(key);
     }
     return result;
 } 

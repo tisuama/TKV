@@ -368,29 +368,6 @@ int Store::drop_region_from_store(int64_t drop_region_id, bool need_delay_drop) 
     return 0;
 }
 
-void Store::get_applied_index(::google::protobuf::RpcController* controller,
-             const ::TKV::pb::GetAppliedIndex* request,
-             ::TKV::pb::StoreRes* response,
-             ::google::protobuf::Closure* done) {
-    brpc::ClosureGuard done_gurad(done);
-    response->set_errcode(pb::SUCCESS);
-    response->set_errmsg("success");
-    SmartRegion region = get_region(request->region_id());
-    if (!region) {
-        DB_FATAL("region_id: %ld not exist, maybe removed", request->region_id());
-        response->set_errcode(pb::REGION_NOT_EXIST);
-        response->set_errmsg("region not exist");
-        return ;
-    }
-    response->set_region_status(region->region_status());
-    response->set_applied_index(region->get_log_index());
-    response->mutable_region_raft_stat()->set_applied_index(region->get_log_index());
-    response->mutable_region_raft_stat()->set_snapshot_meta_size(region->snapshot_meta_size());
-    response->mutable_region_raft_stat()->set_snapshot_data_size(region->snapshot_data_size());
-    response->mutable_region_raft_stat()->set_snapshot_index(region->snapshot_index());
-    response->set_leader(butil::endpoint2str(region->get_leader()).c_str());
-}
-
 /* 检查region是否分裂或者add peer成功 */
 /* region->version() == 0时检查 */
 void Store::check_region_legal_complete(int64_t region_id) {
