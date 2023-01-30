@@ -1,5 +1,4 @@
 #include "client/rpc.h"
-#include <brpc/channel.h>
 
 namespace TKV {
 
@@ -26,32 +25,6 @@ brpc::Channel* RpcClient::create_conn(const std::string& addr) {
 
     _channels[addr] = channel;
     return channel;
-}
-
-template<typename T1, typename T2>
-int RpcClient::send_request(const std::string& addr,
-    brpc::Controller* cntl,
-    const T1* request,
-    T2* response,
-    google::protobuf::Closure* done) {
-
-    auto channel = get_conn(addr);
-    if (channel == nullptr) {
-        DB_FATAL("Get channel for addr: %s failed", addr.c_str());
-        return -1;
-    }
-    uint64_t log_id = butil::fast_rand();
-    cntl->set_log_id(log_id);
-    
-    DB_DEBUG("[send] request %s", request->ShortDebugString().c_str());    
-    pb::StoreService_Stub stub(&channel);
-    stub.query(cntl, request, response, done);
-
-    if (done == NULL && cntl->Failed()) {
-        DB_FATAL("[resp] request %s cntl failed", request->ShortDebugString().c_str()); 
-        return -1;
-    }
-    return 0;
 }
 
 } // namespace TKV

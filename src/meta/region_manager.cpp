@@ -335,6 +335,8 @@ void RegionManager::update_region(const pb::MetaManagerRequest& request,
         add_delete_region = request.add_delete_region();
     }
 
+    (void)add_delete_region;
+
     int ret = MetaRocksdb::get_instance()->put_meta_info(put_keys, put_values);
     if (ret < 0) {
         IF_DONE_SET_RESPONSE(done, pb::INTERNAL_ERROR, "write db fail");

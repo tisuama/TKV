@@ -25,12 +25,6 @@ public:
     {}
 
     int init(); 
-    
-    int send_request(const pb::StoreReq* request, 
-                     pb::StoreRes* response,
-                     brpc::Controller* cntl,
-                     const std::string& addr,
-                     ::google::protobuf::Closure* done);
 
 public:
     // std::shared_ptr也行

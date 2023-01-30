@@ -7,43 +7,34 @@
 namespace TKV {
 constexpr uint64_t ManagedLockTTL = 20000; // 20s
 
-int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size) {
-    return 0;
-}
-
 int64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster, 
-        std::string& primary_lock, uint64_t start_ts, uint64_t new_ttl) {
-    for (;;) {
-        auto loate = cluster->region_cache->locate_key(primary_lock);
-        
-        AsyncSendMeta* meta = new AsyncSendMeta(cluster, loate.region_ver);
-        auto request = meta->request.mutable_txn_hb_req(); 
-        
-        request->set_primary_lock(primary_lock);
-        request->set_start_version(start_ts);
-        request->set_advise_lock_ttl(new_ttl);
+    std::string& primary_lock, uint64_t start_ts, uint64_t new_ttl) {
 
+    auto loate = cluster->region_cache->locate_key(primary_lock);
+    AsyncSendMeta meta(cluster, loate.region_ver);
+    auto request = meta.request.mutable_txn_hb_req(); 
+    
+    request->set_primary_lock(primary_lock);
+    request->set_start_version(start_ts);
+    request->set_advise_lock_ttl(new_ttl);
 
-        auto region = cluster->region_cache->get_region(meta->region_ver);
-        int r = cluster->rpc_client->send_request(region->leader, 
-                                                  &meta->cntl, 
-                                                  &meta->request, 
-                                                  &meta->response, 
-                                                  NULL);   
-        if (r < 0) {
-            // rpc错误
-            bo.backoff(BoRegionMiss);
-            continue;
-        }
-        auto response = meta->response.mutable_txn_hb_res();
-        if (response->has_key_error()) {
-            DB_WARNING("txn heart beat error, request: %s, response: %s", 
-                    request->ShortDebugString().c_str(),
-                    response->ShortDebugString().c_str());
-            return -1;
-        } 
-        return response->lock_ttl();
+    auto region = cluster->region_cache->get_region(meta.region_ver);
+    int r = cluster->rpc_client->send_request(region->leader, 
+                                              &meta.cntl, 
+                                              &meta.request, 
+                                              &meta.response, 
+                                              NULL);   
+    if (r < 0) {
+        CHECK("txn heart beat" == 0);
     }
+    auto response = meta.response.mutable_txn_hb_res();
+    if (response->has_key_error()) {
+        DB_WARNING("txn heart beat error, request: %s, response: %s", 
+                request->ShortDebugString().c_str(),
+                response->ShortDebugString().c_str());
+        return -1;
+    } 
+    return response->lock_ttl();
 }
 
 void TTLManager::keep_alive(std::shared_ptr<TwoPhaseCommitter> committer) {
@@ -156,7 +147,6 @@ int TwoPhaseCommitter::do_action_on_keys(BackOffer& bo, const std::vector<std::s
         // pwrite/rollback
         do_action_on_batchs(bo, batchs, action);
     }
-    
     return 0;
 }
 
@@ -179,37 +169,36 @@ int TwoPhaseCommitter::do_action_on_batchs(BackOffer& bo, const std::vector<Batc
 int TwoPhaseCommitter::pwrite_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
     uint64_t batch_txn_size = region_txn_size[batch.region_ver.region_id];
 
+    AsyncSendMeta meta(cluster, batch.region_ver);
+    pb::PwriteRequest* request = meta.request.mutable_pwrite_req();         
+    
+    request->set_primary_lock(primary_lock);
+    request->set_start_version(start_ts);
+    request->set_lock_ttl(lock_ttl);
+    request->set_txn_size(batch_txn_size);
+    request->set_max_commit_ts(max_commit_ts);
+
+    if (use_async_commit) {
+        // TODO: 异步commit的逻辑
+    } else {
+        // TODO: pessimistic lock怎么处理
+        // 同步commit，start_ts + 1 读到最新值原则
+        request->set_min_commit_ts(start_ts + 1);
+    }
+
     for (;;) {
-        AsyncSendMeta* meta = new AsyncSendMeta(cluster, batch.region_ver);
-        pb::PwriteRequest* request = meta->request.mutable_pwrite_req();         
-        
-        request->set_primary_lock(primary_lock);
-        request->set_start_version(start_ts);
-        request->set_lock_ttl(lock_ttl);
-        request->set_txn_size(batch_txn_size);
-        request->set_max_commit_ts(max_commit_ts);
-
-        if (use_async_commit) {
-            // TODO: 异步commit的逻辑
-        } else {
-            // TODO: pessimistic lock怎么处理
-            // 同步commit，start_ts + 1 读到最新值原则
-            request->set_min_commit_ts(start_ts + 1);
-        }
-
         // pwrite同步发送
-        auto region = cluster->region_cache->get_region(meta->region_ver);
+        auto region = cluster->region_cache->get_region(meta.region_ver);
         int r = cluster->rpc_client->send_request(region->leader, 
-                                                  &meta->cntl, 
-                                                  &meta->request, 
-                                                  &meta->response, 
+                                                  &meta.cntl, 
+                                                  &meta.request, 
+                                                  &meta.response, 
                                                   NULL);   
         if (r < 0) {
-            // rpc错误
-            return -1;
+            CHECK("pwrite failed" == 0);
         }
 
-	auto response = meta->response.mutable_pwrite_res();
+	    auto response = meta.response.mutable_pwrite_res();
         // 处理pwrite结果：有key没有pwrite成功
         if (response->key_error_size() != 0) {
             std::vector<std::shared_ptr<Lock>> locks;
@@ -225,8 +214,11 @@ int TwoPhaseCommitter::pwrite_single_batch(BackOffer& bo, const BatchKeys& batch
             auto ms_before_expired = cluster->lock_resolver->resolve_lock_for_write(bo, start_ts, locks);
             if (ms_before_expired > 0) {
                 bo.backoff_with_max_sleep(BoTxnLock, ms_before_expired);
+                continue;
+            } else {
+                return -1;
             }
-            continue;
+            // 继续等待expired time后查看事务状态
         } else {
             if (batch.keys[0] == primary_lock) {
                 // 在primary lock写入成功后， 如果事务大小大于32M
@@ -239,11 +231,12 @@ int TwoPhaseCommitter::pwrite_single_batch(BackOffer& bo, const BatchKeys& batch
                 // TODO: 异步commit的逻辑
             }
         }
+        return 0;
     }
 }
 
 int TwoPhaseCommitter::commit_single_batch(BackOffer& bo, const BatchKeys& batch, Action action) {
+    return 0;
 }
-
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

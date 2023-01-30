@@ -15,8 +15,6 @@ constexpr uint64_t TTLRunThreshold = 32 * 1024 * 1024; // 32M
 constexpr uint64_t PessimisticLockBackoff = 20000;     // 20s
 constexpr uint32_t TxnCommitBatchSize = 16 * 1024;
 
-int64_t txn_lock_ttl(std::chrono::milliseconds start, uint64_t txn_size);
-
 int64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster, 
         std::string& primary_lock, uint64_t start_ts, uint64_t new_ttl);
 

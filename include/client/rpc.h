@@ -6,6 +6,7 @@
 #include <gflags/gflags.h>
 #include <butil/time.h>
 #include <bthread/mutex.h>
+#include <brpc/channel.h>
 
 #include "proto/store.pb.h"
 #include "common/log.h"
@@ -32,7 +33,26 @@ public:
         brpc::Controller* cntl,
         const T1* request,
         T2* response, 
-        google::protobuf::Closure* done);
+        google::protobuf::Closure* done) {
+
+        auto channel = get_conn(addr);
+        if (channel == nullptr) {
+            DB_FATAL("Get channel for addr: %s failed", addr.c_str());
+            return -1;
+        }
+        uint64_t log_id = butil::fast_rand();
+        cntl->set_log_id(log_id);
+        
+        DB_DEBUG("[send] request %s", request->ShortDebugString().c_str());    
+        pb::StoreService_Stub stub(channel);
+        stub.query(cntl, request, response, done);
+
+        if (done == NULL && cntl->Failed()) {
+            DB_FATAL("[resp] request %s cntl failed", request->ShortDebugString().c_str()); 
+            return -1;
+        }
+        return 0;
+    }
     
 
 private:

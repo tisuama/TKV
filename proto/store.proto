@@ -52,6 +52,9 @@ message StoreRes {
     repeated KVPair          kvpairs = 12;
     optional TxnHBResponse   txn_hb_res = 13;
     optional PwriteResponse  pwrite_res = 14;
+    optional CheckTxnStatusResponse check_txn_res = 15;
+    optional CommitResponse  commit_res = 16;
+    optional ResolveLockResponse resolve_res = 17;
 };
 
 message StoreReq {
@@ -70,8 +73,11 @@ message StoreReq {
     optional bool  select_without_leader = 13; // selcet 不判断Leader
     optional int64 num_increase_rows     = 14;
     repeated BatchData      batch_data   = 15;
-    optional TxnHBRequest   txn_hb_req      = 16;
+    optional TxnHBRequest   txn_hb_req   = 16;
     optional PwriteRequest  pwrite_req   = 17;
+    optional CheckTxnStatusRequest check_txn_req = 18;
+    optional CommitRequest  comit_req    = 19;
+    optional ResolveLockRequest resolve_req = 20;
 };
 
 /******************* 初始化相关 ******************/
@@ -98,6 +104,11 @@ message AlreadyExist {
     required bytes   key = 1;
 };
 
+message TxnNotFound {
+    optional uint64  start_ts = 1;
+    optional bytes   primary_key = 2;
+};
+
 message KeyError {
     optional LockInfo locked     = 1;
     //  optional string   retryable  = 2;   // 停止使用
@@ -106,7 +117,7 @@ message KeyError {
     optional AlreadyExist  already_exist = 5;
     //  DeadLock      deadlock      = 6;
     //  CommitTsExpired commit_ts_expired = 7;
-    //  TxnNotFound   txn_not_found = 8;
+    optional TxnNotFound   txn_not_found = 8;
     //  CommitTsTooLarge commit_ts_too_large = 9;
 };
 enum TxnOp {
@@ -170,10 +181,10 @@ message PwriteResponse {
 
 message LockInfo {
     required bytes  primary_lock = 1;   // primary_lock
-    optional uint64 lock_version = 2;   // txn_id
+    optional uint64 lock_version = 2;   // 等价于start_ts
     optional bytes  key          = 3;
     optional uint64 lock_ttl     = 4;
-    optional uint64 txn_size     = 5;
+    optional uint64 txn_size     = 5;   // 该region所涉及本事务的大小
     optional TxnOp  lock_type    = 6;
     optional uint64 lock_for_update_ts = 7;
     optional bool   use_async_commit = 8;
@@ -186,6 +197,8 @@ message CheckTxnStatusRequest {
     required bytes    primary_key = 1;
     optional uint64   lock_ts     = 2;
     optional uint64   caller_start_ts = 3;
+    // 当前时间戳，用来结合Lock的TTL判断Lock是否过期
+    // current_ts = 0 时Lock必须解锁，无论处于哪种状态
     optional uint64   current_ts  = 4;
     optional bool     rollback_if_not_exist = 5;
     optional bool     force_sync_commit = 7;
@@ -194,6 +207,10 @@ message CheckTxnStatusRequest {
 
 message CheckTxnStatusResponse {
     optional KeyError  key_error = 1;
+    // 事务状态的三种情况：
+    // locked: lock_ttl > 0
+    // committed: lock_ttl == 0 && commit_version > 0
+    // rollbacked: lock_ttl == 0 && commit_version == 0
     optional uint64    lock_ttl  = 2;
     optional uint64    commit_version = 3;
     optional Action    action    = 5;
@@ -212,4 +229,23 @@ message CommitResponse {
     optional uint64   commit_version = 2;
 };
 
+// ResolveLock 请求
+message TxnInfo {
+    optional uint64 txn    = 1;
+    optional uint64 status = 2;
+};
+
+message ResolveLockRequest {
+    optional uint64  start_version  = 1;
+    // commit_version == 0: 该事务已经被回滚
+    // commit_version > 0: 该事务已经提交
+    optional uint64  commit_version = 2;
+    repeated TxnInfo txn_infos = 3;
+    // 指定key
+    repeated bytes   keys = 4;
+};
+
+message ResolveLockResponse {
+    optional KeyError key_error = 1;
+};
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
