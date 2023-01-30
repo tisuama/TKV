@@ -1,5 +1,6 @@
 #pragma once
 #include "client/cluster.h"
+#include "client/2pc.h"
 #include <string>
 
 namespace TKV {
@@ -19,9 +20,30 @@ struct Txn {
         , start_ts(cluster->meta_client->gen_tso())
         , start_time(butil::gettimeofday_ms())
     {}
+
+    void set(const std::string& key, const std::string& value) {
+        buffer.emplace(key, value);
+    }
+
+    std::pair<std::string, bool> get(const std::string& key) {
+        auto it = buffer.find(key);
+        if (it != buffer.end()) {
+            return std::make_pair(it->second, true);
+        }
+
+        return std::make_pair("", false);
+        // TODO: 快照读
+        // Snapshot snapshot(cluster, start_ts);
+        // std::string value = snapshot.Get(key);
+        // if (value.empty()) {
+        //     return std::make_pair("", false);
+        // }
+        // return std::make_pair(value, true);
+    }
     
-    void commit() {
+    int commit() {
         auto committer = std::make_shared<TwoPhaseCommitter>(this);
+        return committer->execute();
     }    
 
     void walk_buffer(std::function<void(const std::string&, const std::string&)> fn) {

@@ -89,7 +89,9 @@ struct KeyLocation {
     {}
 
     bool contains(const std::string& key) const {
-        return key >= start_key && (key < end_key || end_key.empty());
+        return region_ver.region_id != 0 && 
+               key >= start_key && 
+               (key < end_key || end_key.empty());
     }
 };
 

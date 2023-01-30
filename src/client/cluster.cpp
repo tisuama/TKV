@@ -9,7 +9,14 @@ int Cluster::init() {
     /* init meta client */
     int ret = meta_client->init();
     if (ret < 0) {
-        return -1;
+        return ret;
+    }
+
+    lock_resolver = std::make_shared<LockResolver>(shared_from_this());
+
+    ret = TKV::init_log("client");
+    if (ret < 0) {
+        return ret;
     }
 
     /* set inited */

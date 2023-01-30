@@ -86,7 +86,7 @@ TwoPhaseCommitter::TwoPhaseCommitter(Txn* txn, bool use_async_commit)
     }
 }
 
-void TwoPhaseCommitter::execute() {
+int TwoPhaseCommitter::execute() {
     // 2pc执行流程
     if (use_async_commit) {
         // TODO: 异步commit的逻辑
@@ -94,7 +94,12 @@ void TwoPhaseCommitter::execute() {
 
     // step1: pwrite keys
     BackOffer pwrite_bo(PwriteMaxBackOff);
-    pwrite_keys(pwrite_bo, keys);
+    int ret = 0;
+    ret = pwrite_keys(pwrite_bo, keys);
+    
+    if (ret < 0) {
+        return ret;
+    }
 
     if (use_async_commit) {
         // TODO: 异步commit的逻辑
@@ -103,9 +108,10 @@ void TwoPhaseCommitter::execute() {
     // step2: commit keys
     commit_ts = cluster->meta_client->gen_tso();
     BackOffer commit_bo(CommitMaxBackOff);
-    commit_keys(commit_bo, keys);
+    ret = commit_keys(commit_bo, keys);
 
     ttl_manager.close();
+    return ret;
 }
 
 int TwoPhaseCommitter::do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action) {
@@ -138,16 +144,17 @@ int TwoPhaseCommitter::do_action_on_keys(BackOffer& bo, const std::vector<std::s
         batchs[0].is_primary = true;
     }
 
+    int action_result = 0;
     if (action == TxnCommit || action == TxnCleanUp) {
         // commit
-        do_action_on_batchs(bo, std::vector<BatchKeys>(batchs.begin(), batchs.begin() + 1), action);
+        action_result = do_action_on_batchs(bo, std::vector<BatchKeys>(batchs.begin(), batchs.begin() + 1), action);
         batchs = std::vector<BatchKeys>(batchs.begin() + 1, batchs.end());
     }
     if (action != TxnCommit) {
         // pwrite/rollback
-        do_action_on_batchs(bo, batchs, action);
+        action_result = do_action_on_batchs(bo, batchs, action);
     }
-    return 0;
+    return action_result;
 }
 
 int TwoPhaseCommitter::do_action_on_batchs(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action) {
@@ -177,6 +184,10 @@ int TwoPhaseCommitter::pwrite_single_batch(BackOffer& bo, const BatchKeys& batch
     request->set_lock_ttl(lock_ttl);
     request->set_txn_size(batch_txn_size);
     request->set_max_commit_ts(max_commit_ts);
+    
+    DB_DEBUG("[Pwrite] region_ver: %s, request: %s", 
+            batch.region_ver.to_string().c_str(), 
+            meta.request.ShortDebugString().c_str());
 
     if (use_async_commit) {
         // TODO: 异步commit的逻辑

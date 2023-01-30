@@ -70,7 +70,7 @@ class TwoPhaseCommitter: public std::enable_shared_from_this<TwoPhaseCommitter> 
 public:
     explicit TwoPhaseCommitter(Txn* txn, bool use_async_commit = false);
 
-    void execute();
+    int execute();
 
 private:
     enum Action {
@@ -92,12 +92,12 @@ private:
 
     void calculate_max_commit_ts();
 
-    void pwrite_keys(BackOffer& bo, const std::vector<std::string>& keys) {
-        do_action_on_keys(bo, keys, TxnPwrite);
+    int pwrite_keys(BackOffer& bo, const std::vector<std::string>& keys) {
+        return do_action_on_keys(bo, keys, TxnPwrite);
     }
 
-    void commit_keys(BackOffer& bo, const std::vector<std::string>& keys) {
-        do_action_on_keys(bo, keys, TxnCommit);
+    int commit_keys(BackOffer& bo, const std::vector<std::string>& keys) {
+        return do_action_on_keys(bo, keys, TxnCommit);
     }
 
     int do_action_on_keys(BackOffer& bo, const std::vector<std::string>& keys, Action action);

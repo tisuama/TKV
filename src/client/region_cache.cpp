@@ -32,6 +32,7 @@ KeyLocation RegionCache::locate_key(const std::string& key) {
 }
 
 void RegionCache::reload_region() {
+    DB_DEBUG("start reload region info");
     std::vector<pb::RegionInfo> region_infos;
     // span and load region info
     int ret = 0;
@@ -101,6 +102,7 @@ RegionCache::group_keys_by_region(const std::vector<std::string>& keys) {
         if (!location.contains(key)) {
             location = locate_key(key);
         }
+        DB_DEBUG("locate key: %s, locate: %s", key.c_str(), location.region_ver.to_string().c_str());
         result[location.region_ver].push_back(key);
     }
     return result;

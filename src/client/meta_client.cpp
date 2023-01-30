@@ -25,8 +25,6 @@ int MetaClient::reload_region(std::vector<pb::RegionInfo>& region_infos) {
     request.set_op_type(pb::QUERY_REGION);
     request.set_table_name(_table_name);
 
-    DB_DEBUG("meta query: %s", request.DebugString().c_str());
-    
     auto meta = MetaServerInteract::get_instance();
     int ret = meta->send_request("query", request, response);    
     if (!ret) {

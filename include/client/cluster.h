@@ -21,7 +21,6 @@ public:
         , rpc_client(std::make_shared<RpcClient>())
         , oracle(std::make_shared<Oracle>(meta_client, 
                     std::chrono::milliseconds(oracle_update_interval)))
-	    , lock_resolver(std::make_shared<LockResolver>(shared_from_this()))
     {}
 
     int init(); 
