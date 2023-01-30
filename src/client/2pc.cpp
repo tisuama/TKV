@@ -13,6 +13,7 @@ int64_t send_txn_heart_beat(BackOffer& bo, std::shared_ptr<Cluster> cluster,
     auto loate = cluster->region_cache->locate_key(primary_lock);
     AsyncSendMeta meta(cluster, loate.region_ver);
     auto request = meta.request.mutable_txn_hb_req(); 
+    meta.request.set_op_type(pb::OP_TXN_HEART_BEAT);
     
     request->set_primary_lock(primary_lock);
     request->set_start_version(start_ts);
@@ -177,6 +178,7 @@ int TwoPhaseCommitter::pwrite_single_batch(BackOffer& bo, const BatchKeys& batch
     uint64_t batch_txn_size = region_txn_size[batch.region_ver.region_id];
 
     AsyncSendMeta meta(cluster, batch.region_ver);
+    meta.request.set_op_type(pb::OP_PWRITE);
     pb::PwriteRequest* request = meta.request.mutable_pwrite_req();         
     
     request->set_primary_lock(primary_lock);

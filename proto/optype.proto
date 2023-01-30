@@ -13,10 +13,6 @@ enum OpType {
     OP_UPDATE                               = 3;
     OP_SELECT                               = 4;
 
-    OP_BEGIN                                = 5;
-    OP_COMMIT                               = 6;
-    OP_ROLLBACK                             = 7;
-    OP_KILL                                 = 8;
     OP_START_SPLIT                          = 9;  //走raft,创建迭代器，取出index
     OP_START_SPLIT_FOR_TAIL                 = 10; //分发数据完成之后，验证请求的有效性
     OP_VALIDATE_AND_ADD_VERSION             = 11; //分裂时version + 1
@@ -125,6 +121,13 @@ enum OpType {
     OP_UPDATE_TABLE_COMMENT                 = 191; // 修改表的comment
 
 	// 新增加的op_type
+    OP_PWRITE                               = 200;
+    OP_COMMIT                               = 201;
+    OP_ROLLBACK                             = 202;
+    OP_KILL                                 = 203;
+    OP_TXN_HEART_BEAT                       = 204;
+    OP_GET_TXN_STATUS                       = 205;
+    OP_RESOLVE_LOCK                         = 206;
 };
 
 enum QueryOpType {

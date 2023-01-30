@@ -134,6 +134,7 @@ TxnStatus LockResolver::get_txn_status(BackOffer& bo, uint64_t txn_id,
 
     auto location = cluster->region_cache->locate_key(primary);
     AsyncSendMeta meta(cluster,  location.region_ver);
+    meta.request.set_op_type(pb::OP_GET_TXN_STATUS);
     pb::CheckTxnStatusRequest* request = meta.request.mutable_check_txn_req();
     request->set_primary_key(primary);
     request->set_lock_ts(txn_id);
@@ -190,6 +191,7 @@ int LockResolver::resolve_lock(BackOffer& bo, std::shared_ptr<Lock> lock,
     }
     
     AsyncSendMeta meta(cluster, locate.region_ver);
+    meta.request.set_op_type(pb::OP_RESOLVE_LOCK);
     pb::ResolveLockRequest* request = meta.request.mutable_resolve_req();
     request->set_start_version(lock->txn_id);
     if (status.is_committed()) {

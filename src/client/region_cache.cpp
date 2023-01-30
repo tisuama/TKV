@@ -25,9 +25,11 @@ KeyLocation RegionCache::locate_key(const std::string& key) {
     reload_region();
     
     region = search_cache_region(key);
+    if (!region) {
+        CHECK("locate key failed" == 0);
+    }
     
     DB_DEBUG("Locate key: %s to region_id: %ld", key.c_str(), region->region_id());
-    
     return KeyLocation(region->ver_id(), region->start_key(), region->end_key());
 }
 

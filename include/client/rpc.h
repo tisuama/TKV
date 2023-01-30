@@ -48,7 +48,7 @@ public:
         stub.query(cntl, request, response, done);
 
         if (done == NULL && cntl->Failed()) {
-            DB_FATAL("[resp] request %s cntl failed", request->ShortDebugString().c_str()); 
+            DB_FATAL("[resp] request %s cntl failed", cntl->ErrorText().c_str()); 
             return -1;
         }
         return 0;

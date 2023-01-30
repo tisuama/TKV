@@ -11,9 +11,17 @@ struct AsyncSendMeta {
         : cluster(cluster)
         , region_ver(region_ver)
         , region_id(region_ver.region_id)
-    {}
+    {
+        // set common fields for store request
+        set_common_fields();
+    }
     
     ~AsyncSendMeta() {
+    }
+
+    void set_common_fields() {
+        request.set_region_id(region_id);
+        request.set_region_version(region_ver.ver);
     }
     
     // 处理RPC send失败
