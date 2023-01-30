@@ -139,7 +139,10 @@ enum Action {
 	LOCK_NOT_EXIST_DO_NOTHING = 6;
 };
 
-// 更新悲观事务和大事务的LOCK_TTL，防止被kill
+// 更新悲观事务和大事务的primary lock的TTL，防止被kill
+// 在事务的primary lock上使用，primary lock通过以下方式产生:
+// 1) 悲观事务的AcquirePessimisticLock操作
+// 2) 乐观事务的Pwrite操作
 message TxnHBRequest {
     required bytes      primary_lock    = 1;
     optional uint64     start_version   = 2; // 大事务的start timestamp
@@ -160,6 +163,8 @@ message Mutation {
 // Pwrite Phase
 message PwriteRequest {
     repeated Mutation mutations         = 1;
+    // 选择一个key作为primary lock，作为事务状态的判断依据
+    // 其他锁都指向这个primary lock
     optional bytes    primary_lock      = 2; 
     optional uint64   start_version     = 3;
     optional uint64   lock_ttl          = 4;
@@ -167,10 +172,10 @@ message PwriteRequest {
     optional uint64   txn_size          = 6;
     optional uint64   for_update_ts     = 7;     // 仅对悲观事务有效，用来检测冲突
     optional uint64   min_commit_ts     = 8;     // min_commit_ts > 0, 大事务
-    optional bool     use_async_commit  = 9;
-    repeated bytes    secondaries       = 10;
+    optional bool     use_async_commit  = 9;     // 异步commit使用
+    repeated bytes    secondaries       = 10;    // 异步commit使用
     optional bool     try_one_pc        = 11;
-    optional uint64   max_commit_ts     = 12;   // 用在online ddl中防止不一致
+    optional uint64   max_commit_ts     = 12;    // 用在online ddl中防止不一致
 };
 
 message PwriteResponse {
@@ -192,7 +197,7 @@ message LockInfo {
     repeated bytes  secondaries = 10;
 };
 
-// 检查事务状态相关
+// 检查事务状态相关 => 决定如何处理冲突
 message CheckTxnStatusRequest {
     required bytes    primary_key = 1;
     optional uint64   lock_ts     = 2;
@@ -231,6 +236,7 @@ message CommitResponse {
 
 // ResolveLock 请求
 // 对于被start_version锁住的事务，要么commit，要么回滚 => 解锁
+// Percolate依赖对同一个key的其他事务的并发读写来决定失败的(crash)状态事务的处理
 message TxnInfo {
     optional uint64 txn    = 1;
     optional uint64 status = 2;
