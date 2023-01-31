@@ -145,17 +145,19 @@ int TwoPhaseCommitter::do_action_on_keys(BackOffer& bo, const std::vector<std::s
         batchs[0].is_primary = true;
     }
 
-    int action_result = 0;
+    int ret = 0;
     if (action == TxnCommit || action == TxnCleanUp) {
-        // commit
-        action_result = do_action_on_batchs(bo, std::vector<BatchKeys>(batchs.begin(), batchs.begin() + 1), action);
+        // commit阶段primary key需要先处理
+        ret = do_action_on_batchs(bo, std::vector<BatchKeys>(batchs.begin(), batchs.begin() + 1), action);
         batchs = std::vector<BatchKeys>(batchs.begin() + 1, batchs.end());
     }
-    if (action != TxnCommit) {
-        // pwrite/rollback
-        action_result = do_action_on_batchs(bo, batchs, action);
+    if (action == TxnCommit) {
+        // secondaries 可以改成异步提交
+        ret = do_action_on_batchs(bo, batchs, action);
+    } else {
+        ret = do_action_on_batchs(bo, batchs, action);
     }
-    return action_result;
+    return ret;
 }
 
 int TwoPhaseCommitter::do_action_on_batchs(BackOffer& bo, const std::vector<BatchKeys>& batchs, Action action) {
