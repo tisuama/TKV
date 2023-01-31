@@ -49,7 +49,7 @@ void TTLManager::keep_alive(std::shared_ptr<TwoPhaseCommitter> committer) {
         // 事务保活机制，延长事务执行时间
         BackOffer bo(PessimisticLockMaxBackOff);
         uint64_t now = committer->cluster->oracle->get_low_resolution_ts();
-        uint64_t uptime = extract_physical(now) - extract_physical(committer->start_ts);
+        uint64_t uptime = TSO::extract_physical(now) - TSO::extract_physical(committer->start_ts);
         uint64_t new_ttl = uptime + ManagedLockTTL;
         
         auto ret = send_txn_heart_beat(bo, 

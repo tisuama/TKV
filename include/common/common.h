@@ -563,11 +563,18 @@ namespace TSO {
 constexpr int64_t update_timestamp_interval_ms = 1000LL;  // 暂时设置成1s
 constexpr int64_t update_timestamp_guard_ms = 10LL;       // 10ms
 constexpr int64_t save_interval_ms = 3000LL;              // 3s
-constexpr int logical_bits = 18;
-constexpr int64_t max_logical = 1 << logical_bits;
+constexpr int physical_bits = 18;
+constexpr int64_t max_logical = 1 << physical_bits;
 
+inline int64_t extract_physical(uint64_t ts) {
+    return ts >> physical_bits;
+}
 inline int64_t clock_realtime_ms() {
     return butil::gettimeofday_ms();
+}
+
+inline int64_t tso_sub(uint64_t ts1, uint64_t ts2) {
+    return extract_physical(ts1) - extract_physical(ts2);
 }
 } // namespace TSO
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

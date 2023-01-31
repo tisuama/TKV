@@ -3,10 +3,6 @@
 #include "client/meta_client.h"
 
 namespace TKV {
-constexpr int physical_bits = 18;
-inline int64_t extract_physical(uint64_t ts) {
-    return ts >> physical_bits;
-}
 
 class Oracle {
 public:
