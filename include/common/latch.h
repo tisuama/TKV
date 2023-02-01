@@ -3,7 +3,7 @@
 #include "common/common.h"
 
 namespace TKV {
-constexpr int LatchListCount  = 5; 
+constexpr int LatchListCount  = 6; 
 constexpr int LatchExpireTime = 120; // 120s
 
 struct TxnLock {

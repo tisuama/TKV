@@ -244,6 +244,20 @@ add_executable(test_store_server
 	)
 target_link_libraries(test_store_server ${DEP_LIB})
 
+add_executable(test_latch
+	test/test_latch.cpp
+	$<TARGET_OBJECTS:common_src_lib>
+	$<TARGET_OBJECTS:proto_src_lib>
+	$<TARGET_OBJECTS:meta_server_lib>
+	$<TARGET_OBJECTS:engine_src_lib>
+	$<TARGET_OBJECTS:store_interact_lib>
+	$<TARGET_OBJECTS:store_src_lib>
+	$<TARGET_OBJECTS:raft_src_lib>
+	$<TARGET_OBJECTS:meta_interact_lib>
+	$<TARGET_OBJECTS:raft_meta_src_lib>
+	)
+target_link_libraries(test_latch ${DEP_LIB})
+
 add_executable(rocks_bench
 	tool/rocks_bench.cpp
 	$<TARGET_OBJECTS:common_src_lib>
