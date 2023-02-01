@@ -142,10 +142,11 @@ TxnLock* Latches::release_slot(TxnLock* lock) {
         return nullptr;
     }
 
-    int idx = 0;
-    for (; idx < (int)latch.waiting.size(); idx++) {
-        auto wait = latch.waiting[idx];
+    for (auto it = latch.waiting.begin(); it != latch.waiting.end(); it++) {
+        auto wait = *it;
         if (wait->keys[wait->acquired_count] == key) {
+            // 从waiting列表删除
+            latch.waiting.erase(it);
             return wait;
         }
     }
