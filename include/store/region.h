@@ -19,6 +19,7 @@
 #include "common/concurrency.h"
 
 namespace TKV {
+
 struct RegionResource {
     pb::RegionInfo region_info;
 };

@@ -128,6 +128,9 @@ enum OpType {
     OP_TXN_HEART_BEAT                       = 204;
     OP_GET_TXN_STATUS                       = 205;
     OP_RESOLVE_LOCK                         = 206;
+
+    // 读操作
+    OP_SNAPSHOT_READ                        = 207;
 };
 
 enum QueryOpType {

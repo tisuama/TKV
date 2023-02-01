@@ -111,7 +111,9 @@ private:
 private:
     friend class TTLManager;
 
+    // 所有修改操作
     std::unordered_map<std::string, std::string> mutations;
+    // 所有修改数据的key
     std::vector<std::string> keys;
     
     uint64_t start_ts  {0};
@@ -128,6 +130,7 @@ private:
     std::unordered_map<uint64_t, int> region_txn_size;
     uint64_t txn_size;
 
+    // 锁的最长生命周期，持锁时间太长会被其他事务清除，本事务则回滚
     int lock_ttl = 0;
 
     std::string primary_lock;
@@ -139,6 +142,8 @@ private:
     TTLManager  ttl_manager;
 
     Bthread     worker;
+
+    // TODO: undetermined_err: 不能确定事务状态的错误，例如网络原因没有commit的response
 };
 
 } // namespace TKV

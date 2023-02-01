@@ -167,7 +167,8 @@ message PwriteRequest {
     // 其他锁都指向这个primary lock
     optional bytes    primary_lock      = 2; 
     optional uint64   start_version     = 3;
-    optional uint64   lock_ttl          = 4;
+    // 锁的最长生命周期，持锁时间太长会被其他事务清除，本事务回滚
+    optional uint64   lock_ttl          = 4; 
     optional bool     skip_constraint_check = 5; // 加速data migration
     optional uint64   txn_size          = 6;
     optional uint64   for_update_ts     = 7;     // 仅对悲观事务有效，用来检测冲突

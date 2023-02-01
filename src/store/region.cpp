@@ -396,7 +396,6 @@ int Region::on_snapshot_load(braft::SnapshotReader* reader) {
 
 void Region::on_snapshot_load_for_restart(braft::SnapshotReader* reader, 
         std::map<int64_t, std::string>& prepared_log_entrys) {
-    // TODO: 考虑没有committed的日志
     // Read applied index from meta_cf 
     _meta_writer->read_applied_index(_region_id, &_applied_index, &_data_index);
     _num_table_lines = _meta_writer->read_num_table_lines(_region_id);
@@ -526,6 +525,9 @@ void Region::query(::google::protobuf::RpcController* controller,
         return ;
     }
     
+    // MVCC事务实现
+    // 1. 写操作必须走Latch -> Pwrite -> Commit流程
+    // 2. 读操作直接通过快照读取
     switch(request->op_type()) {
         case pb::OP_NONE: 
             apply(request, response, cntl, done_guard.release());
@@ -612,6 +614,7 @@ void Region::do_apply(int64_t term, int64_t index, const pb::StoreReq& request, 
     _region_info.set_log_index(index);
     _applied_index = index;
     pb::StoreRes res;
+    
     switch(request.op_type()) {
         case pb::OP_NONE:
             _meta_writer->update_apply_index(_region_id, _applied_index, _data_index);
@@ -639,7 +642,6 @@ void Region::on_shutdown() {
 void Region::on_leader_start(int64_t term) {
     DB_WARNING("region_id: %ld Leader start at term: %ld", _region_id, term);
     _region_info.set_leader(butil::endpoint2str(get_leader()).c_str());
-    // TODO: APPLYING_TXN 指定
     leader_start(term);
 }
 
@@ -652,14 +654,12 @@ void Region::leader_start(int64_t term) {
 void Region::on_leader_stop() {
     DB_WARNING("region_id: %ld Leader stop", _region_id);
     _is_leader.store(false);
-    // TODO: 只读事务清理
 }
 
 void Region::on_leader_stop(const butil::Status& status) {
     DB_WARNING("region_id: %ld Leader stop, err_code: %d, err_msg: %s",
             _region_id, status.error_code(), status.error_cstr());
     _is_leader.store(false);
-    // 只读事务清理
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
