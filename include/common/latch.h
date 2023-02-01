@@ -12,21 +12,16 @@ struct TxnLock {
     int                         acquired_count;
     uint64_t                    start_ts;
     uint64_t                    commit_ts;
-    // 当前start_ts过期
-    bool                        is_stale;
-
-    bool is_stale() const {
-        return is_stale;
-    }
 
     bool is_locked() const {
-        return !is_stale && acquired_count != required_slots.size(); 
+        return acquired_count != (int)required_slots.size(); 
     }
 };
 
 struct Node {
     int         slot_id;
     std::string key;
+    // 客户端可使用提前check掉一些请求s
     uint64_t    max_commit_ts;
     TxnLock*    value;
     Node*       next;
@@ -52,41 +47,36 @@ struct Latch {
         bthread_mutex_destroy(&bmutex);
     }
 
+    int recycle(uint64_t current_ts);
+
     Node*   queue;      // 当前Latch下第一个节点
     int     count;      // 当前Latch下Lock节点数量
-    std::vector<TxnLock> waiting; // 当前Latch下加锁失败等待的数量
+    std::vector<TxnLock*> waiting; // 当前Latch下加锁失败等待的数量
     bthread_mutex_t      bmutex;
-};
-
-enum LatcheResult {
-    AcquireSuccess = 0,
-    AcquireLocked,
-    AcquireStale
 };
 
 class Latches {
 public:
     Latches(int size)
-        : slots.resize(size)
-    {}
+    {
+        _slots.resize(size);
+    }
 
     TxnLock* gen_lock(uint64_t start_ts, std::vector<std::string>& keys);
     
-    AcquireResult acquire(TxnLock* lock);    
+    bool  acquire(TxnLock* lock);    
 
-    AcquireResult acquire_slot(TxnLock* lock);
+    bool acquire_slot(TxnLock* lock);
 
     // release all latches owned by the 'lock'
-    std::vector<Lock*> release(Lock* lock);    
+    std::vector<TxnLock*> release(TxnLock* lock);    
     
 private:
     std::vector<int> gen_slot_ids(std::vector<std::string>& keys);
-
-    int recycle(uint64_t current_ts);
     
     Node* find_node(Node* list, const std::string& key);
 
-    Lock* release_slot(Lock* lock);
+    TxnLock* release_slot(TxnLock* lock);
 
     std::vector<Latch> _slots;
 };

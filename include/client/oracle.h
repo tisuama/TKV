@@ -26,7 +26,7 @@ public:
     }
 
     int64_t util_expired(uint64_t lock_ts, uint64_t ttl) {
-        return extract_physical(lock_ts) + ttl - extract_physical(last_ts);
+        return TSO::extract_physical(lock_ts) + ttl - TSO::extract_physical(last_ts);
     }
 
     uint64_t get_low_resolution_ts() {

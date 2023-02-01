@@ -59,7 +59,7 @@ int64_t MetaClient::gen_tso() {
         break;
     }
     auto& tso = response.start_timestamp();
-    int64_t timestamp = (tso.physical() << TSO::logical_bits) + tso.logical();
+    int64_t timestamp = (tso.physical() << TSO::physical_bits) + tso.logical();
     return timestamp;
 }
 } // namespace TKV
