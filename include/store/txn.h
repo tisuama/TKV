@@ -6,7 +6,32 @@
 #pragma once
 
 namespace TKV {
+/* 
+src/service/kv.rs:1869
+1. macro_rules! txn_command_future
+sched_txn_command
+
+The entry point of the storage scheduler.
+src/storage/mod.rs:1416
+2. pub fn sched_txn_command<T: StorageCallbackType>
+
+3.scheduler.rs:531
+schedule_command
+  execute(task)
+    process(snapshot, task)
+        process_write(snapshot, task, &mut statistics)
+
+4.process_write:490
+command/prewrite.rs
+    pwrite(&mut txn, &mut reader, context.extra_op)
+
+5.process_write:32
+actions/prewrite.rs
+    pwrite(txn, reader, txn_props, mutation, secondary_keys..)
+*/
+
 // 事务的内存数据结构
+
 class Txn {
 public:
     Txn(uint64_t start_ts, uint64_t lock_ttl, std::string primary)
@@ -15,12 +40,12 @@ public:
         , _primary_lock(primary)
     {}
 
-    
     void pwrite(const pb::Mutation& m, const std::string& primary);
 
     void commit(const std::string& key, uint64_t commit_ts);
 
 private:
+
     std::vector<std::string>                    _keys;
     std::unordered_map<std::string, std::string> _mutations;
     // start_ts可以作为txn_id使用

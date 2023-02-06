@@ -162,6 +162,14 @@ message Mutation {
 
 // Pwrite Phase
 message PwriteRequest {
+    enum PessimisticAction {
+        // 1. key不需要被locked, 不需要write conflict检测
+        SKIP_PESSIMISTIC_CHECK = 0;
+        // 2. key在prewrite需要已经被locked
+        DO_PESSIMISTIC_CHECK   = 1;
+        // 3. key不需要悲观锁，但是需要做data contraint检测
+        DO_CONSTRINT_CHECK     = 2;
+    };
     repeated Mutation mutations         = 1;
     // 选择一个key作为primary lock，作为事务状态的判断依据
     // 其他锁都指向这个primary lock
