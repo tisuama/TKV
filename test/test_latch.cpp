@@ -1,5 +1,5 @@
 #include <iostream>
-#include "common/latch.h"
+#include "txn/latch.h"
 
 using namespace TKV;
 

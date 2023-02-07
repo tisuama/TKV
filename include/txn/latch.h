@@ -12,6 +12,7 @@ struct TxnLock {
     int                         acquired_count;
     uint64_t                    start_ts;
     uint64_t                    commit_ts;
+    BthreadCond                 cond;
 
     bool is_locked() const {
         return acquired_count != (int)required_slots.size(); 
@@ -27,7 +28,7 @@ struct Node {
     Node*       next;
 };
 
-// Latches  | latch1 | latch2 | latch3 |
+// Latches:  | latch1 | latch2 | latch3 |
 //              ||
 //              \/
 //             node1
@@ -64,7 +65,7 @@ public:
 
     TxnLock* gen_lock(uint64_t start_ts, std::vector<std::string>& keys);
     
-    bool  acquire(TxnLock* lock);    
+    bool acquire(TxnLock* lock);    
 
     bool acquire_slot(TxnLock* lock);
 
