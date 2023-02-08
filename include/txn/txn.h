@@ -35,7 +35,7 @@ b) 快照读
 get(ctx, key, start_ts)
 
 2. storage/mod.rs:2858
-prepare_snapshot_ctx
+prepare_snap_ctx
 */
 
 // 事务的内存数据结构
@@ -53,8 +53,12 @@ struct TxnContext {
     Action          action  {ActionNone};
     // DeadLine        deadline;
     TxnLock*        lock    {NULL};
+
+    // Client request/response
     pb::StoreReq*   request {NULL};
     pb::StoreRes*   response{NULL};
+
+    // RPC Closure
     google::protobuf::Closure* done{NULL};
 };
 

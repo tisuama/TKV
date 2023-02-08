@@ -6,6 +6,48 @@ namespace TKV {
 constexpr int LatchListCount  = 6; 
 constexpr int LatchExpireTime = 120; // 120s
 
+enum  ErrorInner {
+    Success = 0,
+
+    // Txn already committed, start_ts, commit_ts, key
+    Committed,
+
+    // Pessimistic lock already rolledback
+    PessimisticLockRolledBack,
+
+    // Txn for lock not found
+    TxnLockNotFound,
+
+    // Txn for key not found
+    TxnNotFound,
+
+    // Lock type not match
+    LockTypeNotMatch,
+
+    // WriteConflict, start_ts, conflict start_ts, conflict commit_ts
+    WriteConflict,
+
+    // DeadLock occurs 
+    DeadLock,
+
+    // Key already exist
+    AlreadyExist,
+
+    // Trying to commit with smaller commit_ts < min_commit_ts
+    CommitTsExpired,
+
+    // Pessimistic lock not found, start_ts, key
+    PessimisticLockNotFound,
+
+    // Online DDL, min_commit_ts > max_commit_ts
+    CommitTsTooLarge,
+
+    // Lock_only_if_exists of a pessimistic lock request is set true,
+    // but return value is not, start_ts, key
+    LockIfExistsFailed,
+};
+
+
 struct TxnLock {
     std::vector<std::string>    keys;
     std::vector<int>            required_slots;
@@ -17,6 +59,7 @@ struct TxnLock {
     bool is_locked() const {
         return acquired_count != (int)required_slots.size(); 
     }
+
 };
 
 struct Node {

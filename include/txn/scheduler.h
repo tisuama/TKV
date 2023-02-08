@@ -11,9 +11,11 @@ public:
     {}
     
     // TxnLock注意释放内存
-    TxnLock* Lock(uint64_t start_ts, std::vector<std::string>& keys);
+    TxnLock* acquire_lock(uint64_t start_ts, std::vector<std::string>& keys);
     
-    void UnLock(TxnLock* lock);
+    void release_lock(TxnLock* lock);
+
+    void execute();
 
 private:
 
