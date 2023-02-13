@@ -79,7 +79,8 @@ public:
     // append string
     MutableKey& append_string(const std::string& val) {
         _data.append(val);
-        _data.append(1, 0);
+        // 多个field场景下
+        // _data.append(1, 0);
         return *this;
     }
     

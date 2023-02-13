@@ -3,40 +3,10 @@
 #include <memory>
 
 #include "common/latch.h"
+#include "engine/rocks_wrapper.h"
 #pragma once
 
 namespace TKV {
-/* 
-a) 事务操作   
-1. src/service/kv.rs:1869
-macro_rules! txn_command_future
-sched_txn_command
-
-2. The entry point of the storage scheduler.
-src/storage/mod.rs:1416
-pub fn sched_txn_command<T: StorageCallbackType>
-
-3. scheduler.rs:531
-schedule_command
-  execute(task)
-    process(snapshot, task)
-        process_write(snapshot, task, &mut statistics)
-
-4. process_write:490
-command/prewrite.rs
-    pwrite(&mut txn, &mut reader, context.extra_op)
-
-5. process_write:32
-actions/prewrite.rs
-    pwrite(txn, reader, txn_props, mutation, secondary_keys..)
-
-b) 快照读
-1. storage/mod.rs:588
-get(ctx, key, start_ts)
-
-2. storage/mod.rs:2858
-prepare_snap_ctx
-*/
 
 // 事务的内存数据结构
 
@@ -49,29 +19,47 @@ enum Action {
     ActionNone
 };
 
+class Txn;
 struct TxnContext {
-    Action          action  {ActionNone};
+    Action              action    {ActionNone};
+    ErrorInner          errcode   {Success};   
+
+
+    // Region
+    uint64_t            region_id;
+    uint64_t            term;
+
+    RocksWrapper*       db        {NULL};
+    rocksdb::Snapshot*  snapshot  {NULL}; 
+    
     // DeadLine        deadline;
-    TxnLock*        lock    {NULL};
+    TxnLock*            lock      {NULL};
 
     // Client request/response
-    pb::StoreReq*   request {NULL};
-    pb::StoreRes*   response{NULL};
+    pb::StoreReq*       req       {NULL};
+    pb::StoreRes*       res       {NULL};
 
     // RPC Closure
-    google::protobuf::Closure* done{NULL};
+    google::protobuf::Closure*    done {NULL};
+
+    ~TxnContext() {
+        if (snapshot) {
+            db->release_snapshot(snapshot); 
+            snapshot = NULL;
+        }
+        if (lock) {
+            delete lock;
+        }
+        if (txn) {
+            delete txn;
+        }
+    }
 };
 
 class Txn {
 public:
-    Txn(TxnContext*  txn_ctx, 
-            uint64_t start_ts, 
-            uint64_t lock_ttl, 
-            std::string primary)
+    Txn(TxnContext*  txn_ctx)
         : _txn_ctx(txn_ctx)
-        , _start_ts(start_ts)
-        , _lock_ttl(lock_ttl)
-        , _primary_lock(primary)
     {}
 
     void pwrite(const pb::Mutation& m, const std::string& primary);

@@ -1,7 +1,9 @@
 #pragma once
-#include "txn/latch.h"
+#include "txn/txn.h"
 
 namespace TKV {
+
+Action to_txn_action(pb::OpType op_type);    
     
 class Scheduler {
 public:
@@ -14,8 +16,11 @@ public:
     TxnLock* acquire_lock(uint64_t start_ts, std::vector<std::string>& keys);
     
     void release_lock(TxnLock* lock);
+    
+    void sched_command(Action action, 
+            StoreRequest* req, StoreResponse* res, google::protobuf::Closure* done);
 
-    void execute();
+    void execute(TxnContext* txn_ctx);
 
 private:
 
