@@ -7,7 +7,7 @@ constexpr int LatchListCount  = 6;
 constexpr int LatchExpireTime = 120; // 120s
 
 enum  ErrorInner {
-    Success = 0,
+    InnerSuccess = 0,
 
     // Txn already committed, start_ts, commit_ts, key
     Committed,

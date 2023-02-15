@@ -1,6 +1,16 @@
-#include "store/txn.h"
+#include "txn/txn.h"
 
 namespace TKV {
+void Txn::add_mutation(const pb::Mutation& m) {
+    _mutations.push_back(m);
+    _keys.push_back(m.key());
+}
+
+void Txn::add_secondary(const std::string& key) {
+    // async commit + primary row才回出现
+    _secondaries.push_back(key);
+}
+
 void Txn::pwrite(const pb::Mutation& m, const std::string& primary) {
 }
 

@@ -120,6 +120,7 @@ message KeyError {
     optional TxnNotFound   txn_not_found = 8;
     //  CommitTsTooLarge commit_ts_too_large = 9;
 };
+
 enum TxnOp {
 	PUT = 0;
 	DEL = 1;

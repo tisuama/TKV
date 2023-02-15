@@ -18,7 +18,11 @@ public:
     void release_lock(TxnLock* lock);
     
     void sched_command(Action action, 
-            StoreRequest* req, StoreResponse* res, google::protobuf::Closure* done);
+            int64_t region_id,
+            int64_t term,
+            pb::StoreReq*  req, 
+            pb::StoreRes* res, 
+            google::protobuf::Closure* done);
 
     void execute(TxnContext* txn_ctx);
 
