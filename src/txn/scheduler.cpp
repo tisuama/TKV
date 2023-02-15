@@ -46,6 +46,7 @@ void Scheduler::release_lock(TxnLock* lock) {
 void Scheduler::sched_command(Action action, 
         int64_t region_id,
         int64_t term,
+        ConcurrencyManager* concurrency,
         pb::StoreReq*  req, 
         pb::StoreRes*  res, 
         google::protobuf::Closure* done) {
@@ -57,7 +58,13 @@ void Scheduler::sched_command(Action action,
     txn_ctx->req = req;
     txn_ctx->res = res;
     txn_ctx->done = done;
+    txn_ctx->concurrency = concurrency;
     
+    auto db = RocksWrapper::get_instance();
+    auto snapshot = db->get_snapshot();
+    txn_ctx->db = db;
+    txn_ctx->snapshot = snapshot;
+
     if (txn_ctx->action == Pwrite) {
         auto pwrite_req = req->mutable_pwrite_req();
         auto pwriter = std::make_shared<Pwriter>(pwrite_req->start_version(), 
@@ -74,12 +81,11 @@ void Scheduler::sched_command(Action action,
         }
         pwriter->process_write(txn_ctx);
     } else if (txn_ctx->action == Commit) {
-        // 
+        // TODO: Commit/Rollback
     }
 
 }
 
-void Scheduler::execute(TxnContext* txn_ctx) {
 }
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

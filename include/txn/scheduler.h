@@ -20,11 +20,10 @@ public:
     void sched_command(Action action, 
             int64_t region_id,
             int64_t term,
+            ConcurrencyManager* concurrency,
             pb::StoreReq*  req, 
             pb::StoreRes* res, 
             google::protobuf::Closure* done);
-
-    void execute(TxnContext* txn_ctx);
 
 private:
 

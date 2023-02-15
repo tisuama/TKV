@@ -1,20 +1,31 @@
 #include "txn/txn.h"
 
 namespace TKV {
-void Txn::add_mutation(const pb::Mutation& m) {
+void Pwriter::add_mutation(const pb::Mutation& m) {
     _mutations.push_back(m);
     _keys.push_back(m.key());
 }
 
-void Txn::add_secondary(const std::string& key) {
-    // async commit + primary row才回出现
+void Pwriter::add_secondary(const std::string& key) {
     _secondaries.push_back(key);
 }
 
-void Txn::pwrite(const pb::Mutation& m, const std::string& primary) {
+void Pwriter::process_write(TxnContext* ctx) {
+    // TODO: check_max_ts_synced
+
+    MvccTxn txn(_start_ts, ctx->concurrency);
+    SnapshotReader reader(_start_ts, ctx->snapshot);
+
+    // 返回值
+    uint64_t final_commit_ts = 0;
+    std::vector<LockMap*> locks;
+    // start pwrite
+    for (auto m: _mutations) {
+    }
 }
 
-void Txn::commit(const std::string& key, uint64_t commit_ts) {
+void Pwriter::process_read(TxnContext* ctx) {
 }
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

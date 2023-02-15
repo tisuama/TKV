@@ -1,11 +1,10 @@
+#pragma once
 #include <vector>
 #include <unordered_map>
 #include <memory>
-
 #include "txn/latch.h"
 #include "proto/store.pb.h"
 #include "engine/rocks_wrapper.h"
-#pragma once
 
 namespace TKV {
 
@@ -31,22 +30,34 @@ enum TxnKind {
     PessimisticTxn
 };
 
+enum CommitKind {
+    CommitOnePc = 0,
+    CommitAsync,
+    COmmitTwoPc
+};
+
 struct TxnContext {
-    Action              action    {ActionNone};
-    ErrorInner          errcode   {InnerSuccess};
-    PessimisticLockMode mode      {PessimisticLockSync};
+    Action              action      {ActionNone};
+    ErrorInner          errcode     {InnerSuccess};
+    PessimisticLockMode mode        {PessimisticLockSync};
+    CommitKind          commit_kind {COmmitTwoPc};
 
     // Region
     int64_t            region_id;
     int64_t            term;
 
     // DeadLine        deadline
-    //
-    TxnLock*            lock      {NULL};
+    TxnLock*            lock        {NULL};
+    rocksdb::Snapshot*  snapshot    {NULL};
+    ConcurrencyManager* concurrency {NULL};
+
+    // DB
+    rocksdb::DB*        db          {NULL};
+    rocksdb::Snapshot*  snapshot    {NULL};
 
     // Client request/response
-    pb::StoreReq*       req       {NULL};
-    pb::StoreRes*       res       {NULL};
+    pb::StoreReq*       req         {NULL};
+    pb::StoreRes*       res         {NULL};
 
     // RPC Closure
     google::protobuf::Closure*    done {NULL};
@@ -69,14 +80,13 @@ public:
         , _txn_size(txn_size)
         , _min_commit_ts(min_commit_ts)
         , _max_commit_ts(max_commit_ts)\
-    {
-    }
+    {}
 
-    ~Pwriter() {
-    }
+    ~Pwriter() {}
 
     void add_mutation(const pb::Mutation& m);
 
+    // Async commit for primary row
     void add_secondary(const std::string& key);
 
     void process_write(TxnContext* ctx);
@@ -85,21 +95,21 @@ public:
 
 private:
 
-    std::vector<std::string>                     _keys;
-    std::vector<pb::Mutation>                    _mutations;
-    std::vector<std::string>                     _secondaries;
+    std::vector<std::string>  _keys;
+    std::vector<pb::Mutation> _mutations;
+    std::vector<std::string>  _secondaries;
 
     // start_ts可以作为txn_id使用
-    TxnKind                  _txn_kind         {OptimisticTxn};
-    uint64_t                 _start_ts;
-    uint64_t                 _lock_ttl;
-    std::string              _primary_lock;
-    bool                     _committed;
-    uint64_t                 _commit_ts        {0};
-    bool                     _use_async_commit {false};
-    uint64_t                 _txn_size         {0};
-    uint64_t                 _min_commit_ts;
-    uint64_t                 _max_commit_ts;
+    TxnKind                   _txn_kind         {OptimisticTxn /* 悲观事务 */};
+    uint64_t                  _start_ts;
+    uint64_t                  _lock_ttl;
+    std::string               _primary_lock;
+    bool                      _committed;
+    uint64_t                  _commit_ts        {0};
+    bool                      _use_async_commit {false};
+    uint64_t                  _txn_size         {0};
+    uint64_t                  _min_commit_ts;
+    uint64_t                  _max_commit_ts;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

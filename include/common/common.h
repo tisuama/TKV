@@ -243,7 +243,7 @@ public:
     
 private:
     int _count;
-    bthread_cond_t _cond;
+    bthread_cond_t  _cond;
     bthread_mutex_t _mutex;
 };
 
