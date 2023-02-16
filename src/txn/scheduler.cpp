@@ -1,4 +1,5 @@
 #include "txn/scheduler.h"
+#include "txn/concurrency.h"
 #include "proto/store.pb.h"
 
 namespace TKV {

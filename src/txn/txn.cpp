@@ -1,4 +1,6 @@
 #include "txn/txn.h"
+#include "txn/mvcc.h"
+#include "txn/reader.h"
 
 namespace TKV {
 void Pwriter::add_mutation(const pb::Mutation& m) {
@@ -18,7 +20,7 @@ void Pwriter::process_write(TxnContext* ctx) {
 
     // 返回值
     uint64_t final_commit_ts = 0;
-    std::vector<LockMap*> locks;
+    std::vector<LockRef*> locks;
     // start pwrite
     for (auto m: _mutations) {
     }

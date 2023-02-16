@@ -19,13 +19,13 @@ enum Action {
     ActionNone
 };
 
-enum PessimisticLockMode {
+enum PessimisticLockKind {
     PessimisticLockInmemory = 0,
     PessimisticLockPipeline,
     PessimisticLockSync,
 };
 
-enum TxnKind {
+enum TransactionKind {
     OptimisticTxn = 0,
     PessimisticTxn
 };
@@ -39,7 +39,10 @@ enum CommitKind {
 struct TxnContext {
     Action              action      {ActionNone};
     ErrorInner          errcode     {InnerSuccess};
-    PessimisticLockMode mode        {PessimisticLockSync};
+
+    // All kinds
+    TransactionKind     txn_id      {OptimisticTxn};
+    PessimisticLockKind pessi_mode  {PessimisticLockSync};
     CommitKind          commit_kind {COmmitTwoPc};
 
     // Region
@@ -100,7 +103,6 @@ private:
     std::vector<std::string>  _secondaries;
 
     // start_ts可以作为txn_id使用
-    TxnKind                   _txn_kind         {OptimisticTxn /* 悲观事务 */};
     uint64_t                  _start_ts;
     uint64_t                  _lock_ttl;
     std::string               _primary_lock;

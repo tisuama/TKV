@@ -1,27 +1,24 @@
 #pragma once
+#include "common/common.h"
 
 namespace TKV {
-struct LockMap {
-    LockMap(): _ref(0) {
-        bthread_mutex_init(&_mutex, NULL);
-    }
-    ~LockMap() {
-        bthread_mutex_destroy(_mutex);
+struct LockRef {
+    LockRef(): ref(0) {
     }
 
     int             ref;
-    bthread_mutex_t mu;
+    bthread::Mutex  mu;
 };    
 
 // TODO: RAII锁释放
 class LockTable {
 public:
-    LockMap* lock_key(const std::string& key) {
-        LockMap* find_lock = nullptr;
+    LockRef* lock_key(const std::string& key) {
+        LockRef* find_lock = nullptr;
         {
             BAIDU_SCOPED_LOCK(_table_mutex);
             if (_table.find(key) == _table.end()) {
-                find_lock = new LockMap;
+                find_lock = new LockRef;
                 _table.emplace(key, find_lock);
             } else {
                 find_lock = _table[key];
@@ -33,9 +30,9 @@ public:
         return find_lock;
     }
 
-    LockMap* get(const std::string& key) {
+    LockRef* get(const std::string& key) {
         BAIDU_SCOPED_LOCK(_table_mutex);
-        LockMap* find_lock = nullptr;
+        LockRef* find_lock = nullptr;
         if (_table.find(key) != _table.end()) {
             find_lock = _table[key];
         }
@@ -48,7 +45,7 @@ public:
         it->second->ref--;
         it->second->mu.unlock();
         if (it->second->ref == 0) {
-            _table.remove(it);
+            _table.erase(it);
             // remove from table
             delete it->second;
         }
@@ -56,7 +53,7 @@ public:
     
 private:
     bthread::Mutex _table_mutex;
-    std::unordered_map<std::string, LockMap*> _table;
+    std::unordered_map<std::string, LockRef*> _table;
 };
 
 class ConcurrencyManager {
@@ -73,12 +70,12 @@ public:
         }
     }
 
-    LockMap* lock_key(const std::string& key) {
+    LockRef* lock_key(const std::string& key) {
         return _lock_table.lock_key(key);
     }
 
-    std::vector<LockMap*> lock_keys(std::vector<std::string>& keys) {
-        std::vector<LockMap*> result;
+    std::vector<LockRef*> lock_keys(std::vector<std::string>& keys) {
+        std::vector<LockRef*> result;
         sort(keys.begin(),  keys.end());
         for (auto& key: keys) {
             result.push_back(_lock_table.lock_key(key));

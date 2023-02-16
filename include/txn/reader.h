@@ -1,4 +1,5 @@
 #pragma once
+#include "engine/rocks_wrapper.h"
 
 namespace TKV {
 class MvccReader {
