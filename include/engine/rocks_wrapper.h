@@ -11,9 +11,15 @@
 #include <rocksdb/utilities/transaction.h>
 #include <rocksdb/utilities/transaction_db.h>
 
-
-
 namespace TKV {
+enum KV_CF {
+     CF_LOCK,
+     CF_WRITE,
+     CF_DATA,
+     CF_META,
+     CF_RAFT_LOG
+};
+
 using rocksdb::Status;
 class RocksWrapper {
 public:
@@ -96,6 +102,8 @@ public:
     rocksdb::ColumnFamilyHandle* get_raft_log_handle();
     rocksdb::ColumnFamilyHandle* get_data_handle();
     rocksdb::ColumnFamilyHandle* get_meta_info_handle();
+    rocksdb::ColumnFamilyHandle* get_handle(KV_CF CF);
+    
     rocksdb::DB* get_db() {
         return _db;
     }
@@ -132,6 +140,7 @@ public:
     uint64_t flush_file_number() const {
         return _flush_file_num;
     }
+
 private:
     RocksWrapper(): _is_init(false), _db{nullptr} {}
     std::string _db_path;

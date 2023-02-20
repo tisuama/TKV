@@ -2,8 +2,8 @@
 #include "common/common.h"
 
 namespace TKV {
-struct LockRef {
-    LockRef(): ref(0) {
+struct MemLock {
+    MemLock(): ref(0) {
     }
 
     int             ref;
@@ -13,12 +13,12 @@ struct LockRef {
 // TODO: RAII锁释放
 class LockTable {
 public:
-    LockRef* lock_key(const std::string& key) {
-        LockRef* find_lock = nullptr;
+    MemLock* lock_key(const std::string& key) {
+        MemLock* find_lock = nullptr;
         {
             BAIDU_SCOPED_LOCK(_table_mutex);
             if (_table.find(key) == _table.end()) {
-                find_lock = new LockRef;
+                find_lock = new MemLock;
                 _table.emplace(key, find_lock);
             } else {
                 find_lock = _table[key];
@@ -30,9 +30,9 @@ public:
         return find_lock;
     }
 
-    LockRef* get(const std::string& key) {
+    MemLock* get(const std::string& key) {
         BAIDU_SCOPED_LOCK(_table_mutex);
-        LockRef* find_lock = nullptr;
+        MemLock* find_lock = nullptr;
         if (_table.find(key) != _table.end()) {
             find_lock = _table[key];
         }
@@ -53,7 +53,7 @@ public:
     
 private:
     bthread::Mutex _table_mutex;
-    std::unordered_map<std::string, LockRef*> _table;
+    std::unordered_map<std::string, MemLock*> _table;
 };
 
 class ConcurrencyManager {
@@ -70,12 +70,12 @@ public:
         }
     }
 
-    LockRef* lock_key(const std::string& key) {
+    MemLock* lock_key(const std::string& key) {
         return _lock_table.lock_key(key);
     }
 
-    std::vector<LockRef*> lock_keys(std::vector<std::string>& keys) {
-        std::vector<LockRef*> result;
+    std::vector<MemLock*> lock_keys(std::vector<std::string>& keys) {
+        std::vector<MemLock*> result;
         sort(keys.begin(),  keys.end());
         for (auto& key: keys) {
             result.push_back(_lock_table.lock_key(key));

@@ -62,8 +62,7 @@ void Scheduler::sched_command(Action action,
     txn_ctx->concurrency = concurrency;
     
     auto db = RocksWrapper::get_instance();
-    auto snapshot = db->get_snapshot();
-    txn_ctx->db = db;
+    auto snapshot = new RocksSnapshot(db->get_snapshot(), db);
     txn_ctx->snapshot = snapshot;
 
     if (txn_ctx->action == Pwrite) {
@@ -79,6 +78,9 @@ void Scheduler::sched_command(Action action,
         }
         for (auto& key: pwrite_req->mutable_secondaries()) {
             pwriter->add_secondary(key);   
+        }
+        if (pwrite_req->has_primary_lock()) {
+            pwriter->set_primary(pwrite_req->primary_lock());
         }
         pwriter->process_write(txn_ctx);
     } else if (txn_ctx->action == Commit) {

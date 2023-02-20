@@ -10,13 +10,12 @@ public:
         , _concurrency(concurrency)
     {}
 
-
 private:
     uint64_t        _start_ts;
     uint64_t        _write_size;
     rocksdb::WriteBatch   _modifies;
     ConcurrencyManager*   _concurrency;
-    std::vector<LockRef*> _guards;
+    std::vector<MemLock*> _guards;
 };
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

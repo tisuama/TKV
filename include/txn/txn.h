@@ -9,7 +9,6 @@
 namespace TKV {
 
 // 事务的内存数据结构
-
 enum Action {
     Pwrite = 0, 
     PwritePessimistic,
@@ -26,7 +25,9 @@ enum PessimisticLockKind {
 };
 
 enum TransactionKind {
+    // OptimisticTxn(bool) => bool is skip_constraint_check
     OptimisticTxn = 0,
+    // PessimisticTxn(ts)  => ts: for_update_ts
     PessimisticTxn
 };
 
@@ -36,12 +37,20 @@ enum CommitKind {
     COmmitTwoPc
 };
 
+enum LockStatus {
+    LOCKED = 0,
+    PESSIMISTIC_LOCKED,
+    // Error
+    NONE_LOCKED,
+    LOCKED_ERROR,
+};
+
 struct TxnContext {
-    Action              action      {ActionNone};
-    ErrorInner          errcode     {InnerSuccess};
+    Action              action  {ActionNone};
+    ErrorInner          errcode {InnerSuccess};
 
     // All kinds
-    TransactionKind     txn_id      {OptimisticTxn};
+    TransactionKind     txn_kind    {OptimisticTxn};
     PessimisticLockKind pessi_mode  {PessimisticLockSync};
     CommitKind          commit_kind {COmmitTwoPc};
 
@@ -51,21 +60,22 @@ struct TxnContext {
 
     // DeadLine        deadline
     TxnLock*            lock        {NULL};
-    rocksdb::Snapshot*  snapshot    {NULL};
     ConcurrencyManager* concurrency {NULL};
+    MvccTxn*            txn         {NULL};
+    SnapshotReader*     reader      {NULL};
 
     // DB
-    rocksdb::DB*        db          {NULL};
-    rocksdb::Snapshot*  snapshot    {NULL};
+    RocksSnapshot*      snapshot    {NULL};
 
     // Client request/response
-    pb::StoreReq*       req         {NULL};
-    pb::StoreRes*       res         {NULL};
+    pb::StoreReq*       req      {NULL};
+    pb::StoreRes*       res      {NULL};
 
     // RPC Closure
     google::protobuf::Closure*    done {NULL};
 
     ~TxnContext() {
+        // TODO: Release resource
         if (lock) {
             delete lock;
         }
@@ -87,6 +97,10 @@ public:
 
     ~Pwriter() {}
 
+    void set_primary_lock(const std::string& primary) {
+        _primary_lock = primary;
+    }
+
     void add_mutation(const pb::Mutation& m);
 
     // Async commit for primary row
@@ -96,7 +110,16 @@ public:
 
     void process_read(TxnContext* ctx);
 
+    // single pwrite
+    uint64_t pwrite(TxnContext* ctx, const pb::Mutation& m);
+
 private:
+    LockStatus check_lock(LockInfo& lock, 
+            uint64_t& min_commit_ts, TransactionKind txn_kind);
+
+    bool skip_constraint_check(TransactionKind txn_kind) const ;
+
+    bool check_for_newer_version(TxnContext* ctx, uint64_t& commit_ts, Write& write_record);
 
     std::vector<std::string>  _keys;
     std::vector<pb::Mutation> _mutations;
@@ -104,6 +127,7 @@ private:
 
     // start_ts可以作为txn_id使用
     uint64_t                  _start_ts;
+    uint64_t                  _for_update_ts;
     uint64_t                  _lock_ttl;
     std::string               _primary_lock;
     bool                      _committed;
@@ -113,5 +137,6 @@ private:
     uint64_t                  _min_commit_ts;
     uint64_t                  _max_commit_ts;
 };
+
 } // namespace TKV
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */

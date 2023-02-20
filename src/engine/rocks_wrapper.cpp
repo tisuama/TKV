@@ -310,6 +310,21 @@ rocksdb::ColumnFamilyHandle* RocksWrapper::get_meta_info_handle() {
     return _column_families[METAINFO_CF];
 }
 
+rocksdb::ColumnFamilyHandle* RocksWrapper::get_handle(KV_CF CF) {
+    switch(CF) {
+        case CF_LOCK:
+        case CF_WRITE:
+        case CF_DATA:
+            return _column_families[DATA_CF];
+        case CF_META:
+            return _column_families[METAINFO_CF];
+        case CF_RAFT_LOG:
+            return _column_families[RAFT_LOG_CF];
+        default:
+            abort();
+    }
+    return _column_families[DATA_CF];
+}
 } // namespace TKV
 
 /* vim: set expandtab ts=4 sw=4 sts=4 tw=100: */
