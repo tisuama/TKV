@@ -34,10 +34,10 @@ enum TransactionKind {
 enum CommitKind {
     CommitOnePc = 0,
     CommitAsync,
-    COmmitTwoPc
+    CommitTwoPc
 };
 
-enum LockStatus {
+enum class LockStatus {
     LOCKED = 0,
     PESSIMISTIC_LOCKED,
     // Error
@@ -52,7 +52,7 @@ struct TxnContext {
     // All kinds
     TransactionKind     txn_kind    {OptimisticTxn};
     PessimisticLockKind pessi_mode  {PessimisticLockSync};
-    CommitKind          commit_kind {COmmitTwoPc};
+    CommitKind          commit_kind {CommitTwoPc};
 
     // Region
     int64_t            region_id;
@@ -120,6 +120,14 @@ private:
     bool skip_constraint_check(TransactionKind txn_kind) const ;
 
     bool check_for_newer_version(TxnContext* ctx, uint64_t& commit_ts, Write& write_record);
+    
+    bool need_min_commit_ts(TxnContext* ctx);
+    
+    bool try_one_pc(TxnContext* ctx);
+    
+    uint64_t write_lock(LockStatus lock_status, const Mutation& m, TxnContext* ctx, bool is_new_lock);
+
+    uint64_t async_commit_ts(const std::string& key, TxnContext* ctx);
 
     std::vector<std::string>  _keys;
     std::vector<pb::Mutation> _mutations;

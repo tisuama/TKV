@@ -207,10 +207,11 @@ message LockInfo {
     optional bool   use_async_commit = 8;
     optional uint64 min_commit_ts = 9;
     optional uint64 rollback_ts = 10;
-    // TS of latest PUT/DELETE record
+    // Ts of latest PUT/DELETE record
     optional uint64 last_change_ts = 11;
     optional uint64 txn_source  = 12;
     repeated bytes  secondaries = 13;
+    optional bool   remove_pessimistic_lock = 14;
 };
 
 // 检查事务状态相关 => 决定如何处理冲突

@@ -18,7 +18,7 @@ bool MvccReader::load_lock(const std::string& key, LockInfo& lock) {
         return false;
     }
     if (!lock.ParseFromString(val)) {
-        CHECK("Parse failed" == 0);
+        CHECK("parse failed" == 0);
     }
     return true;
 }
