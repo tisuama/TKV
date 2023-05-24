@@ -212,6 +212,8 @@ message LockInfo {
     optional uint64 txn_source  = 12;
     repeated bytes  secondaries = 13;
     optional bool   remove_pessimistic_lock = 14;
+    // for_update_ts != 0, lock belongs pessimistic txn
+    optional uint64 for_update_ts = 15;
 };
 
 // 检查事务状态相关 => 决定如何处理冲突

@@ -82,9 +82,10 @@ struct TxnContext {
     }
 };
 
+// Acuqire Optimistic Lock
+// Acuqire Pessimistic Lock in other file
 class Pwriter {
 public:
-
     // Pwriter
     Pwriter(uint64_t start_ts, uint64_t lock_ttl, uint64_t txn_size, 
         uint64_t min_commit_ts, uint64_t max_commit_ts)

@@ -72,7 +72,7 @@ uint64_t Pwriter::pwrite(TxnContext* ctx, const pb::Mutation& m) {
     }
 
     bool is_new_lock = true; 
-    uint64_t final_commit_ts = write_lock(lock_status, m.key(), ctx, is_new_lock);
+    uint64_t final_commit_ts = write_lock(lock_status, m, ctx, is_new_lock);
     return final_commit_ts;
 }
 
@@ -157,10 +157,19 @@ bool Pwriter::try_one_pc(TxnContext* ctx) {
 }
 
 uint64_t Pwriter::write_lock(LockStatus lock_status, const Mutation& m, TxnContext* ctx, bool is_new_lock) {
-    // 短value优化
+    // TODO: 短value优化
     bool try_one_pc = try_one_pc();
+
     LockInfo write_lock;
-    // TODO: set write lock info and put
+    write_lock.set_primary_lock(_primary_lock);
+    write_lock.set_lock_version(_start_ts);
+    write_lock.set_key(m.key());
+    write_lock.set_lock_ttl(_lock_ttl);
+    write_lock.set_lock_type(m.op());
+    write_lock.set_for_update_ts(_for_udpate_ts);
+    write_lock.set_txn_size(_txn_size);
+    write_lock.set_min_commit_ts(_min_commit_ts);
+
     if (_secondaries.size() > 0) {
         write_lock.set_use_async_commit(true);
         for (auto& s: _secondaries) {

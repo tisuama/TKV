@@ -67,6 +67,7 @@ void Scheduler::sched_command(Action action,
 
     if (txn_ctx->action == Pwrite) {
         auto pwrite_req = req->mutable_pwrite_req();
+        // One pwriter for a pwrite request
         auto pwriter = std::make_shared<Pwriter>(pwrite_req->start_version(), 
                                 pwrite_req->lock_ttl(), 
                                 pwrite_req->txn_size(), 
